@@ -74,6 +74,29 @@ ins.add_argument("--module", default=DEFAULT_MODULE_NAME)
 ins.add_argument("--force", action="store_true",
                  help="Replace an existing install, moving it aside first")
 
+ign = subparsers.add_parser(
+    "ignored-files",
+    help="Print store-relative mp3s whose every corpus line is ignored (rsync exclusions).")
+ign.add_argument("--corpus", default=DEFAULT_CORPUS_PATH)
+ign.add_argument("--ignored", default=DEFAULT_IGNORED_PATH)
+
+subparsers.add_parser(
+    "gen_lookup_tables",
+    help="Generate the addon lookup tables and sound length table.") \
+    .add_argument("--lang", default="enUS")
+
+cvt = subparsers.add_parser(
+    "convert-legacy",
+    help="Convert a pre-built AI_VoiceOver pack into a Spoken Quests pack in a language.")
+cvt.add_argument("source", help="The legacy pack folder (holds a .toc and generated/)")
+cvt.add_argument("out", help="Where to write the converted pack; its name is the module's")
+cvt.add_argument("--language", required=True,
+                 help="The language the pack was recorded in, e.g. ptBR")
+cvt.add_argument("--module", default=None,
+                 help="Module name; defaults to the output folder's name")
+cvt.add_argument("--copy", action="store_true",
+                 help="Copy the audio instead of symlinking it (gigabytes; rarely wanted)")
+
 args = parser.parse_args()
 
 if args.mode == "init-db":
@@ -130,6 +153,31 @@ elif args.mode == "install":
     print(f"installed {report['target']}")
     if report["replaced"]:
         print(f"previous install moved to {report['replaced']}")
+
+elif args.mode == "gen_lookup_tables":
+    from tts_cli import utils
+    from tts_cli.sql_queries import query_dataframe_for_all_quests_and_gossip
+    from tts_cli.tts_utils import TTSProcessor
+
+    tts_processor = TTSProcessor()
+    language_number = utils.language_code_to_language_number(args.lang)
+    print(f"Selected language: {args.lang}")
+    df = query_dataframe_for_all_quests_and_gossip(language_number)
+    df = tts_processor.preprocess_dataframe(df)
+    tts_processor.generate_lookup_tables(df)
+
+elif args.mode == "convert-legacy":
+    from tts_cli.convert_legacy import convert
+    report = convert(args.source, args.out, args.language, args.module, args.copy)
+    print(f"converted {report['packDir']}")
+    print(f"  module    {report['moduleName']}")
+    print(f"  language  {report['language']}")
+    print(f"  audio     {report['audioFormat']} "
+          f"({'symlinked' if report['audioLinked'] else 'copied'})")
+    print(f"  tables    {len(report['tables'])} carried over unchanged")
+    # A converted third-party pack carries its author's licence, not this project's.
+    print("\nThe converted pack holds the source pack's audio and its licence.\n"
+          "Do not commit or redistribute it.")
 
 else:
     parser.print_help()
