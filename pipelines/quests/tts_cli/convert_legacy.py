@@ -160,6 +160,8 @@ def convert_toc(toc_text: str, language: str, module_name: str) -> str:
             continue
         out.append(line)
 
+    # LF endings: the file list's backslashes are paths, not escapes, and this addon
+    # is developed on LF regardless of what the legacy TOC shipped.
     return "\n".join(out) + "\n"
 
 
@@ -181,6 +183,10 @@ def convert(pack_dir: str, out_dir: str, language: str, module_name: str = None,
 
     module_name = module_name or os.path.basename(os.path.normpath(out_dir))
     extension = audio_extension(pack_dir)
+    # The lookup tables assign onto the pack's original module global, by its folder
+    # name. Module.lua registers under the converted folder's name instead, so the
+    # tables must be re-pointed or they attach to a global nothing registered.
+    legacy_module = os.path.basename(os.path.normpath(pack_dir))
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -192,8 +198,19 @@ def convert(pack_dir: str, out_dir: str, language: str, module_name: str = None,
     tables = []
     for name in sorted(os.listdir(generated_src)):
         if name.endswith(".lua"):
-            shutil.copy2(os.path.join(generated_src, name),
-                         os.path.join(generated_out, name))
+            source_path = os.path.join(generated_src, name)
+            with open(source_path, encoding="utf-8-sig", newline="") as f:
+                text = f.read()
+            if legacy_module != module_name:
+                # Line endings are preserved (newline=""): legacy packs ship CRLF, and
+                # rewriting endings would make the tables differ from the source for no
+                # gain. Only the module prefix on its assignment lines changes.
+                text = re.sub(
+                    r"(?m)^(\s*)" + re.escape(legacy_module) + r"(\.\w+\s*=)",
+                    r"\g<1>" + module_name + r"\g<2>", text)
+            with open(os.path.join(generated_out, name), "w",
+                      encoding="utf-8", newline="") as f:
+                f.write(text)
             tables.append(name)
     if not tables:
         raise ConversionError(f"No lookup tables in {generated_src}")

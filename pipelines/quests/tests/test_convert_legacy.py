@@ -130,17 +130,36 @@ def test_convert_writes_a_loadable_pack(tmp_path):
     assert "SpokenQuestsAudioPtBR:GetSoundPath" in module
 
 
-def test_the_lookup_tables_are_copied_untouched(tmp_path):
+def test_the_lookup_tables_are_re_pointed_onto_the_new_module(tmp_path):
+    """The tables assign onto the source pack's module global, by its folder name.
+
+    Module.lua registers under the converted folder's name; a table still assigning to
+    the old global attaches to a table nothing registered, and the pack loads empty.
+    The data between the assignments must not change.
+    """
     src = legacy_pack(tmp_path)
     out = str(tmp_path / "out" / "Pack")
     report = convert(src, out, "ptBR")
 
     assert report["tables"] == ["quest_id_lookups.lua", "sound_length_table.lua"]
+    converted = open(os.path.join(out, "generated", "sound_length_table.lua"),
+                     encoding="utf-8").read()
+    assert "Pack.SoundLengthLookupByFileName" in converted
+    assert "AI_VoiceOverData_Vanilla.SoundLengthLookupByFileName" not in converted
+    assert '["5-accept"]=4.5,["abc123"]=2.0' in converted
+
+
+def test_the_lookup_data_between_assignments_is_byte_identical(tmp_path):
+    src = legacy_pack(tmp_path)
+    out = str(tmp_path / "out" / "Pack")
+    convert(src, out, "ptBR")
     original = open(os.path.join(src, "generated", "sound_length_table.lua"),
                     encoding="utf-8").read()
     converted = open(os.path.join(out, "generated", "sound_length_table.lua"),
                      encoding="utf-8").read()
-    assert converted == original
+    original_data = original.split("=", 1)[1]
+    converted_data = converted.split("=", 1)[1]
+    assert converted_data == original_data
 
 
 def test_the_audio_is_linked_rather_than_copied(tmp_path):
@@ -230,3 +249,27 @@ def test_the_sound_path_matches_what_this_project_builds(tmp_path):
 
     expected = BUILT.format(module="Pack", extension=".mp3")
     assert converted == expected
+
+
+def test_legacy_crlf_endings_survive_conversion(tmp_path):
+    """Real legacy packs ship CRLF tables and TOC (Windows-built). Neither may confuse
+    the module rewrite (an assignment mid-table missed) nor crash the TOC handling."""
+    src = legacy_pack(tmp_path)
+    table = os.path.join(src, "generated", "sound_length_table.lua")
+    text = open(table, encoding="utf-8").read().replace("\n", "\r\n")
+    with open(table, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    toc = os.path.join(src, "AI_VoiceOverData_Vanilla.toc")
+    text = open(toc, encoding="utf-8").read().replace("\n", "\r\n")
+    with open(toc, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+
+    out = str(tmp_path / "out" / "Pack")
+    convert(src, out, "ptBR")
+
+    converted = open(os.path.join(out, "generated", "sound_length_table.lua"),
+                     encoding="utf-8").read()
+    assert "Pack.SoundLengthLookupByFileName" in converted
+    assert "AI_VoiceOverData_Vanilla." not in converted
+    keys = read_toc_keys(open(os.path.join(out, "Pack.toc"), encoding="utf-8").read())
+    assert keys["X-SpokenQuests-Language"] == "ptBR"
