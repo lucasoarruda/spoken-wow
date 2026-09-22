@@ -72,14 +72,23 @@ Expect("the gossip lookup arrived", type(module.GossipLookupByNPCID), "table")
 
 ---------------------------------------------------------------- real lines resolve in ptBR
 -- One entry from each table, resolved through the addon's own PrepareSound.
-local anyQuestID
-for _source, titles in pairs(module.QuestIDLookup) do
-    for _title, id in pairs(titles) do
-        anyQuestID = id
-        break
+--
+-- QuestIDLookup is a *pruned* tree of variable depth: build.py collapses any unambiguous
+-- branch to a bare quest id, so one source's entry may be a number while its neighbour is
+-- still source -> title -> npcName -> text -> id. Descend until a number turns up rather
+-- than assuming a depth -- pairs() order is hash order, so an assumed depth makes this
+-- test pass or fail depending on which branch it happens to walk first.
+local function firstQuestID(node, depth)
+    if type(node) == "number" then return node end
+    if type(node) ~= "table" or (depth or 0) > 8 then return nil end
+    for _key, child in pairs(node) do
+        local found = firstQuestID(child, (depth or 0) + 1)
+        if found then return found end
     end
-    break
+    return nil
 end
+
+local anyQuestID = firstQuestID(module.QuestIDLookup)
 Expect("the quest lookup holds real quest IDs", type(anyQuestID), "number")
 local soundData = { event = VO.Enums.SoundEvent.QuestAccept, questID = anyQuestID }
 local found = VO.DataModules:PrepareSound(soundData)

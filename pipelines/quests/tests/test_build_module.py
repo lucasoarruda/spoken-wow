@@ -171,3 +171,47 @@ def test_the_length_table_measures_ogg(tmp_path):
     build_module(CORPUS, store, str(tmp_path / "dist"), "Mod")
 
     assert '["5-accept"] = 0.3' in _sound_length_table(tmp_path)
+
+def _toc(tmp_path):
+    with open(tmp_path / "dist" / "Mod" / "Mod.toc", encoding="utf-8") as f:
+        return f.read()
+
+
+def test_a_pack_declares_the_language_it_was_recorded_in(tmp_path):
+    # This is the key the addon resolves on: without it a Portuguese pack is indexed as
+    # English and competes with the English packs on priority alone.
+    store = _store(tmp_path, "quests/5-accept.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="ptBR")
+
+    assert "## X-SpokenQuests-Language: ptBR\n" in _toc(tmp_path)
+
+
+def test_an_english_pack_stamps_no_language_key(tmp_path):
+    # An absent key already means enUS. Stamping it would rewrite the TOC of every pack
+    # this project ships to say what the addon assumes anyway.
+    store = _store(tmp_path, "quests/5-accept.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod")
+
+    assert "X-SpokenQuests-Language" not in _toc(tmp_path)
+
+
+def test_the_language_key_precedes_the_file_list(tmp_path):
+    # A TOC's keys are its header and the client stops reading them at the first listed
+    # file, so a key written after generated\... is never seen.
+    store = _store(tmp_path, "quests/5-accept.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="ptBR")
+
+    toc = _toc(tmp_path)
+    assert toc.index("X-SpokenQuests-Language") < toc.index("generated\\")
+
+
+def test_the_report_carries_the_language(tmp_path):
+    store = _store(tmp_path, "quests/5-accept.ogg")
+
+    report = build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="ptBR")
+
+    assert report["language"] == "ptBR"
+

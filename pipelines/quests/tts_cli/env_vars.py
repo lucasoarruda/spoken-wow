@@ -30,3 +30,7 @@ MYSQL_PORT = int(os.getenv("MYSQL_PORT") or 3306)
 MYSQL_USER = os.getenv("MYSQL_USER")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+
+# Read only by the local `synthesize` path (tts_cli/providers.py): the site makes the
+# maintainer's takes, but this CLI can still speak through the hosted API.
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")

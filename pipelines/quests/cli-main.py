@@ -1,14 +1,22 @@
 """Command line entry point for the voiceline production pipeline.
 
-Audio is not made here: every take is cut by the site and archived there. What is left is
-the corpus, and building a pack from audio/ once `make quests-sounds` has assembled it:
+Only `extract` needs a database:
 
-    init-db       download and import the vmangos dump      maintainer, rare
-    extract       world DB -> corpus/corpus.json.gz         maintainer, rare
-    import-corpus corpus/corpus.json.gz -> Postgres         after an extract
-    export-corpus Postgres -> corpus/corpus.json.gz         before a build
-    build         corpus + audio/ -> dist/<module>          per release
-    install       dist/<module> -> WoW AddOns               per release
+    init-db           download and import the vmangos dump      maintainer, rare
+    extract           world DB -> corpus/corpus.json.gz         maintainer, rare
+    import-corpus     corpus.json.gz -> Postgres                maintainer, rare
+    export-corpus     Postgres -> corpus.json.gz                maintainer, rare
+    export-ignores    line_ignore -> corpus/ignored.json        maintainer, rare
+    import-audio      an existing sound pack -> audio/          once
+    synthesize        corpus + voice config -> audio/           everyday
+    build             corpus + audio/ -> dist/<module>          per release
+    install           dist/<module> -> WoW AddOns               per release
+    convert-legacy    an AI_VoiceOver pack -> a language pack   third-party packs
+
+The maintainer's synthesis moved to the website (spoken.rusty.one), but this CLI keeps a
+local `synthesize` that goes through tts_cli/providers.py - the hosted ElevenLabs API or a
+local model on your own GPU - because a language pack recorded off a reference voice is a
+many-hour local batch, not a website form.
 """
 import argparse
 
@@ -17,8 +25,14 @@ from tts_cli.build import (DEFAULT_ADDONS_DIR, DEFAULT_DIST_DIR,
 from tts_cli.corpus import DEFAULT_CORPUS_PATH, load_corpus
 from tts_cli.factions import (DEFAULT_FACTIONS_PATH, PACKS, load_sides, pack_stems,
                               pack_title)
-from tts_cli.ignores import DEFAULT_IGNORED_PATH, load_ignored
-from tts_cli.store import DEFAULT_STORE_DIR
+from tts_cli.ignores import DEFAULT_IGNORED_PATH, ignored_files, load_ignored
+from tts_cli.providers import PROVIDERS, get_provider
+from tts_cli.select import estimate, select_lines, unique_by_file
+from tts_cli.store import DEFAULT_SOURCE_DIR, DEFAULT_STORE_DIR, import_audio
+from tts_cli.synthesize import synthesize_line
+from tts_cli.voice_config import apply_pronunciation, load_pronunciation
+# fetch_voice_map still exists for callers that want the hosted list directly; synthesize
+# now goes through a provider, which answers the same question for either backend.
 
 # init-db and extract are imported inside their branches: they pull in
 # pandas and PyMySQL, which the everyday path deliberately does not install.
@@ -51,6 +65,36 @@ exp.add_argument("--corpus", default=DEFAULT_CORPUS_PATH)
 exp.add_argument("--check", action="store_true",
                  help="Compare instead of writing; exits 1 if they differ.")
 
+syn = subparsers.add_parser(
+    "synthesize",
+    help="Render selected corpus lines into the audio store.")
+syn.add_argument("--line-id")
+syn.add_argument("--npc", help="NPC id or name substring")
+syn.add_argument("--quest", help="Quest id or title substring")
+syn.add_argument("--voice", help="e.g. human-male")
+syn.add_argument("--missing", action="store_true",
+                 help="Only lines with no audio in the store")
+syn.add_argument("--area", nargs=5, type=float, metavar=("MAP", "X1", "X2", "Y1", "Y2"),
+                 help="Only NPCs spawned in this world-coordinate box")
+syn.add_argument("--force", action="store_true", help="Replace audio already in the store")
+syn.add_argument("--limit", type=int)
+syn.add_argument("--dry-run", action="store_true",
+                 help="Report what would be generated and what it would cost")
+syn.add_argument("--store", default=DEFAULT_STORE_DIR)
+syn.add_argument("--corpus", default=DEFAULT_CORPUS_PATH)
+syn.add_argument("--ignored", default=DEFAULT_IGNORED_PATH)
+syn.add_argument("--provider", default="elevenlabs", choices=sorted(PROVIDERS),
+                 help="Who speaks the lines: the hosted API, or a local model on your GPU")
+syn.add_argument("--language", default=None,
+                 help="The language being recorded, e.g. ptBR. Omitted means English.")
+syn.add_argument("--model-dir", default=None,
+                 help="Local model weights (chatterbox); omitted downloads them")
+syn.add_argument("--references", default=None,
+                 help="Reference clips to clone from (chatterbox); "
+                      "one per voice, named e.g. orc-male-shady.wav")
+syn.add_argument("--device", default="cuda",
+                 help="Torch device for a local provider ('cuda' covers ROCm builds)")
+
 bld = subparsers.add_parser(
     "build",
     help="Assemble the addon data module from the corpus and audio/ (make quests-sounds).")
@@ -65,6 +109,9 @@ bld.add_argument("--pack", default="all", choices=PACKS,
 bld.add_argument("--factions", default=DEFAULT_FACTIONS_PATH)
 bld.add_argument("--module-title", default=None,
                  help="TOC title; defaults to one naming the pack")
+bld.add_argument("--language", default=None,
+                 help="Stamp the pack's recorded language, e.g. ptBR. "
+                      "Omitted leaves the key off, which the addon reads as English.")
 
 ins = subparsers.add_parser(
     "install", help="Copy the built module into a WoW AddOns folder.")
@@ -132,6 +179,69 @@ elif args.mode == "export-corpus":
         # the table would produce, so the table is not carrying everything it needs to.
         raise SystemExit(1)
 
+elif args.mode == "synthesize":
+    corpus = load_corpus(args.corpus)
+    ignored = load_ignored(args.ignored)
+    area = (int(args.area[0]), (args.area[1], args.area[2]), (args.area[3], args.area[4])) \
+        if args.area else None
+    selected = select_lines(corpus, args.store, npc=args.npc, quest=args.quest,
+                            voice=args.voice, line_id=args.line_id,
+                            missing=args.missing, area=area, ignored=ignored)
+    targets = unique_by_file([l for l in selected if l["generatable"]])
+    if args.limit:
+        targets = targets[:args.limit]
+
+    est = estimate(targets)
+    print(f"selected {len(selected)} lines -> {est['files']} files, "
+          f"{est['characters']:,} characters")
+    print(f"voices needed: {', '.join(est['voices']) or 'none'}")
+
+    if args.dry_run or not targets:
+        # Show what will actually be spoken, after pronunciation rules - that is the
+        # thing worth eyeballing before spending characters.
+        rules = load_pronunciation()
+        for line in targets[:10]:
+            spoken = apply_pronunciation(line["text"], rules)
+            flag = "*" if spoken != line["text"] else " "
+            print(f"  {flag} {line['lineId']:<26} {line['voice']:<14} {spoken[:52]}")
+        if len(targets) > 10:
+            print(f"    ... and {len(targets) - 10} more")
+        if any(apply_pronunciation(l["text"], rules) != l["text"] for l in targets):
+            print("  (* = pronunciation rules changed the spoken text)")
+        raise SystemExit(0)
+
+    kwargs = {}
+    if args.provider == "chatterbox":
+        kwargs = {"model_dir": args.model_dir, "reference_dir": args.references,
+                  "device": args.device}
+    provider = get_provider(args.provider, **kwargs)
+
+    voice_map = provider.voice_map()
+    unavailable = sorted(set(est["voices"]) - set(voice_map))
+    if unavailable:
+        raise SystemExit(
+            f"{provider.name} cannot speak: {', '.join(unavailable)}\n"
+            "Voices are named race-gender[-flavor] (e.g. orc-male-shady) - as clones in "
+            "the ElevenLabs account, or as reference clips in the references directory.")
+
+    done = failed = 0
+    # Every failure is counted and printed rather than raised: a run of thousands of lines
+    # on a local GPU takes many hours, and one bad line must not discard the ones already
+    # made. Re-running resumes, because a line whose audio exists is refused as a rewrite.
+    for line in tqdm(targets, unit="line", desc="Synthesizing"):
+        try:
+            synthesize_line(line, voice_map[line["voice"]], args.store, force=args.force,
+                            provider=provider, language=args.language)
+            done += 1
+        except FileExistsError:
+            pass
+        except Exception as exc:
+            failed += 1
+            print(f"\n  {line['lineId']}: {exc}")
+    print(f"\nsynthesized {done}, failed {failed}")
+    if failed:
+        print("Re-run the same command to retry only what is missing.")
+
 elif args.mode == "build":
     corpus = load_corpus(args.corpus)
     # None for the whole store rather than the 'all' stem set, so a store file the corpus
@@ -141,9 +251,11 @@ elif args.mode == "build":
     report = build_module(corpus, args.store, args.dist,
                           args.module, args.version, progress=True,
                           ignored=load_ignored(args.ignored), include=include,
-                          title=args.module_title or pack_title(args.pack))
+                          title=args.module_title or pack_title(args.pack),
+                          language=args.language)
     print(f"\nbuilt {report['moduleDir']}")
     print(f"  audio files {report['audioFiles']} ({report['audioFormat']}, pack: {args.pack})")
+    print(f"  language    {report['language'] or 'enUS (key not stamped)'}")
     for name, rows in sorted(report["tableRows"].items()):
         print(f"  {name:<32} {rows:>6} entries")
 
