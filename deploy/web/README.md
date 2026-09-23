@@ -83,6 +83,7 @@ no longer lives in is one somebody sets on the wrong box.
 | `SPOKEN_QUESTS_VOICE_CONFIG` | `current/pipelines/quests/voice` | per release |
 | `SPOKEN_QUESTS_AUDIO_HISTORY` | `shared/audio-history/quests` | shared; **must be set**, or the archive of every take — including audio nothing can reproduce — lands in a release |
 | `SPOKEN_QUESTS_VOICE_SAMPLES` | `shared/voices` | shared; **must be set**, or clone clips land where nothing backs them up |
+| `SPOKEN_QUESTS_VOICE_REFERENCES` | `shared/voice-references` | shared; **must be set**, or fish.audio references are cut into a release and lost on the next deploy |
 | `SPOKEN_QUESTS_NPC_LINES` | `shared/npc-lines` | shared; unset, it points inside a release, which has none, and **Seed from clips** finds nothing |
 | `SPOKEN_QUESTS_PREVIEWS` | `shared/audio-previews` | shared; **must be set**, or previews land inside `releases/`, where `prune.sh` counts them as a release and eventually deletes them |
 | `SPOKEN_ZONES_ROOT` | `current` | per release; the zones pipeline resolves its own paths from it |

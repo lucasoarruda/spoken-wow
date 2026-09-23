@@ -95,6 +95,7 @@ export function elevenLabsSpeaker(options: ElevenLabsOptions): Speaker {
 
       return {
         ...speech,
+        costUsd: null,
         made: {
           modelId: config.modelId,
           // What was actually sent: the dialogue endpoint takes only stability, and a row

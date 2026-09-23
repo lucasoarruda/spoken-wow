@@ -16,7 +16,7 @@ import type { Lang } from "@/lib/lang";
 
 import type { Failure } from "../errors";
 
-export type Provider = "elevenlabs";
+export type Provider = "elevenlabs" | "fish";
 
 /** One voice speaking one stretch of the line. A line with a stage direction has two. */
 export type Turn = {
@@ -63,6 +63,11 @@ export type Spoken =
       leadInSec: number | null;
       /** ElevenLabs credits, exactly as billed. null when the provider did not say. */
       credits: number | null;
+      /**
+       * fish.audio's cost in dollars. Never folded into `credits`: a sum that added dollars
+       * to credits would be wrong without looking wrong.
+       */
+      costUsd: number | null;
       made: Made;
     }
   | { ok: false; failure: Failure };

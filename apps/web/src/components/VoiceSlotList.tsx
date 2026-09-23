@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import FishReference, { type ReferenceView } from "./FishReference";
 import VoiceSamples from "./VoiceSamples";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -64,9 +65,17 @@ type Props = {
   initialSamples: Record<string, Sample[]>;
   /** The accent direction per race, as the settings currently in force hold it. */
   raceTags: Record<string, string>;
+  /** This language's fish.audio references, by voice. */
+  initialReferences: Record<string, ReferenceView>;
 };
 
-export default function VoiceSlotList({ slots, existing, initialSamples, raceTags }: Props) {
+export default function VoiceSlotList({
+  slots,
+  existing,
+  initialSamples,
+  raceTags,
+  initialReferences,
+}: Props) {
   const lang = useLang();
   const [open, setOpen] = useState<string | null>(null);
   const [openRace, setOpenRace] = useState<string | null>(null);
@@ -76,6 +85,7 @@ export default function VoiceSlotList({ slots, existing, initialSamples, raceTag
   const [tagError, setTagError] = useState<string | null>(null);
   const [savingRace, setSavingRace] = useState<string | null>(null);
   const [samples, setSamples] = useState(initialSamples);
+  const [references, setReferences] = useState(initialReferences);
   // Held as state so a slot flips to "created" without a reload; the server value is the
   // account, read fresh on every page view.
   const [present, setPresent] = useState(existing === null ? null : new Set(existing));
@@ -312,6 +322,11 @@ export default function VoiceSlotList({ slots, existing, initialSamples, raceTag
                             {clips.length} {clips.length === 1 ? "clip" : "clips"}
                           </Badge>
                         )}
+                        {references[slot.name] && (
+                          <Badge variant="outline" className="shrink-0 text-sky-400">
+                            fish ref
+                          </Badge>
+                        )}
                         <span className="w-24 shrink-0 text-right">
                           {present === null ? (
                             <span className="text-muted-foreground text-xs">unknown</span>
@@ -335,6 +350,19 @@ export default function VoiceSlotList({ slots, existing, initialSamples, raceTag
                           }
                           onCloned={() =>
                             setPresent((current) => new Set(current ?? []).add(slot.name))
+                          }
+                        />
+                      )}
+                      {expanded && (
+                        <FishReference
+                          voice={slot.name}
+                          samples={clips}
+                          initial={references[slot.name] ?? null}
+                          onChange={(next) =>
+                            setReferences((current) => {
+                              const { [slot.name]: _, ...rest } = current;
+                              return next ? { ...rest, [slot.name]: next } : rest;
+                            })
                           }
                         />
                       )}

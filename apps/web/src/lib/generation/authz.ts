@@ -10,7 +10,7 @@
  */
 import { headers } from "next/headers";
 
-import { readApiKey } from "@/lib/api-key";
+import { readApiKey, type KeyProvider } from "@/lib/api-key";
 import { auth } from "@/lib/auth";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { langParam } from "@/lib/lang-server";
@@ -75,32 +75,46 @@ function noKey(message: string): Response {
   return Response.json({ error: message, code: "no_api_key" }, { status: NO_API_KEY });
 }
 
+const PROVIDER_NAME: Record<KeyProvider, string> = { elevenlabs: "ElevenLabs", fish: "fish.audio" };
+
 /**
- * The signed-in user's own ElevenLabs key, for the routes that spend.
+ * The signed-in user's own key for a provider, for the routes that spend.
  *
  * Run AFTER a role guard, never instead of one: a key is a credential, not a permission,
  * and a member who pasted one must still be refused.
  *
  * There is no fallback to a server-wide ELEVENLABS_API_KEY, deliberately. With one, "who
  * paid for this line" would have no answer, and granting somebody the collaborator role
- * would quietly grant them the deployer's bill as well.
+ * would quietly grant them the deployer's bill as well. fish.audio has none for the same
+ * reason.
  */
-export async function requireApiKey(userId: string): Promise<KeyGuard> {
+export async function requireApiKey(
+  userId: string,
+  provider: KeyProvider = "elevenlabs",
+): Promise<KeyGuard> {
+  const name = PROVIDER_NAME[provider];
   let key: string | null;
   try {
-    key = await readApiKey(userId);
+    key = await readApiKey(userId, provider);
   } catch {
     // A row that will not open means SPOKEN_SECRET_KEY changed under it. Saving the key
     // again is the fix, so this points at the same page as having none at all -- but it
     // says which of the two happened.
     return {
       key: null,
-      denied: noKey("Your stored ElevenLabs key could not be read. Set it again in your profile."),
+      denied: noKey(`Your stored ${name} key could not be read. Set it again in your profile.`),
     };
   }
 
   if (!key) {
-    return { key: null, denied: noKey("This spends ElevenLabs credits, and you have no key set.") };
+    return {
+      key: null,
+      denied: noKey(
+        provider === "elevenlabs"
+          ? "This spends ElevenLabs credits, and you have no key set."
+          : "This spends from your fish.audio balance, and you have no fish.audio key set.",
+      ),
+    };
   }
 
   return { key, denied: null };
