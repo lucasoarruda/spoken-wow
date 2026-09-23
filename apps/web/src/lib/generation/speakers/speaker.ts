@@ -16,8 +16,9 @@ import type { Lang } from "@/lib/lang";
 
 import type { Failure } from "../errors";
 import type { SeedStrategy } from "../config";
+import type { Provider } from "../providers";
 
-export type Provider = "elevenlabs" | "fish";
+export type { Provider } from "../providers";
 
 /** One voice speaking one stretch of the line. A line with a stage direction has two. */
 export type Turn = {
@@ -31,13 +32,10 @@ export type SpeakRequest = {
   lang: Lang;
   seed: number | null;
   /**
-   * Whether this is narration spoken as dialogue, whatever the number of turns.
-   *
-   * Not simply `turns.length > 1`: a line that is all stage direction is one turn, and has
-   * always gone through the same dialogue path as a line that is half one, so that every
-   * narrated take was made, and is recorded, the same way.
+   * Whether the line holds narration. A line that is all stage direction is one turn and
+   * still narration, so this is not `turns.length > 1`.
    */
-  dialogue?: boolean;
+  dialogue: boolean;
 };
 
 /**
@@ -82,18 +80,13 @@ export type Voices = {
 
 export interface Speaker {
   readonly provider: Provider;
+  /** The model lines are generated with, which also sizes the provider's concurrency. */
+  readonly modelId: string;
   /** How lines are seeded: the collaborator's choice for ElevenLabs; fish.audio has no seed. */
   readonly seedStrategy: SeedStrategy;
   /** The slots this provider can speak in `lang`, as the key in hand sees them. */
   voices(lang: Lang): Promise<Voices>;
   /** How a slot with no voice is named to the person who has to go and make one. */
   missing(voice: string): string;
-  /**
-   * The line as this provider should be sent it, before the lexicon.
-   *
-   * Audio tags and the race's accent direction are written for a model that performs
-   * them. Staleness hashes this string, so it has to be the same function both use.
-   */
-  shape(text: string, raceTag: string | undefined): string;
   speak(request: SpeakRequest): Promise<Spoken>;
 }

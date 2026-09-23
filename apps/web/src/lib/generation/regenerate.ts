@@ -28,11 +28,10 @@ import { canonicalNpcId, seedFor } from "./seed";
 import { spokenHash } from "./spoken-hash";
 import { currentConfig } from "./settings";
 import { NARRATOR_VOICE, segments } from "./narration";
-import { elevenLabsSpeaker } from "./speakers/elevenlabs";
 import type { Speaker } from "./speakers/speaker";
 import { BUSY, withTakeLock } from "./lock";
 import { busy, failure, type Failure } from "./errors";
-import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
+import { SHAPE } from "./speakers/shape";
 
 export type RegenerateSuccess = {
   ok: true;
@@ -44,7 +43,7 @@ export type RegenerateSuccess = {
   /** What this cost, exactly, in ElevenLabs credits. null when it did not say. */
   credits: number | null;
   /** What this cost in dollars, for a fish.audio take. */
-  costUsd?: number | null;
+  costUsd: number | null;
   seed: number | null;
   voice: string;
   voiceId: string;
@@ -77,10 +76,10 @@ async function resolve(lineId: string, lang: Lang): Promise<CorpusLine[] | null>
 export async function regenerateLine(
   lineId: string,
   createdBy: string,
-  options: ElevenLabsOptions & { lang?: Lang; speaker?: Speaker } = {},
+  options: { speaker: Speaker; lang?: Lang },
 ): Promise<RegenerateResult> {
   const lang = options.lang ?? BASE_LANG;
-  const speaker = options.speaker ?? elevenLabsSpeaker(options);
+  const { speaker } = options;
   const group = await resolve(lineId, lang);
   if (!group) {
     return { ok: false, failure: { ...failure("bad-request", `no line ${lineId}`), status: 404 } };
@@ -161,7 +160,7 @@ export async function regenerateLine(
     //
     // The committed pronunciation rules are English's spellings of English words; another
     // language is spoken with its own lexicon, which the speaker applies, and nothing else.
-    const spokenText = speaker.shape(
+    const spokenText = SHAPE[speaker.provider](
       committedPronunciation(source, lang),
       config.raceTags[line.race],
     );

@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { withLang } from "@/lib/lang";
 import { displayName } from "@/lib/voices/names";
+import {
+  DEFAULT_REFERENCE_SECONDS as DEFAULT_SECONDS,
+  MAX_REFERENCE_SECONDS as MAX_SECONDS,
+  MIN_REFERENCE_SECONDS as MIN_SECONDS,
+  rejectWindow,
+} from "@/lib/voices/reference-window";
+import type { Reference } from "@/lib/voices/references";
 import type { Sample } from "@/lib/voices/samples";
 
 /**
@@ -17,21 +24,11 @@ import type { Sample } from "@/lib/voices/samples";
  * Kept apart from VoiceSamples because nothing about it is ElevenLabs': there is no clone and
  * no account, just a cut, a transcript and a row. The first clip's first twenty seconds are
  * offered before anybody chooses, so for most slots making a reference is one click.
- *
- * The limits mirror lib/voices/references.ts, which enforces them; they are repeated here
- * only so the button can say no before a request does. (That module is server-only.)
  */
-const MIN_SECONDS = 10;
-const MAX_SECONDS = 30;
-const DEFAULT_SECONDS = 20;
-
-export type ReferenceView = {
-  sample: string;
-  startSec: number;
-  endSec: number;
-  transcript: string;
-  clipHash: string;
-};
+export type ReferenceView = Pick<
+  Reference,
+  "sample" | "startSec" | "endSec" | "transcript" | "clipHash"
+>;
 
 type Props = {
   voice: string;
@@ -76,16 +73,14 @@ export default function FishReference({ voice, samples, initial, onChange }: Pro
 
   const startSec = Number(start);
   const endSec = startSec + Number(length);
-  const why =
-    !sample
-      ? "Add a clip first."
-      : !Number.isFinite(startSec) || startSec < 0
-        ? "The start must be zero or more."
-        : Number(length) < MIN_SECONDS || Number(length) > MAX_SECONDS
-          ? `A reference is ${MIN_SECONDS}-${MAX_SECONDS} seconds.`
-          : duration !== null && endSec > duration + 0.05
-            ? `That clip is only ${duration.toFixed(1)} s long.`
-            : null;
+  // The server's own check, then the one only the browser can make: whether the clip is long
+  // enough to hold the window at all.
+  const why = !sample
+    ? "Add a clip first."
+    : (rejectWindow(startSec, endSec) ??
+      (duration !== null && endSec > duration + 0.05
+        ? `That clip is only ${duration.toFixed(1)} s long.`
+        : null));
 
   async function send(kind: "cut" | "transcript" | "delete", init: RequestInit) {
     setBusy(kind);

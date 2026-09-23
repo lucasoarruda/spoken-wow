@@ -59,10 +59,15 @@ export function isFishModel(value: unknown): value is FishModelId {
   return FISH_MODELS.some((model) => model.id === value);
 }
 
+/** List price in dollars per million UTF-8 bytes, or null for a model with no known price. */
+export function fishPrice(model: string): number | null {
+  return FISH_MODELS.find((entry) => entry.id === model)?.usdPerMillionBytes ?? null;
+}
+
 /** Dollars for `bytes` of text on `model`, or null when the model has no known price. */
 export function fishCost(model: string, bytes: number): number | null {
-  const rate = FISH_MODELS.find((entry) => entry.id === model)?.usdPerMillionBytes;
-  return rate === undefined || rate === null ? null : (bytes * rate) / 1_000_000;
+  const price = fishPrice(model);
+  return price === null ? null : (bytes * price) / 1_000_000;
 }
 
 async function failure(response: Response, what: string): Promise<Error> {

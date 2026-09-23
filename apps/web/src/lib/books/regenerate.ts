@@ -24,7 +24,7 @@ async function pageFor(lineId: string, lang: Lang): Promise<BookPage | undefined
 export async function regenerateBookLine(
   lineId: string,
   createdBy: string,
-  options: { apiKey: string; lang?: Lang; speaker?: Speaker },
+  options: { speaker: Speaker; lang?: Lang },
 ): Promise<RegenerateResult> {
   const lang = options.lang ?? BASE_LANG;
 

@@ -23,6 +23,7 @@ import { BASE_LANG, type Lang } from "@/lib/lang";
 
 import { historyDirOf } from "./adapters";
 import type { Source } from "@/lib/sections";
+import type { Provider } from "@/lib/generation/providers";
 
 export type Take = {
   version: number;
@@ -34,7 +35,7 @@ export type Take = {
   credits: number | null;
   /** Dollars, for a fish.audio take. Never summed with credits. */
   costUsd: number | null;
-  provider: "elevenlabs" | "fish";
+  provider: Provider;
   modelId: string | null;
   createdAt: string;
   createdByName: string | null;

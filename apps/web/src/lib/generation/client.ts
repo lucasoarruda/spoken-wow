@@ -11,6 +11,7 @@ import { BASE_LANG, withLang, type Lang } from "@/lib/lang";
 import { noApiKeyMessage } from "@/lib/no-api-key";
 import type { Source } from "@/lib/sections";
 import type { Rate } from "./billing";
+import type { Provider } from "./providers";
 
 
 export type FailureKind =
@@ -68,7 +69,6 @@ export type GenerationStatusResponse = {
     voiceSettings: Record<string, number | boolean>;
     seedStrategy: string;
   };
-  settingsSource: "file" | "database";
   /**
    * Credits per character, or dollars for fish.audio, calibrated from what this account has
    * actually been charged.
@@ -77,11 +77,8 @@ export type GenerationStatusResponse = {
    * standing in - an upper bound, not a measurement.
    */
   rate: Rate;
-  /**
-   * Which generator the signed-in user spends with. ElevenLabs when absent, which is what
-   * the route said before there was a choice.
-   */
-  provider?: "elevenlabs" | "fish";
+  /** Which generator the signed-in user spends with. */
+  provider: Provider;
   /** fish.audio's balance in dollars, for a fish.audio user; null when it could not be read. */
   wallet?: { credit: number } | null;
 };

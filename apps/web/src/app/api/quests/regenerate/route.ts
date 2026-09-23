@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   // After the role check, never instead of it: a key is a credential, not a permission.
-  const { speaker, key, denied: noKey } = await requireSpeaker(session.user.id);
+  const { speaker, denied: noKey } = await requireSpeaker(session.user.id);
   if (noKey) return noKey;
 
   const body = (await request.json().catch(() => ({}))) as { lineId?: unknown };
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "lineId is required", kind: "bad-request" }, { status: 400 });
   }
 
-  const result = await regenerateLine(body.lineId, session.user.id, { apiKey: key, lang, speaker });
+  const result = await regenerateLine(body.lineId, session.user.id, { speaker, lang });
 
   if (!result.ok) {
     // `fatal` is the whole contract with the browser: it says whether to abandon the rest of

@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SEED_STRATEGIES, type SeedStrategy, type VoiceSettings } from "@/lib/generation/config";
+import type { Preference as ServerPreference } from "@/lib/generation/preference";
 
 /** The models a collaborator may pick. Mirrors FISH_MODELS in lib/voices/fish.ts, which is server-side. */
 export type FishModelOption = { id: string; label: string; preview: boolean; price: string };
@@ -12,17 +14,12 @@ export type FishModelOption = { id: string; label: string; preview: boolean; pri
 /** An ElevenLabs model the collaborator's account may use, read from the account. */
 export type ElevenLabsModelOption = { id: string; name: string };
 
-type VoiceSettings = {
-  stability: number;
-  similarity_boost: number;
-  style: number;
-  use_speaker_boost: boolean;
-};
+// Type-only: erased from the bundle, so the form and the server cannot drift apart on shape.
+type Preference = Pick<ServerPreference, "provider" | "elevenlabs" | "fish">;
 
-type Preference = {
-  provider: "elevenlabs" | "fish";
-  elevenlabs: { modelId: string; voiceSettings: VoiceSettings; seedStrategy: "npc" | "none" };
-  fish: { model: string; temperature: number; topP: number; speed: number };
+const SEED_LABELS: Record<SeedStrategy, string> = {
+  npc: "Per NPC — every line an NPC speaks draws the same way",
+  none: "None — each line is an independent draw",
 };
 
 /** The three 0-1 voice settings, as the admin form described them before they moved here. */
@@ -196,11 +193,14 @@ export default function GeneratorSection({
         <select
           id="eleven-seed"
           value={eleven.seedStrategy}
-          onChange={(event) => setEleven({ seedStrategy: event.target.value as "npc" | "none" })}
+          onChange={(event) => setEleven({ seedStrategy: event.target.value as SeedStrategy })}
           className="border-input bg-background h-8 rounded-md border px-2 text-sm"
         >
-          <option value="npc">Per NPC — every line an NPC speaks draws the same way</option>
-          <option value="none">None — each line is an independent draw</option>
+          {SEED_STRATEGIES.map((strategy) => (
+            <option key={strategy} value={strategy}>
+              {SEED_LABELS[strategy]}
+            </option>
+          ))}
         </select>
       </div>
       <p className="text-muted-foreground mb-5 text-xs">

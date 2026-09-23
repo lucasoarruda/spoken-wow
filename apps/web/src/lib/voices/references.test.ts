@@ -193,7 +193,7 @@ describe.skipIf(!hasFfmpeg)("fish.audio as a speaker", () => {
     });
     const voiceId = (await speaker.voices(LANG)).ids.get(VOICE)!;
 
-    const spoken = await speaker.speak({ turns: [{ text: "你好", voiceId }], lang: LANG, seed: 7 });
+    const spoken = await speaker.speak({ turns: [{ text: "你好", voiceId }], lang: LANG, seed: 7, dialogue: false });
     expect(spoken.ok).toBe(true);
     if (!spoken.ok) return;
     expect(spoken.made).toMatchObject({ modelId: "s2.1-pro", dictionaryVersion: null });
@@ -210,7 +210,7 @@ describe.skipIf(!hasFfmpeg)("fish.audio as a speaker", () => {
       fetchImpl: fetchImpl as unknown as typeof globalThis.fetch,
       settings: SETTINGS,
     });
-    const spoken = await speaker.speak({ turns: [{ text: "x", voiceId: "stale" }], lang: LANG, seed: null });
+    const spoken = await speaker.speak({ turns: [{ text: "x", voiceId: "stale" }], lang: LANG, seed: null, dialogue: false });
     expect(spoken.ok || spoken.failure.kind).toBe("voice-missing");
     expect(fetchImpl).not.toHaveBeenCalled();
   });

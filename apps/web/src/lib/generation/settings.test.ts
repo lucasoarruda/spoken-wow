@@ -148,7 +148,7 @@ describe("validateConfig", () => {
  *   deploy/web/bin/migrate.sh "$PWD/apps/web"
  */
 const { closeDb, db } = await import("@/lib/db");
-const { readSettings, resetSettings, writeRaceTags, writeSettings } = await import("./settings");
+const { readSettings, writeRaceTags } = await import("./settings");
 
 /**
  * The settings row, put back after every case.
@@ -224,9 +224,9 @@ describe("writeRaceTags", () => {
   });
 
   it("leaves the rest of an existing row alone", async () => {
-    await writeSettings(
-      { ...FALLBACK, modelId: "eleven_flash_v2_5", seedStrategy: "none", raceTags: {} },
-      null as unknown as string,
+    await writeRaceTags({}, null);
+    await db().query(
+      `update "generation_setting" set "modelId" = 'eleven_flash_v2_5', "seedStrategy" = 'none' where "id"`,
     );
 
     await writeRaceTags({ orc: "[gruff]" }, null);
@@ -242,34 +242,6 @@ describe("writeRaceTags", () => {
     await writeRaceTags({}, null);
 
     expect((await readSettings()).config.raceTags).toEqual({});
-  });
-});
-
-// The settings form no longer shows the tags, so the config it holds carries whatever they
-// were when the page loaded. Writing those back would let a Save on the model revert a tag
-// somebody set on /voices in the meantime.
-describe("writeSettings", () => {
-  it("does not touch the race tags of a row that already exists", async () => {
-    await writeRaceTags({ dwarf: "[Scottish accent]" }, null);
-
-    await writeSettings(
-      { ...FALLBACK, modelId: "eleven_flash_v2_5", raceTags: {} },
-      null as unknown as string,
-    );
-
-    const settings = await readSettings();
-    expect(settings.config.modelId).toBe("eleven_flash_v2_5");
-    expect(settings.config.raceTags).toEqual({ dwarf: "[Scottish accent]" });
-  });
-
-  it("uses the tags it was given when there is no row to preserve", async () => {
-    await noRow();
-    await writeSettings(
-      { ...FALLBACK, raceTags: { orc: "[gruff]" } },
-      null as unknown as string,
-    );
-
-    expect((await readSettings()).config.raceTags).toEqual({ orc: "[gruff]" });
   });
 });
 
@@ -296,13 +268,10 @@ describe("another language's settings", () => {
 
   it("are its own once saved, and English does not move", async () => {
     const before = await readSettings();
-    await writeSettings(validateConfig({ ...VALID, raceTags: {} }), null as unknown as string, "koKR");
+    await writeRaceTags({ orc: "[gruff]" }, null, "koKR");
 
     expect((await readSettings("koKR")).source).toBe("database");
-    expect((await readSettings("koKR")).config.modelId).toBe(VALID.modelId);
+    expect((await readSettings("koKR")).config.raceTags).toEqual({ orc: "[gruff]" });
     expect((await readSettings()).config).toEqual(before.config);
-
-    await resetSettings("koKR");
-    expect((await readSettings("koKR")).source).toBe("english");
   });
 });

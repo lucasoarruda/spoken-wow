@@ -16,21 +16,42 @@ import type { Lang } from "@/lib/lang";
 import { fishCost, type FishOptions } from "@/lib/voices/fish";
 import { listReferences, loadReferences } from "@/lib/voices/references";
 
-import { readLexicon } from "../dictionary";
+import { lexiconStamp, readLexicon } from "../dictionary";
 import { failure } from "../errors";
-import { applyFishLexicon, fishRules, type FishRule } from "../fish-lexicon";
+import { compileFishLexicon, fishRules, type FishRule } from "../fish-lexicon";
 import { fishSpeech, type FishSettings } from "../fish-tts";
-import { SHAPE } from "./shape";
 import type { Speaker, SpeakRequest, Spoken, Voices } from "./speaker";
 
 /** What a fish.audio take is recorded as having been cut at: what fish-tts.ts asks for. */
 export const FISH_OUTPUT_FORMAT = "mp3_44100_128";
+
+type CompiledLexicon = { stamp: string | null; apply: (text: string) => string; version: string | null };
+const lexicons = new Map<Lang, CompiledLexicon>();
+
+/**
+ * A language's lexicon as fish.audio applies it, rebuilt only when the lexicon changes.
+ *
+ * Checked on every line, as ElevenLabs' locator is read on every line: an edit mid-batch
+ * applies to the lines after it, and each take records the rules it was made with. But the
+ * check is a timestamp, and converting every entry and compiling one pattern of them all
+ * happens once per edit rather than once per line of a forty-thousand-line batch.
+ */
+async function fishLexicon(lang: Lang): Promise<CompiledLexicon> {
+  const stamp = await lexiconStamp(lang);
+  const cached = lexicons.get(lang);
+  if (cached && cached.stamp === stamp) return cached;
+  const rules = fishRules((await readLexicon(lang)).entries, lang);
+  const compiled = { stamp, apply: compileFishLexicon(rules), version: fishLexiconVersion(rules) };
+  lexicons.set(lang, compiled);
+  return compiled;
+}
 
 export function fishSpeaker(options: FishOptions & { settings: FishSettings }): Speaker {
   const { settings } = options;
 
   return {
     provider: "fish",
+    modelId: settings.model,
     // fish.audio takes no seed, so there is nothing to hold steady.
     seedStrategy: "none",
 
@@ -46,7 +67,6 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
       return `no fish.audio reference for "${voice}"`;
     },
 
-    shape: SHAPE.fish,
 
     async speak({ turns, lang }: SpeakRequest): Promise<Spoken> {
       // One speaker per distinct voice, in order of first appearance: the NPC is speaker 0
@@ -66,17 +86,15 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
         };
       }
 
-      // Read per request, as ElevenLabs' locator is: an edit mid-batch applies to the lines
-      // after it, and each take records the rules it was actually made with.
-      const rules = fishRules((await readLexicon(lang)).entries, lang);
+      const lexicon = await fishLexicon(lang);
 
       const speech = await fishSpeech(
         {
           turns: turns.map((turn) => ({
-            text: applyFishLexicon(turn.text, rules),
+            text: lexicon.apply(turn.text),
             speaker: speakers.indexOf(turn.voiceId),
           })),
-          references: speakers.map((hash) => [clips.get(hash)!]),
+          references: speakers.map((hash) => clips.get(hash)!),
           settings,
         },
         options,
@@ -97,7 +115,7 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
           outputFormat: FISH_OUTPUT_FORMAT,
           // There is no dictionary on fish.audio's side; the version names the rules applied.
           dictionaryId: null,
-          dictionaryVersion: fishLexiconVersion(rules),
+          dictionaryVersion: lexicon.version,
         },
       };
     },

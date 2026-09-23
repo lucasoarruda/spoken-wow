@@ -6,34 +6,21 @@
  * arrive in the queue rather than here.
  */
 import { apiKeyStatus } from "@/lib/api-key";
-import { viewerOf } from "@/lib/grants/store";
 import {
   PreferenceError,
-  readPreference,
   validateElevenLabs,
   validateFish,
   writePreference,
 } from "@/lib/generation/preference";
-import { spendsCredits } from "@/lib/permissions";
-import { currentSession } from "@/lib/session";
+import { currentSpender } from "@/lib/generation/authz";
+import { isProvider, PROVIDERS } from "@/lib/generation/providers";
 
 export const dynamic = "force-dynamic";
 
 const FORBIDDEN = () => Response.json({ error: "not allowed" }, { status: 403 });
 
-async function spender() {
-  const session = await currentSession();
-  return session && spendsCredits(await viewerOf(session)) ? session : null;
-}
-
-export async function GET() {
-  const session = await spender();
-  if (!session) return FORBIDDEN();
-  return Response.json({ preference: await readPreference(session.user.id) });
-}
-
 export async function PUT(request: Request) {
-  const session = await spender();
+  const session = await currentSpender();
   if (!session) return FORBIDDEN();
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -41,8 +28,8 @@ export async function PUT(request: Request) {
     elevenlabs?: unknown;
     fish?: unknown;
   };
-  if (body.provider !== "elevenlabs" && body.provider !== "fish") {
-    return Response.json({ error: "provider must be 'elevenlabs' or 'fish'" }, { status: 400 });
+  if (!isProvider(body.provider)) {
+    return Response.json({ error: `provider must be one of ${PROVIDERS.join(", ")}` }, { status: 400 });
   }
 
   let fish;

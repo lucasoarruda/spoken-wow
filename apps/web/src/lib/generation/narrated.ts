@@ -26,14 +26,12 @@ import { BASE_LANG } from "@/lib/lang";
 import "server-only";
 
 import { commitTake } from "@/lib/takes/commit";
-import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
 import { durationOf } from "@/lib/zones/tools";
 
 import { busy, failure } from "./errors";
 import { BUSY, withTakeLock } from "./lock";
 import { NARRATOR_VOICE } from "./narration";
 import type { RegenerateResult } from "./regenerate";
-import { elevenLabsSpeaker } from "./speakers/elevenlabs";
 import type { Speaker, Spoken } from "./speakers/speaker";
 import type { Lang } from "@/lib/lang";
 
@@ -57,10 +55,10 @@ export async function regenerateNarrated(
   source: "zones" | "books",
   line: NarratedLine,
   createdBy: string,
-  options: ElevenLabsOptions & { lang?: Lang; speaker?: Speaker },
+  options: { speaker: Speaker; lang?: Lang },
 ): Promise<RegenerateResult> {
   const lang = options.lang ?? BASE_LANG;
-  const speaker = options.speaker ?? elevenLabsSpeaker(options);
+  const { speaker } = options;
 
   // Each language has its own narrator, like every other voice.
   const voices = await speaker.voices(lang);
@@ -86,7 +84,12 @@ export async function regenerateNarrated(
     // not answer is one line's failure for the worker to weigh, not an exception.
     let speech: Spoken;
     try {
-      speech = await speaker.speak({ turns: [{ text: line.spoken, voiceId }], lang, seed: null });
+      speech = await speaker.speak({
+        turns: [{ text: line.spoken, voiceId }],
+        lang,
+        seed: null,
+        dialogue: false,
+      });
     } catch (error) {
       return { ok: false, failure: asFailure(error) };
     }

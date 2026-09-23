@@ -57,7 +57,12 @@ function escape(text: string): string {
  * "Kel'Thuzad". Case-insensitive, as the lexicon's own rules are.
  */
 export function applyFishLexicon(text: string, rules: FishRule[]): string {
-  if (rules.length === 0) return text;
+  return compileFishLexicon(rules)(text);
+}
+
+/** The rules as one function, so a batch builds the pattern once rather than per line. */
+export function compileFishLexicon(rules: FishRule[]): (text: string) => string {
+  if (rules.length === 0) return (text) => text;
   const byGrapheme = new Map(rules.map((rule) => [rule.grapheme.toLowerCase(), rule.replacement]));
   const alternation = [...byGrapheme.keys()]
     .sort((a, b) => b.length - a.length)
@@ -69,5 +74,5 @@ export function applyFishLexicon(text: string, rules: FishRule[]): string {
     `(?<![\\p{L}\\p{N}'’])(${alternation})(?![\\p{L}\\p{N}]|['’](?!s(?![\\p{L}\\p{N}]))\\p{L})`,
     "giu",
   );
-  return text.replace(pattern, (match) => byGrapheme.get(match.toLowerCase()) ?? match);
+  return (text) => text.replace(pattern, (match) => byGrapheme.get(match.toLowerCase()) ?? match);
 }

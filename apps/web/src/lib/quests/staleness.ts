@@ -21,8 +21,9 @@ import { spokenHash } from "../generation/spoken-hash";
 import { SHAPE } from "../generation/speakers/shape";
 import { currentConfig } from "../generation/settings";
 import { readOverrides } from "./overrides";
+import type { Provider } from "../generation/providers";
 
-type Row = { file: string; spokenHash: string | null; provider: "elevenlabs" | "fish" };
+type Row = { file: string; spokenHash: string | null; provider: Provider };
 
 /**
  * Of these files, the ones whose live take was made from different text.

@@ -9,8 +9,9 @@
 -- before this one would not survive. Nothing is lost by the split; the two keys are never
 -- read together.
 --
--- The columns are 0018's, sealed the same way by src/lib/secrets.ts, less "tier": fish.audio
--- bills from a prepaid balance per byte, so there is no plan to record.
+-- The columns are 0018's, sealed the same way by src/lib/secrets.ts. "tier" stays NULL:
+-- fish.audio bills from a prepaid balance with no plan, but one shape for both tables lets
+-- lib/api-key.ts read and write either with the same statements.
 create table "fish_key" (
   "userId" text not null primary key references "user" ("id") on delete cascade,
   "ciphertext" text not null,
@@ -19,6 +20,7 @@ create table "fish_key" (
   "hint" text not null,
   -- When fish.audio last confirmed the key, which is when it was saved.
   "verifiedAt" timestamptz,
+  "tier" text,
   "createdAt" timestamptz default CURRENT_TIMESTAMP not null,
   "updatedAt" timestamptz default CURRENT_TIMESTAMP not null
 );

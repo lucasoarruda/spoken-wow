@@ -5,7 +5,7 @@ import ApiKeySection from "@/components/ApiKeySection";
 import GeneratorSection from "@/components/GeneratorSection";
 import { apiKeyStatus, readApiKey } from "@/lib/api-key";
 import { readPreference } from "@/lib/generation/preference";
-import { listModels } from "@/lib/voices/elevenlabs";
+import { generationStatus } from "@/lib/generation/status";
 import { FISH_MODELS } from "@/lib/voices/fish";
 import { viewerOf } from "@/lib/grants/store";
 import { localeHref } from "@/lib/lang";
@@ -34,21 +34,22 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const spends = spendsCredits(await viewerOf(session));
   // The status, never the key. Sent to a client component as props, so this is the shape
   // that decides what the browser can possibly learn.
-  const [status, fishStatus, preference] = spends
+  const [status, fishStatus, preference, elevenKey] = spends
     ? await Promise.all([
         apiKeyStatus(session.user.id),
         apiKeyStatus(session.user.id, "fish"),
         readPreference(session.user.id),
+        readApiKey(session.user.id).catch(() => null),
       ])
-    : [null, null, null];
+    : [null, null, null, null];
   // The models this collaborator's own ElevenLabs account offers, which is the only honest
-  // list: a plan decides which exist. None without a key, or when the account will not say.
-  const elevenKey = spends ? await readApiKey(session.user.id).catch(() => null) : null;
-  const elevenLabsModels = elevenKey
-    ? await listModels({ apiKey: elevenKey })
-        .then((models) => models.map((model) => ({ id: model.id, name: model.name })))
-        .catch(() => null)
-    : null;
+  // list: a plan decides which exist. From the memoised account read, which asks for them
+  // anyway. None without a key, or when the account will not say.
+  const account = elevenKey ? await generationStatus({ apiKey: elevenKey }) : null;
+  const elevenLabsModels =
+    account && !(account.error && account.models.length === 0)
+      ? account.models.map((model) => ({ id: model.id, name: model.name }))
+      : null;
   const models = FISH_MODELS.map((model) => ({
     id: model.id,
     label: model.label,

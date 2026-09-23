@@ -9,7 +9,7 @@ const SETTINGS = { model: "s2.1-pro-free", temperature: 0.7, topP: 0.7, speed: 1
 
 const SOLO: FishSpeechRequest = {
   turns: [{ text: "Hiccup! Ho ho!", speaker: 0 }],
-  references: [[NPC]],
+  references: [NPC],
   settings: SETTINGS,
 };
 
@@ -18,7 +18,7 @@ const DIALOGUE: FishSpeechRequest = {
     { text: "Take this to Ironforge.", speaker: 0 },
     { text: "He hands you a letter.", speaker: 1 },
   ],
-  references: [[NPC], [NARRATOR]],
+  references: [NPC, NARRATOR],
   settings: SETTINGS,
 };
 

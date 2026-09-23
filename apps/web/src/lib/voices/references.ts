@@ -25,16 +25,13 @@ import type { Lang } from "@/lib/lang";
 import { VOICE_REFERENCES_DIR } from "@/lib/paths";
 import { writeAtomic } from "@/lib/takes/bytes";
 
-import { FFMPEG } from "./merge";
+import { FFMPEG, ffmpegError, OUTPUT_BITRATE, OUTPUT_RATE } from "./merge";
+import { rejectWindow } from "./reference-window";
 import { isVoiceSlot } from "./slots";
 
 const run = promisify(execFile);
 
-/** fish.audio's guidance: shorter clones badly, longer only costs upload on every request. */
-export const MIN_REFERENCE_SECONDS = 10;
-export const MAX_REFERENCE_SECONDS = 30;
-/** What the panel offers before anybody has chosen: a comfortable middle of the range. */
-export const DEFAULT_REFERENCE_SECONDS = 20;
+export { rejectWindow } from "./reference-window";
 
 export type Reference = {
   voice: string;
@@ -46,17 +43,6 @@ export type Reference = {
   clipHash: string;
   updatedAt: string;
 };
-
-/** A reason to refuse a window, worth showing a human, or null. */
-export function rejectWindow(startSec: number, endSec: number): string | null {
-  if (!Number.isFinite(startSec) || !Number.isFinite(endSec)) return "the window must be numbers";
-  if (startSec < 0) return "the window cannot start before the clip does";
-  const length = endSec - startSec;
-  if (length < MIN_REFERENCE_SECONDS || length > MAX_REFERENCE_SECONDS) {
-    return `a reference must be ${MIN_REFERENCE_SECONDS}-${MAX_REFERENCE_SECONDS} seconds long, not ${length.toFixed(1)}`;
-  }
-  return null;
-}
 
 /**
  * Of the clip and the transcript together: a new transcript for the same audio is a
@@ -86,14 +72,34 @@ export async function readReference(voice: string, lang: Lang): Promise<Referenc
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
-/** Every reference in one language, by voice. */
-export async function listReferences(lang: Lang): Promise<Map<string, Reference>> {
-  const { rows } = await db().query<Row>(
-    `select ${COLUMNS} from "fish_reference" where "lang" = $1`,
-    [lang],
-  );
-  return new Map(rows.map((row) => [row.voice, fromRow(row)]));
+/**
+ * Every reference in one language, by voice.
+ *
+ * Memoised for a minute, as ElevenLabs' roster is (lib/generation/status.ts): a batch asks
+ * once per line for an answer that only changes when somebody cuts a reference, and every
+ * write below clears it. The promise is cached, so lines starting together share one query.
+ */
+const LIST_TTL_MS = 60_000;
+const lists = new Map<Lang, { at: number; value: Promise<Map<string, Reference>> }>();
+
+export function listReferences(lang: Lang): Promise<Map<string, Reference>> {
+  const cached = lists.get(lang);
+  if (cached && Date.now() - cached.at < LIST_TTL_MS) return cached.value;
+  const value = db()
+    .query<Row>(`select ${COLUMNS} from "fish_reference" where "lang" = $1`, [lang])
+    .then(({ rows }) => new Map(rows.map((row) => [row.voice, fromRow(row)])));
+  // A failed read is not remembered: the next line asks again.
+  value.catch(() => lists.delete(lang));
+  lists.set(lang, { at: Date.now(), value });
+  return value;
 }
+
+/**
+ * Clips by hash, read once. Safe to keep for as long as the process lives, because the hash
+ * is of the clip and its transcript: a re-cut reference is a different hash, never a changed
+ * entry. A few dozen slots, a few languages, half a megabyte each.
+ */
+const clips = new Map<string, { audio: Buffer; text: string }>();
 
 /**
  * The clip and transcript a request sends, found by the hash a Speaker handed out.
@@ -113,11 +119,19 @@ export async function loadReferences(
   );
   const loaded = await Promise.all(
     rows.map(async (row) => {
+      const cached = clips.get(row.clipHash);
+      if (cached) return [row.clipHash, cached] as const;
+      // Checked against the hash before it is kept: the file is written before the row, so
+      // a re-cut in progress can leave new audio beside an old row for a moment, and that
+      // must fail the line rather than be sent under the old hash.
       const audio = await fs.readFile(referencePath(row.voice, lang));
-      return [row.clipHash, { audio, text: row.transcript }] as const;
+      if (clipHash(audio, row.transcript) !== row.clipHash) return null;
+      const clip = { audio, text: row.transcript };
+      clips.set(row.clipHash, clip);
+      return [row.clipHash, clip] as const;
     }),
   );
-  return new Map(loaded);
+  return new Map(loaded.filter((entry) => entry !== null));
 }
 
 /**
@@ -146,14 +160,16 @@ export async function cutClip(source: string, startSec: number, endSec: number):
         "-ac",
         "1",
         "-ar",
-        "44100",
+        String(OUTPUT_RATE),
         "-b:a",
-        "192k",
+        OUTPUT_BITRATE,
         "-y",
         out,
       ],
       { maxBuffer: 16 * 1024 * 1024 },
-    );
+    ).catch((error: unknown) => {
+      throw ffmpegError(error, "cutting the reference");
+    });
     const audio = await fs.readFile(out);
     if (audio.byteLength === 0) throw new Error("ffmpeg produced an empty clip");
     return audio;
@@ -214,6 +230,7 @@ export async function saveReference(input: SaveReference): Promise<Reference> {
       input.userId,
     ],
   );
+  lists.delete(input.lang);
   return (await readReference(input.voice, input.lang))!;
 }
 
@@ -235,6 +252,7 @@ export async function saveTranscript(
       where "voice" = $1 and "lang" = $2`,
     [voice, lang, text, clipHash(audio, text), userId],
   );
+  lists.delete(lang);
   return rowCount ? readReference(voice, lang) : null;
 }
 
@@ -245,4 +263,5 @@ export async function deleteReference(voice: string, lang: Lang): Promise<void> 
     lang,
   ]);
   await fs.rm(referencePath(voice, lang), { force: true });
+  lists.delete(lang);
 }

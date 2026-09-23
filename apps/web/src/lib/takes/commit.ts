@@ -31,6 +31,7 @@ import { BASE_LANG, type Lang } from "@/lib/lang";
 
 import { historyDirOf } from "./adapters";
 import { archiveName, writeAtomic } from "./bytes";
+import type { Provider } from "@/lib/generation/providers";
 
 /** What a take was made with. Anything unknown is null, which means unknown, not unchanged. */
 export type TakeFields = {
@@ -45,7 +46,7 @@ export type TakeFields = {
   characters?: number | null;
   credits?: number | null;
   /** Which generator made it. ElevenLabs when omitted, which every caller before fish was. */
-  provider?: "elevenlabs" | "fish";
+  provider?: Provider;
   /** fish.audio's cost in dollars; never ElevenLabs credits. See migration 0043. */
   costUsd?: number | null;
   spokenHash?: string | null;

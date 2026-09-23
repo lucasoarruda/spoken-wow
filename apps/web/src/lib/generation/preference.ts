@@ -11,12 +11,13 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import type { Lang } from "@/lib/lang";
 import { DEFAULT_FISH_MODEL, isFishModel } from "@/lib/voices/fish";
 
 import type { GenerationConfig } from "./config";
 import { fileDefaults } from "./files";
 import { FISH_DEFAULTS, type FishSettings } from "./fish-tts";
-import { SettingsError, validateConfig } from "./settings";
+import { currentConfig, SettingsError, validateConfig } from "./settings";
 import type { Provider } from "./speakers/speaker";
 
 /** ElevenLabs' model, voice settings and seed strategy: everything but the accent tags. */
@@ -141,4 +142,15 @@ export async function writePreference(userId: string, preference: Preference): P
       JSON.stringify(preference.fish),
     ],
   );
+}
+
+/**
+ * What ElevenLabs is sent with for this collaborator in `lang`: their own settings, and the
+ * language's accent tags, which are the one part of the settings that stayed per language.
+ */
+export async function speakingConfig(
+  elevenlabs: ElevenLabsSettings,
+  lang: Lang,
+): Promise<GenerationConfig> {
+  return { ...elevenlabs, raceTags: (await currentConfig(lang)).raceTags };
 }

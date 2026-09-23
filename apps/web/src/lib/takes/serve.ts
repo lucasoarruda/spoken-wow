@@ -6,16 +6,15 @@
  * (store.ts), so what is left to differ between them is how a URL names the file and
  * whether the answer can be cached for good.
  *
- * Range is answered here because Safari opens audio with `bytes=0-1` and refuses a
- * resource that answers 200, and without it the scrubber cannot seek.
+ * The Range and ETag answer itself is serveFile's (lib/stream.ts), shared with the voice
+ * clips.
  */
 import "server-only";
 
 import { stat } from "node:fs/promises";
 import path from "node:path";
 
-import { parseRange } from "@/lib/range";
-import { streamOf } from "@/lib/stream";
+import { serveFile } from "@/lib/stream";
 
 import { BASE_LANG, langTag, type Lang } from "@/lib/lang";
 
@@ -49,32 +48,10 @@ export async function serveTake(
   const archived = path.basename(bytes.path, ".mp3");
   const etag = lang === BASE_LANG ? `"${archived}"` : `"${lang}-${archived}"`;
 
-  if (!immutable && request.headers.get("if-none-match") === etag) {
-    return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": cacheControl } });
-  }
-
-  const range = parseRange(request.headers.get("range"), info.size);
-  if (range === "unsatisfiable") {
-    return new Response(null, {
-      status: 416,
-      headers: { "Content-Range": `bytes */${info.size}`, "Accept-Ranges": "bytes" },
-    });
-  }
-
-  const headers: Record<string, string> = {
-    "Content-Type": "audio/mpeg",
-    "Accept-Ranges": "bytes",
-    "Cache-Control": cacheControl,
-    ETag: etag,
-  };
-  if (lang !== BASE_LANG) headers["Content-Language"] = langTag(lang);
-
-  if (!range) {
-    headers["Content-Length"] = String(info.size);
-    return new Response(streamOf(bytes.path), { status: 200, headers });
-  }
-
-  headers["Content-Length"] = String(range.end - range.start + 1);
-  headers["Content-Range"] = `bytes ${range.start}-${range.end}/${info.size}`;
-  return new Response(streamOf(bytes.path, range.start, range.end), { status: 206, headers });
+  return serveFile(request, bytes.path, info.size, {
+    etag,
+    cacheControl,
+    revalidate: !immutable,
+    headers: lang === BASE_LANG ? {} : { "Content-Language": langTag(lang) },
+  });
 }

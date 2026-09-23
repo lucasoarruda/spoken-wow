@@ -58,18 +58,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const created = existing ? all.filter((slot) => existing.has(slot.name)).length : 0;
 
   // Not the account's: a fish.audio reference is a row here, the same for every key.
-  const references = Object.fromEntries(
-    [...(await listReferences(lang))].map(([voice, reference]) => [
-      voice,
-      {
-        sample: reference.sample,
-        startSec: reference.startSec,
-        endSec: reference.endSec,
-        transcript: reference.transcript,
-        clipHash: reference.clipHash,
-      },
-    ]),
-  );
+  const references = Object.fromEntries(await listReferences(lang));
   const referenced = all.filter((slot) => slot.name in references).length;
 
   // The page's language's settings and accent tags: the voices are everyone's, but how each

@@ -4,22 +4,21 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ApiKeyStatus, KeyProvider } from "@/lib/api-key";
+import type { ApiKeyStatus } from "@/lib/api-key";
+import { PROVIDER_NAME, type Provider } from "@/lib/generation/providers";
 
 /** What differs between the two providers' sections: the words, and where the key goes. */
 const COPY: Record<
-  KeyProvider,
-  { title: string; endpoint: string; mask: string; placeholder: string; checked: string }
+  Provider,
+  { endpoint: string; mask: string; placeholder: string; checked: string }
 > = {
   elevenlabs: {
-    title: "ElevenLabs key",
     endpoint: "/api/profile/api-key",
     mask: "sk_…••••",
     placeholder: "sk_…",
     checked: "Checked against ElevenLabs before it is stored, which costs no credits.",
   },
   fish: {
-    title: "fish.audio key",
     endpoint: "/api/profile/fish-key",
     mask: "••••",
     placeholder: "fish.audio API key",
@@ -40,7 +39,7 @@ export default function ApiKeySection({
   provider = "elevenlabs",
 }: {
   initial: ApiKeyStatus | null;
-  provider?: KeyProvider;
+  provider?: Provider;
 }) {
   const copy = COPY[provider];
   const [status, setStatus] = useState(initial);
@@ -91,7 +90,7 @@ export default function ApiKeySection({
 
   return (
     <section className="max-w-xl">
-      <h2 className="mb-1 font-medium">{copy.title}</h2>
+      <h2 className="mb-1 font-medium">{PROVIDER_NAME[provider]} key</h2>
       {provider === "elevenlabs" ? (
         <p className="text-muted-foreground mb-4 text-sm">
           Regenerating a line, cloning a voice and previewing a pronunciation all spend credits
@@ -138,7 +137,7 @@ export default function ApiKeySection({
             value={entry}
             autoComplete="off"
             placeholder={copy.placeholder}
-            aria-label={`${copy.title.replace(" key", "")} API key`}
+            aria-label={`${PROVIDER_NAME[provider]} API key`}
             onChange={(event) => setEntry(event.target.value)}
             className="w-80 font-mono"
           />

@@ -38,6 +38,7 @@ const OK: RegenerateResult = {
   bytes: 10,
   characters: 100,
   credits: 55,
+  costUsd: null,
   seed: null,
   voice: "human-male",
   voiceId: "v",
@@ -474,7 +475,7 @@ describe("a fish.audio batch", () => {
   it("runs on the provider it was queued with, with the owner's fish.audio key and settings", async () => {
     const batch = await seed(1, "quests", "fish");
     const asked: string[] = [];
-    const seen: { apiKey: string; provider?: string }[] = [];
+    const seen: string[] = [];
 
     const worker = startWorker(() => true, {
       apiKeyFor: async (_user, provider) => {
@@ -485,7 +486,7 @@ describe("a fish.audio batch", () => {
       budget: async () => 1,
       regenerate: {
         quests: async (_line, _user, options) => {
-          seen.push({ apiKey: options.apiKey, provider: options.speaker?.provider });
+          seen.push(options.speaker.provider);
           return { ...OK, credits: null, costUsd: 0.001 };
         },
       },
@@ -494,7 +495,7 @@ describe("a fish.audio batch", () => {
     await worker.stop();
 
     expect(asked).toEqual(["fish"]);
-    expect(seen).toEqual([{ apiKey: "fish-key", provider: "fish" }]);
+    expect(seen).toEqual(["fish"]);
     const { rows } = await db().query(`select "costUsd"::float8 as usd from "regeneration_job" where "batchId" = $1`, [batch]);
     expect(rows[0].usd).toBeCloseTo(0.001);
   });
@@ -553,7 +554,7 @@ describe("an ElevenLabs batch", () => {
       budget: async () => 1,
       regenerate: {
         quests: async (_line, _user, options) => {
-          seen.push({ provider: options.speaker?.provider, seed: options.speaker?.seedStrategy });
+          seen.push({ provider: options.speaker.provider, seed: options.speaker.seedStrategy });
           return OK;
         },
       },

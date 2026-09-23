@@ -10,17 +10,24 @@
  */
 import { headers } from "next/headers";
 
-import { readApiKey, type KeyProvider } from "@/lib/api-key";
+import { readApiKey } from "@/lib/api-key";
+import { PROVIDER_NAME, type Provider } from "@/lib/generation/providers";
 import { readPreference } from "@/lib/generation/preference";
 import { speakerFrom } from "@/lib/generation/speakers/for";
-import type { Provider, Speaker } from "@/lib/generation/speakers/speaker";
+import type { Speaker } from "@/lib/generation/speakers/speaker";
 import { auth } from "@/lib/auth";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { langParam } from "@/lib/lang-server";
 import { NO_API_KEY } from "@/lib/no-api-key";
 import { currentSession } from "@/lib/session";
 import { viewerOf } from "@/lib/grants/store";
-import { can, canConfigureGeneration, langsWhere, type Capability } from "@/lib/permissions";
+import {
+  can,
+  canConfigureGeneration,
+  langsWhere,
+  spendsCredits,
+  type Capability,
+} from "@/lib/permissions";
 
 export type Session = Awaited<ReturnType<typeof auth.api.getSession>>;
 
@@ -72,13 +79,21 @@ export async function requireConfigure(): Promise<
 // Credentials
 //------------------------------------------------------------------------------
 
+/**
+ * The session of somebody who spends somewhere, or null: the gate on every profile route
+ * that stores a key or a generator choice. Somewhere includes a language grant -- a
+ * translator who may regenerate Portuguese pays with their own key like anybody else.
+ */
+export async function currentSpender() {
+  const session = await currentSession();
+  return session && spendsCredits(await viewerOf(session)) ? session : null;
+}
+
 export type KeyGuard = { key: string; denied: null } | { key: null; denied: Response };
 
 function noKey(message: string): Response {
   return Response.json({ error: message, code: "no_api_key" }, { status: NO_API_KEY });
 }
-
-const PROVIDER_NAME: Record<KeyProvider, string> = { elevenlabs: "ElevenLabs", fish: "fish.audio" };
 
 /**
  * The signed-in user's own key for a provider, for the routes that spend.
@@ -93,7 +108,7 @@ const PROVIDER_NAME: Record<KeyProvider, string> = { elevenlabs: "ElevenLabs", f
  */
 export async function requireApiKey(
   userId: string,
-  provider: KeyProvider = "elevenlabs",
+  provider: Provider = "elevenlabs",
 ): Promise<KeyGuard> {
   const name = PROVIDER_NAME[provider];
   let key: string | null;

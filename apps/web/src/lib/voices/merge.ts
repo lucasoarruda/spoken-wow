@@ -35,9 +35,21 @@ export const MAX_MERGE_INPUTS = 100;
 
 // 192 kbps mono is what ElevenLabs asks for as a floor; the inputs are mixed formats and
 // sample rates, so they are normalised before concat rather than assumed to match.
-const OUTPUT_RATE = 44100;
-const OUTPUT_BITRATE = "192k";
+export const OUTPUT_RATE = 44100;
+export const OUTPUT_BITRATE = "192k";
 const FORMAT = `aformat=sample_fmts=fltp:sample_rates=${OUTPUT_RATE}:channel_layouts=mono`;
+
+/**
+ * An ffmpeg failure as something worth showing: a missing binary said plainly, since a
+ * droplet without ffmpeg would otherwise surface as a spawn error nobody can act on.
+ */
+export function ffmpegError(error: unknown, what: string): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("ENOENT") && message.includes(FFMPEG)) {
+    return new Error(`ffmpeg is not installed or not on PATH (looked for "${FFMPEG}")`);
+  }
+  return new Error(`${what} failed: ${message.slice(0, 400)}`);
+}
 
 export function rejectMerge(files: string[], pauseSeconds: number): string | null {
   if (files.length < 2) return "select at least two clips to merge";
@@ -124,11 +136,7 @@ export async function mergeSamples(
       await fs.copyFile(scratch, path.join(dir, file));
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("ENOENT") && message.includes(FFMPEG)) {
-      throw new Error(`ffmpeg is not installed or not on PATH (looked for "${FFMPEG}")`);
-    }
-    throw new Error(`merge failed: ${message.slice(0, 400)}`);
+    throw ffmpegError(error, "merge");
   } finally {
     await fs.rm(path.dirname(scratch), { recursive: true, force: true });
   }

@@ -24,6 +24,7 @@ import { fishConcurrency, getWallet } from "@/lib/voices/fish";
 import { defaultElevenLabs, readPreference, type Preference } from "./preference";
 import { speakerFrom } from "./speakers/for";
 import type { Provider, Speaker } from "./speakers/speaker";
+import { PROVIDER_NAME } from "./providers";
 
 /**
  * How many times a rate-limited job is retried before it is failed.
@@ -58,9 +59,9 @@ export function backoffFor(attempts: number, random: () => number = Math.random)
  * one job is enough to learn who is next.
  */
 export async function currentBudget(
-  apiKey: string | null = null,
-  provider: Provider = "elevenlabs",
-  modelId: string = defaultElevenLabs().modelId,
+  apiKey: string | null,
+  provider: Provider,
+  modelId: string,
 ): Promise<number> {
   if (provider === "fish" && apiKey) return clampToPool(await fishBudget(apiKey), POOL_MAX);
   const status = await generationStatus(apiKey ? { apiKey } : {});
@@ -101,7 +102,7 @@ async function fishBudget(apiKey: string): Promise<number> {
 export type Generator = (
   lineId: string,
   userId: string,
-  options: { apiKey: string; lang: Lang; speaker?: Speaker },
+  options: { speaker: Speaker; lang: Lang },
 ) => Promise<RegenerateResult>;
 
 export type WorkerOptions = {
@@ -153,16 +154,19 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
   /** When a 429 was last seen, which halves the budget for the cool-down. */
   let rateLimitedAt: number | null = null;
   /**
-   * The key the last claimed job was generated with, for sizing the next pump.
+   * The key, provider and model the last claimed job was generated with, for sizing the next
+   * pump.
    *
    * The budget belongs to a plan, and which plan depends on whose key. Reading it per pump
    * from the job most recently claimed is close enough: a queue holding two people's batches
    * is rare, and the cost of guessing the wrong one is a batch that runs at the other's
    * width for a tick.
    */
-  let lastKey: string | null = null;
-  let lastProvider: Provider = "elevenlabs";
-  let lastModel = defaultElevenLabs().modelId;
+  let last: { key: string | null; provider: Provider; model: string } = {
+    key: null,
+    provider: "elevenlabs",
+    model: defaultElevenLabs().modelId,
+  };
 
   async function run(job: QueueJob): Promise<void> {
     // Whose credits this line is spent from. A batch is enqueued by someone who had a key at
@@ -178,9 +182,8 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     }
 
     if (!apiKey) {
-      const name = job.provider === "fish" ? "fish.audio" : "ElevenLabs";
       const message =
-        `the account that started this batch has no usable ${name} key; set one in your` +
+        `the account that started this batch has no usable ${PROVIDER_NAME[job.provider]} key; set one in your` +
         " profile and start it again";
       try {
         await failJob(job.id, { kind: "auth", message });
@@ -190,14 +193,9 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       }
       return;
     }
-    lastKey = apiKey;
-    lastProvider = job.provider;
-
     // The owner's own settings, read per job so an edit on /profile applies to later lines.
-    const preference = await preferenceFor(job.createdBy ?? "");
-    lastModel =
-      job.provider === "fish" ? preference.fish.model : preference.elevenlabs.modelId;
-    const speaker = speakerFrom(job.provider, apiKey, preference);
+    const speaker = speakerFrom(job.provider, apiKey, await preferenceFor(job.createdBy ?? ""));
+    last = { key: apiKey, provider: job.provider, model: speaker.modelId };
 
     const generate = generators[job.source];
     if (!generate) {
@@ -214,9 +212,8 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     // A batch whose owner's account was deleted still has takes to attribute, and
     // take."createdBy" is nullable for exactly that case.
     const result = await generate(job.lineId, job.createdBy ?? "", {
-      apiKey,
-      lang: job.lang,
       speaker,
+      lang: job.lang,
     }).catch(
       (error: unknown): RegenerateResult => ({
         ok: false,
@@ -287,7 +284,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       if (!isLeader()) return;
 
       const allowed = afterRateLimit(
-        await budget(lastKey, lastProvider, lastModel),
+        await budget(last.key, last.provider, last.model),
         rateLimitedAt,
         Date.now(),
       );

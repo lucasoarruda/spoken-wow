@@ -31,8 +31,8 @@ export const FISH_DEFAULTS = { temperature: 0.7, topP: 0.7, speed: 1 } as const;
 export type FishSpeechRequest = {
   /** In order; `speaker` indexes `references`. */
   turns: { text: string; speaker: number }[];
-  /** One list of clips per speaker. */
-  references: FishReference[][];
+  /** One clip per speaker. */
+  references: FishReference[];
   settings: FishSettings;
 };
 
@@ -52,9 +52,9 @@ export function buildFishPayload(request: FishSpeechRequest): Record<string, unk
   const single = request.references.length === 1;
   return {
     text: fishText(request),
-    // A list for one speaker, a list of lists for several -- which fish.audio then pairs
-    // with reference_id by position. The ids themselves may be anything for zero-shot.
-    references: single ? request.references[0] : request.references,
+    // fish.audio takes a list of clips for one speaker and a list of lists for several, which
+    // it pairs with reference_id by position. The ids themselves may be anything for zero-shot.
+    references: single ? request.references : request.references.map((clip) => [clip]),
     ...(single ? {} : { reference_id: request.references.map((_, index) => String(index)) }),
     temperature: settings.temperature,
     top_p: settings.topP,

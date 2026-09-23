@@ -7,7 +7,7 @@
  */
 import { db } from "@/lib/db";
 import type { Lang } from "@/lib/lang";
-import { FISH_MODELS } from "@/lib/voices/fish";
+import { fishPrice } from "@/lib/voices/fish";
 
 import { CALIBRATION_SAMPLE, LIST_RATE, type Rate } from "./billing";
 
@@ -95,8 +95,8 @@ export async function observedFishRate(modelId: string, lang: Lang): Promise<Rat
 
   // A model fish.audio has not priced has no list rate either, and is said to be unknown
   // rather than given a guess.
-  const perByte = FISH_MODELS.find((model) => model.id === modelId)?.usdPerMillionBytes;
-  if (perByte === null || perByte === undefined) {
+  const perByte = fishPrice(modelId);
+  if (perByte === null) {
     return { rate: 0, unit: "usd", unknown: true, samples: 0, modelId };
   }
   const width = BYTES_PER_CHARACTER[lang] ?? ACCENTED_LATIN;

@@ -20,6 +20,8 @@ const historyDir = (file: string) => historyDirOf("quests", file);
 const { archiveName } = await import("@/lib/takes/bytes");
 const { listTakes } = await import("@/lib/takes/store");
 const { regenerateLine } = await import("./regenerate");
+const { elevenLabsSpeaker } = await import("./speakers/elevenlabs");
+const { defaultElevenLabs } = await import("./preference");
 const { LEAD_IN } = await import("./leadin");
 const { audioRelPath } = await import("@/lib/audio");
 const { lineIndex } = await import("@/lib/quests/catalogue");
@@ -100,9 +102,12 @@ function stub({ voices = DEFAULT_VOICES, speech }: StubOptions = {}) {
   return {
     calls,
     options: {
-      apiKey: "test-key",
-      baseUrl: "https://stub.invalid",
-      fetchImpl: fetchImpl as unknown as typeof globalThis.fetch,
+      speaker: elevenLabsSpeaker({
+        apiKey: "test-key",
+        baseUrl: "https://stub.invalid",
+        fetchImpl: fetchImpl as unknown as typeof globalThis.fetch,
+        settings: defaultElevenLabs(),
+      }),
     },
   };
 }

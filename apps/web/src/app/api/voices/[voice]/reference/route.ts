@@ -6,13 +6,10 @@
  * fish.audio key -- the rule every other paid action here follows. It costs a fraction of a
  * cent, but a server-wide key would still leave "who paid" with no answer.
  */
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import { requireApiKey } from "@/lib/generation/authz";
 import { elevenLabsCode } from "@/lib/lang";
 import { langParam } from "@/lib/lang-server";
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { requireVoiceManager } from "@/lib/voices/authz";
 import { cloneName } from "@/lib/voices/clone-name";
 import { transcribe } from "@/lib/voices/fish";
 import {
@@ -29,12 +26,10 @@ export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ voice: string }> };
 
 async function guard(request: Request, voice: string) {
-  const denied = await denyVoiceRequest(voice);
+  const { session, denied } = await requireVoiceManager(voice);
   if (denied) return { denied } as const;
   const { lang, denied: noLang } = await langParam(request);
   if (noLang) return { denied: noLang } as const;
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) return { denied: Response.json({ error: "not allowed" }, { status: 403 }) } as const;
   return { denied: null, lang, session } as const;
 }
 

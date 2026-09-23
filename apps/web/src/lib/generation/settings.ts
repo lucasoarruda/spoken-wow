@@ -230,41 +230,6 @@ async function upsertLanguage(
   );
 }
 
-export async function writeSettings(
-  config: GenerationConfig,
-  updatedBy: string,
-  lang: Lang = BASE_LANG,
-): Promise<void> {
-  if (lang !== BASE_LANG) {
-    // The tags ride along only on the insert, for the reason the English upsert below gives.
-    await upsertLanguage(lang, config, updatedBy, ["modelId", "voiceSettings", "seedStrategy"]);
-    return;
-  }
-  await db().query(
-    `insert into "generation_setting"
-       ("id", "modelId", "voiceSettings", "seedStrategy", "raceTags", "updatedAt", "updatedBy")
-     values (true, $1, $2, $3, $4, now(), $5)
-     on conflict ("id") do update set
-       "modelId"       = excluded."modelId",
-       "voiceSettings" = excluded."voiceSettings",
-       "seedStrategy"  = excluded."seedStrategy",
-       -- "raceTags" deliberately absent: they are edited on /voices, by writeRaceTags, and
-       -- the settings form no longer shows them. Its config carries whatever they were when
-       -- the page loaded, so writing those back would let a Save on the model silently
-       -- revert a direction somebody set in the meantime. The insert above still seeds them,
-       -- because a row being created has no earlier value to preserve.
-       "updatedAt"     = excluded."updatedAt",
-       "updatedBy"     = excluded."updatedBy"`,
-    [
-      config.modelId,
-      JSON.stringify(config.voiceSettings),
-      config.seedStrategy,
-      JSON.stringify(config.raceTags),
-      updatedBy,
-    ],
-  );
-}
-
 /**
  * Change the accent directions and nothing else.
  *
@@ -311,16 +276,4 @@ export async function writeRaceTags(
       updatedBy,
     ],
   );
-}
-
-/**
- * Drop the override, so the committed defaults are in force again -- or, for another
- * language, so it follows English again.
- */
-export async function resetSettings(lang: Lang = BASE_LANG): Promise<void> {
-  if (lang !== BASE_LANG) {
-    await db().query(`delete from "generation_setting_locale" where "lang" = $1`, [lang]);
-    return;
-  }
-  await db().query(`delete from "generation_setting" where "id"`);
 }

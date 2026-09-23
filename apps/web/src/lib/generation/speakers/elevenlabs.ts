@@ -12,10 +12,9 @@ import { elevenLabsCode, type Lang } from "@/lib/lang";
 import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
 
 import { currentLocator } from "../dictionary";
-import { defaultElevenLabs, type ElevenLabsSettings } from "../preference";
+import type { ElevenLabsSettings } from "../preference";
 import { generationStatus } from "../status";
 import { textToDialogue, textToSpeech } from "../tts";
-import { SHAPE } from "./shape";
 import type { Speaker, SpeakRequest, Spoken, Voices } from "./speaker";
 
 /**
@@ -36,13 +35,13 @@ export const OUTPUT_FORMAT = "mp3_44100_128";
  * spending account does not own.
  */
 export function elevenLabsSpeaker(
-  options: ElevenLabsOptions & { settings?: ElevenLabsSettings },
+  options: ElevenLabsOptions & { settings: ElevenLabsSettings },
 ): Speaker {
-  // The collaborator's own (see preference.ts). The built-in settings only where no caller
-  // said, which is a test or a path that predates the choice.
-  const config = options.settings ?? defaultElevenLabs();
+  // The collaborator's own (see preference.ts).
+  const config = options.settings;
   return {
     provider: "elevenlabs",
+    modelId: config.modelId,
     seedStrategy: config.seedStrategy,
 
     async voices(lang: Lang): Promise<Voices> {
@@ -56,10 +55,9 @@ export function elevenLabsSpeaker(
       return `no ElevenLabs voice named "${voice}"`;
     },
 
-    shape: SHAPE.elevenlabs,
 
     async speak(request: SpeakRequest): Promise<Spoken> {
-      const { turns, lang, seed, dialogue = turns.length > 1 } = request;
+      const { turns, lang, seed, dialogue } = request;
       // Read per request, not per batch: an admin saving the lexicon mid-batch should affect
       // the lines after the save, and pinning one locator for a whole batch would record a
       // version that some of its takes were not made with.
