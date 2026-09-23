@@ -14,7 +14,7 @@
  * a property of the text that will be sent. The corpus's `generatable` flag cannot answer it,
  * having been computed in Python from text that nobody could edit yet.
  */
-import { BASE_LANG, elevenLabsCode, type Lang } from "@/lib/lang";
+import { BASE_LANG, type Lang } from "@/lib/lang";
 import { audioRelPath } from "@/lib/audio";
 import type { CorpusLine } from "@/lib/corpus";
 import { lineIndex } from "@/lib/quests/catalogue";
@@ -23,14 +23,13 @@ import { readOverrides } from "@/lib/quests/overrides";
 import { commitTake } from "@/lib/takes/commit";
 import { INVALID_CHARS, isVoiceable } from "@/lib/text-gate";
 
-import { currentLocator } from "./dictionary";
 import { committedPronunciation } from "./files";
 import { canonicalNpcId, seedFor } from "./seed";
 import { spokenHash } from "./spoken-hash";
 import { currentConfig } from "./settings";
-import { generationStatus } from "./status";
-import { accentTagged, audioTags, NARRATOR_VOICE, segments } from "./narration";
-import { textToDialogue, textToSpeech } from "./tts";
+import { NARRATOR_VOICE, segments } from "./narration";
+import { elevenLabsSpeaker } from "./speakers/elevenlabs";
+import type { Speaker } from "./speakers/speaker";
 import { BUSY, withTakeLock } from "./lock";
 import { busy, failure, type Failure } from "./errors";
 import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
@@ -42,7 +41,7 @@ export type RegenerateSuccess = {
   version: number;
   bytes: number;
   characters: number;
-  /** What this cost, exactly, from ElevenLabs. null when it did not say. */
+  /** What this cost, exactly, in ElevenLabs credits. null when it did not say. */
   credits: number | null;
   seed: number | null;
   voice: string;
@@ -76,9 +75,10 @@ async function resolve(lineId: string, lang: Lang): Promise<CorpusLine[] | null>
 export async function regenerateLine(
   lineId: string,
   createdBy: string,
-  options: ElevenLabsOptions & { lang?: Lang } = {},
+  options: ElevenLabsOptions & { lang?: Lang; speaker?: Speaker } = {},
 ): Promise<RegenerateResult> {
   const lang = options.lang ?? BASE_LANG;
+  const speaker = options.speaker ?? elevenLabsSpeaker(options);
   const group = await resolve(lineId, lang);
   if (!group) {
     return { ok: false, failure: { ...failure("bad-request", `no line ${lineId}`), status: 404 } };
@@ -133,94 +133,70 @@ export async function regenerateLine(
     };
   }
 
-  // The account, not the provenance table: a voice created in the ElevenLabs dashboard is
-  // just as real to tts_cli/voices.py, and refusing to notice it would block a usable voice.
-  // This language's clones: a slot cloned in English has no German voice until German clips
+  // This language's voices: a slot cloned in English has no German voice until German clips
   // are cloned into it.
-  const status = await generationStatus(options, lang);
-  if (status.error && status.voiceIds.size === 0) {
-    return { ok: false, failure: failure("auth", status.error) };
+  const voices = await speaker.voices(lang);
+  if (voices.error && voices.ids.size === 0) {
+    return { ok: false, failure: failure("auth", voices.error) };
   }
 
-  const voiceId = status.voiceIds.get(line.voice);
+  const voiceId = voices.ids.get(line.voice);
   if (!voiceId) {
     return {
       ok: false,
       failure: failure(
         "voice-missing",
-        `no ElevenLabs voice named "${line.voice}". Create it on /voices before generating this line.`,
+        `${speaker.missing(line.voice)}. Create it on /voices before generating this line.`,
       ),
     };
   }
 
   const outcome = await withTakeLock("quests", file, async (): Promise<RegenerateResult> => {
     const config = await currentConfig(lang);
-    // The accent direction goes on last, so it sits in front of the words rather than in
-    // front of a `<hic>` audioTags has yet to rewrite. Inside spokenText and not bolted on at
-    // the request, because these are characters ElevenLabs bills and the staleness check
-    // hashes: a take that under-reported them would be mispriced and permanently stale.
+    // Inside spokenText and not bolted on at the request, because these are characters the
+    // provider bills and the staleness check hashes: a take that under-reported them would
+    // be mispriced and permanently stale.
     //
     // The committed pronunciation rules are English's spellings of English words; another
-    // language is spoken with its own lexicon, through the dictionary below, and nothing else.
-    const spokenText = accentTagged(
-      audioTags(committedPronunciation(source, lang)),
+    // language is spoken with its own lexicon, which the speaker applies, and nothing else.
+    const spokenText = speaker.shape(
+      committedPronunciation(source, lang),
       config.raceTags[line.race],
     );
-    // Read inside the lock and per line, not hoisted: an admin saving the lexicon mid-batch
-    // should affect the lines after the save, and pinning one locator for a whole batch
-    // would record a version that some of those takes were not made with.
-    const dictionary = await currentLocator(lang);
-    const languageCode = elevenLabsCode(lang);
     // Lowest npcId in the group, so a file shared by many NPCs regenerates the same way
     // whichever row the button was pressed on. See canonicalNpcId.
     const seed = seedFor(canonicalNpcId(group), config.seedStrategy);
 
     // A capitalised <stage direction> is the game narrating, not the NPC talking, so the line
-    // is spoken by two voices and ElevenLabs stitches the turns into one file. Everything
-    // below - seed, dictionary, credit accounting - is identical either way.
+    // is spoken by two voices and the speaker makes one file of the turns. Everything below -
+    // seed, dictionary, credit accounting - is identical either way.
     const parts = segments(spokenText);
     const narrated = parts.some((part) => part.speaker === "narrator");
 
-    // Resolved by name from the account, because narrator-male is not a race-gender-flavor
-    // slot and so has no corpus line to read it off.
-    const narratorVoiceId = narrated ? status.voiceIds.get(NARRATOR_VOICE) : undefined;
+    // Resolved by name, because narrator-male is not a race-gender-flavor slot and so has no
+    // corpus line to read it off.
+    const narratorVoiceId = narrated ? voices.ids.get(NARRATOR_VOICE) : undefined;
     if (narrated && !narratorVoiceId) {
       return {
         ok: false,
         failure: failure(
           "voice-missing",
-          `no ElevenLabs voice named "${NARRATOR_VOICE}". Create it on /voices before generating a line with stage directions.`,
+          `${speaker.missing(NARRATOR_VOICE)}. Create it on /voices before generating a line with stage directions.`,
         ),
       };
     }
 
-    const speech = narrated
-      ? await textToDialogue(
-          {
-            inputs: parts.map((part) => ({
-              text: part.text,
-              voiceId: part.speaker === "narrator" ? narratorVoiceId! : voiceId,
-            })),
-            modelId: config.modelId,
-            stability: config.voiceSettings.stability,
-            seed,
-            dictionary,
-            languageCode,
-          },
-          options,
-        )
-      : await textToSpeech(
-          {
-            voiceId,
-            text: spokenText,
-            modelId: config.modelId,
-            voiceSettings: config.voiceSettings,
-            seed,
-            dictionary,
-            languageCode,
-          },
-          options,
-        );
+    const speech = await speaker.speak({
+      turns: narrated
+        ? parts.map((part) => ({
+            text: part.text,
+            voiceId: part.speaker === "narrator" ? narratorVoiceId! : voiceId,
+          }))
+        : [{ text: spokenText, voiceId }],
+      lang,
+      seed,
+      dialogue: narrated,
+    });
     if (!speech.ok) return { ok: false, failure: speech.failure };
 
     // Already trimmed of its lead-in by tts.ts, so the archived file and `bytes` both
@@ -234,17 +210,13 @@ export async function regenerateLine(
         voice: line.voice,
         narratorVoice: narrated ? NARRATOR_VOICE : null,
         voiceId,
-        modelId: config.modelId,
+        modelId: speech.made.modelId,
         seed,
         characters: spokenText.length,
         credits: speech.credits,
-        // What was actually sent: the dialogue endpoint takes only stability, and a row
-        // claiming the other three would describe a take that never had them.
-        settings: narrated
-          ? { stability: config.voiceSettings.stability }
-          : config.voiceSettings,
+        settings: speech.made.settings,
         spokenHash: spokenHash(spokenText),
-        dictionaryVersion: dictionary?.versionId ?? null,
+        dictionaryVersion: speech.made.dictionaryVersion,
         leadIn: speech.leadIn,
         leadInSec: speech.leadInSec,
         createdBy,
@@ -264,7 +236,7 @@ export async function regenerateLine(
       voice: line.voice,
       voiceId,
       spokenText,
-      dictionaryVersion: dictionary?.versionId ?? null,
+      dictionaryVersion: speech.made.dictionaryVersion,
       sharedWith: new Set(group.map((l) => `${l.npcType}:${l.npcId}`)).size - 1,
     };
   }, lang);

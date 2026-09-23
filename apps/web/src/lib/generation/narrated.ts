@@ -12,19 +12,28 @@
  * what to do next from `kind` and `fatal`: running out of credits fails every remaining
  * line identically and stops the batch, while one line that cannot be voiced is one line.
  *
- * THE REQUEST ITSELF IS lib/generation/tts.ts, the same client quests narrates through.
+ * THE REQUEST ITSELF IS the Speaker's (./speakers), the same one quests narrates through.
+ *
+ * The narrator is the `narrator-male` slot on /voices, resolved by name against the account
+ * the request is spending from. It is the same roster entry the quests side narrates its
+ * stage directions with; the two were always the same voice on the same account, and only
+ * the zones site's old config file made them look separate. The model, settings and
+ * lexicon are the ones both sections read, so a narrator is never cut with a different
+ * model from the NPC beside it without somebody choosing that.
  */
-import { BASE_LANG, elevenLabsCode } from "@/lib/lang";
+import { BASE_LANG } from "@/lib/lang";
 import "server-only";
 
 import { commitTake } from "@/lib/takes/commit";
+import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
 import { durationOf } from "@/lib/zones/tools";
-import { narratorConfig, NarratorMissing, type VoiceConfig } from "@/lib/zones/voice";
 
 import { busy, failure } from "./errors";
 import { BUSY, withTakeLock } from "./lock";
+import { NARRATOR_VOICE } from "./narration";
 import type { RegenerateResult } from "./regenerate";
-import { textToSpeech } from "./tts";
+import { elevenLabsSpeaker } from "./speakers/elevenlabs";
+import type { Speaker, Spoken } from "./speakers/speaker";
 import type { Lang } from "@/lib/lang";
 
 /** What a section hands over once it has found a line and decided it can be voiced. */
@@ -38,14 +47,8 @@ export type NarratedLine = {
   hash: string;
 };
 
-/**
- * Resolving the narrator can fail before any request is made.
- *
- * Only this one kind: textToSpeech returns its own classified failure rather than
- * throwing, so there is nothing to recover from a message.
- */
+/** Anything thrown on the way to a take is reported as a failure, never let out. */
 function asFailure(error: unknown) {
-  if (error instanceof NarratorMissing) return failure("voice-missing", error.message);
   return failure("upstream", error instanceof Error ? error.message : String(error));
 }
 
@@ -53,42 +56,42 @@ export async function regenerateNarrated(
   source: "zones" | "books",
   line: NarratedLine,
   createdBy: string,
-  options: { apiKey: string; lang?: Lang },
+  options: ElevenLabsOptions & { lang?: Lang; speaker?: Speaker },
 ): Promise<RegenerateResult> {
-  let config: VoiceConfig;
-  try {
-    config = await narratorConfig(options.apiKey, options.lang ?? BASE_LANG);
-  } catch (error) {
-    return { ok: false, failure: asFailure(error) };
+  const lang = options.lang ?? BASE_LANG;
+  const speaker = options.speaker ?? elevenLabsSpeaker(options);
+
+  // Each language has its own narrator, like every other voice.
+  const voices = await speaker.voices(lang);
+  const voiceId = voices.ids.get(NARRATOR_VOICE);
+  if (!voiceId) {
+    return {
+      ok: false,
+      failure: failure(
+        "voice-missing",
+        `${speaker.missing(NARRATOR_VOICE)} on this account. ` +
+          "Create it on /voices before generating zone lore.",
+      ),
+    };
   }
 
-  // Held across the ElevenLabs call, not just the write: two requests for one line must not
-  // both spend credits, and a restore must not interleave with the commit.
-  const lang = options.lang ?? BASE_LANG;
-  // The language's own lexicon, which narratorConfig read for it.
-  const dictionary =
-    config.dictionaryId && config.dictionaryVersionId
-      ? { dictionaryId: config.dictionaryId, versionId: config.dictionaryVersionId }
-      : null;
-
+  // Held across the request, not just the write: two requests for one line must not both
+  // spend credits, and a restore must not interleave with the commit.
   const outcome = await withTakeLock(source, line.file, async (): Promise<RegenerateResult> => {
     // No seed: a line is narrated once and re-rolled by hand if it comes out wrong, so
     // there is nothing to reproduce bit for bit.
-    const speech = await textToSpeech(
-      {
-        voiceId: config.voiceId!,
-        text: line.spoken,
-        modelId: config.modelId,
-        voiceSettings: config.voiceSettings,
-        seed: null,
-        dictionary,
-        languageCode: elevenLabsCode(lang),
-      },
-      { apiKey: options.apiKey },
-    );
+    //
+    // Caught because the settings and lexicon are read in here, and a database that will
+    // not answer is one line's failure for the worker to weigh, not an exception.
+    let speech: Spoken;
+    try {
+      speech = await speaker.speak({ turns: [{ text: line.spoken, voiceId }], lang, seed: null });
+    } catch (error) {
+      return { ok: false, failure: asFailure(error) };
+    }
     if (!speech.ok) return { ok: false, failure: speech.failure };
-    // Already trimmed of its lead-in by tts.ts: what is written here is what the addon plays.
-    const { audio, credits } = speech;
+    // Already trimmed of its lead-in: what is written here is what the addon plays.
+    const { audio, credits, made } = speech;
 
     try {
       const committed = await commitTake(
@@ -97,17 +100,17 @@ export async function regenerateNarrated(
         audio,
         {
           lineId: line.lineId,
-          voiceId: config.voiceId ?? null,
-          modelId: config.modelId,
-          outputFormat: config.outputFormat,
+          voiceId,
+          modelId: made.modelId,
+          outputFormat: made.outputFormat,
           // Unlike an imported take, this one knows exactly what it was made with, so a
           // version that sounded right can be reproduced after the settings have moved on.
-          settings: config.voiceSettings,
+          settings: made.settings,
           characters: line.spoken.length,
           credits,
           spokenHash: line.hash,
-          dictionaryId: dictionary?.dictionaryId ?? null,
-          dictionaryVersion: dictionary?.versionId ?? null,
+          dictionaryId: made.dictionaryId,
+          dictionaryVersion: made.dictionaryVersion,
           leadIn: speech.leadIn,
           leadInSec: speech.leadInSec,
           createdBy,
@@ -127,10 +130,9 @@ export async function regenerateNarrated(
         // regenerates the same way whichever row the button was pressed on; here every line
         // has a file of its own and one narrator, so there is nothing to hold steady.
         seed: null,
-        voice: config.voiceName,
-        // narratorConfig resolves this or throws, so it is set by the time we are here.
-        voiceId: config.voiceId!,
-        dictionaryVersion: dictionary?.versionId ?? null,
+        voice: NARRATOR_VOICE,
+        voiceId,
+        dictionaryVersion: made.dictionaryVersion,
         spokenText: line.spoken,
         // Nothing else plays this file: every line has its own, which is the whole
         // difference from a quests gossip file named after its text.
