@@ -20,7 +20,7 @@ import { readLexicon } from "../dictionary";
 import { failure } from "../errors";
 import { applyFishLexicon, fishRules, type FishRule } from "../fish-lexicon";
 import { fishSpeech, type FishSettings } from "../fish-tts";
-import { accentTagged, audioTags } from "../narration";
+import { SHAPE } from "./shape";
 import type { Speaker, SpeakRequest, Spoken, Voices } from "./speaker";
 
 /** What a fish.audio take is recorded as having been cut at: what fish-tts.ts asks for. */
@@ -44,11 +44,7 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
       return `no fish.audio reference for "${voice}"`;
     },
 
-    shape(text: string, raceTag: string | undefined): string {
-      // fish.audio's S2 models read [bracketed] cues as directions, so the ElevenLabs shaping
-      // carries over as it is until the spike shows which of them fish.audio performs.
-      return accentTagged(audioTags(text), raceTag);
-    },
+    shape: SHAPE.fish,
 
     async speak({ turns, lang }: SpeakRequest): Promise<Spoken> {
       // One speaker per distinct voice, in order of first appearance: the NPC is speaker 0

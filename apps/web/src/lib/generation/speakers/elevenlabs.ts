@@ -12,10 +12,10 @@ import { elevenLabsCode, type Lang } from "@/lib/lang";
 import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
 
 import { currentLocator } from "../dictionary";
-import { accentTagged, audioTags } from "../narration";
 import { currentConfig } from "../settings";
 import { generationStatus } from "../status";
 import { textToDialogue, textToSpeech } from "../tts";
+import { SHAPE } from "./shape";
 import type { Speaker, SpeakRequest, Spoken, Voices } from "./speaker";
 
 /**
@@ -50,11 +50,7 @@ export function elevenLabsSpeaker(options: ElevenLabsOptions): Speaker {
       return `no ElevenLabs voice named "${voice}"`;
     },
 
-    shape(text: string, raceTag: string | undefined): string {
-      // The accent direction goes on last, so it sits in front of the words rather than in
-      // front of a `<hic>` audioTags has yet to rewrite.
-      return accentTagged(audioTags(text), raceTag);
-    },
+    shape: SHAPE.elevenlabs,
 
     async speak(request: SpeakRequest): Promise<Spoken> {
       const { turns, lang, seed, dialogue = turns.length > 1 } = request;

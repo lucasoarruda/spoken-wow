@@ -92,3 +92,26 @@ describe("estimate", () => {
     expect(estimate([], rate).rate).toEqual(rate);
   });
 });
+
+describe("a fish.audio estimate", () => {
+  const fishRate = { rate: 0.000015, unit: "usd" as const, samples: 0, modelId: "s2.1-pro" };
+
+  it("is dollars, unrounded, and no credits", () => {
+    const result = estimate([{ file: "quests/1-accept.mp3", characters: 1000 }], fishRate);
+    expect(result.credits).toBe(0);
+    expect(result.usd).toBeCloseTo(0.015);
+  });
+
+  it("is unknown for a model with no price, rather than free", () => {
+    const result = estimate([{ file: "quests/1-accept.mp3", characters: 1000 }], {
+      ...fishRate,
+      rate: 0,
+      unknown: true,
+    });
+    expect(result.usd).toBeNull();
+  });
+
+  it("leaves an ElevenLabs estimate with no dollars at all", () => {
+    expect(estimate([{ file: "a.mp3", characters: 100 }], rate).usd).toBeNull();
+  });
+});

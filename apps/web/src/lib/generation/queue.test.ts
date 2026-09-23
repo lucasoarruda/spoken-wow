@@ -226,6 +226,19 @@ describe("snapshot", () => {
     expect(seen.unpriced).toBeGreaterThanOrEqual(1);
   });
 
+  it("sums fish.audio's dollars apart from credits, and counts them as priced", async () => {
+    const batch = await newBatch();
+    await enqueue(batch, [line(1)], "quests");
+    const before = await snapshot(null);
+    const a = await claimNext();
+    await finishJob(a!.id, { version: 1, credits: null, costUsd: 0.0042 });
+
+    const seen = await snapshot(null);
+    expect(seen.costUsd - before.costUsd).toBeCloseTo(0.0042);
+    expect(seen.credits).toBe(before.credits);
+    expect(seen.unpriced).toBe(before.unpriced);
+  });
+
   it("reports jobs finished after the cursor, and not before it", async () => {
     const batch = await newBatch();
     await enqueue(batch, [line(1), line(2)], "quests");

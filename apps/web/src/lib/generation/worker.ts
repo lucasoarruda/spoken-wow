@@ -193,7 +193,11 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     // the log explains the duplicate charge.
     try {
       if (result.ok) {
-        await finishJob(job.id, { version: result.version, credits: result.credits });
+        await finishJob(job.id, {
+          version: result.version,
+          credits: result.credits,
+          costUsd: result.costUsd,
+        });
         return;
       }
 

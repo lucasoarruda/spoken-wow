@@ -91,7 +91,7 @@ export async function regenerateNarrated(
     }
     if (!speech.ok) return { ok: false, failure: speech.failure };
     // Already trimmed of its lead-in: what is written here is what the addon plays.
-    const { audio, credits, made } = speech;
+    const { audio, credits, costUsd, made } = speech;
 
     try {
       const committed = await commitTake(
@@ -108,6 +108,8 @@ export async function regenerateNarrated(
           settings: made.settings,
           characters: line.spoken.length,
           credits,
+          provider: speaker.provider,
+          costUsd,
           spokenHash: line.hash,
           dictionaryId: made.dictionaryId,
           dictionaryVersion: made.dictionaryVersion,
@@ -126,6 +128,7 @@ export async function regenerateNarrated(
         bytes: committed.bytes,
         characters: line.spoken.length,
         credits,
+        costUsd,
         // No seed. The quests side derives one per NPC so a file shared by several of them
         // regenerates the same way whichever row the button was pressed on; here every line
         // has a file of its own and one narrator, so there is nothing to hold steady.

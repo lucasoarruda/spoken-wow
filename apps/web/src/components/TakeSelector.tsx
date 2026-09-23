@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { Take } from "@/lib/takes/store";
 import { cn } from "@/lib/utils";
 import type { Source } from "@/lib/sections";
+import { usd } from "@/lib/generation/money";
 
 function when(iso: string): string {
   const date = new Date(iso);
@@ -275,6 +276,8 @@ export default function TakeSelector({
                     {/* Nothing recorded how an imported take was made, so nothing is
                         claimed about it. */}
                     {take.credits !== null && ` · ${take.credits} credits`}
+                    {take.costUsd !== null && ` · ${usd(take.costUsd)}`}
+                    {take.provider === "fish" && " · fish.audio"}
                   </div>
                 </div>
 

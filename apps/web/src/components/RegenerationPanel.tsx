@@ -4,6 +4,7 @@ import { Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { QueueSnapshot } from "@/lib/generation/client";
+import { usd } from "@/lib/generation/money";
 
 function n(value: number): string {
   return value.toLocaleString();
@@ -87,7 +88,11 @@ export default function RegenerationPanel({
           <span className="text-muted-foreground ml-auto font-mono text-xs">
             {/* Unpriced takes are counted separately rather than folded in as zero, which
                 would understate the total and look like a bargain. */}
-            {n(snapshot.credits)} credits
+            {/* Each provider in its own unit, side by side and never summed: a total that
+                added dollars to credits would be wrong without looking wrong. */}
+            {(snapshot.credits > 0 || snapshot.costUsd === 0) && `${n(snapshot.credits)} credits`}
+            {snapshot.credits > 0 && snapshot.costUsd > 0 && " · "}
+            {snapshot.costUsd > 0 && usd(snapshot.costUsd)}
             {snapshot.unpriced > 0 && ` · ${n(snapshot.unpriced)} unpriced`}
           </span>
 

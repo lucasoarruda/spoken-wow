@@ -32,6 +32,9 @@ export type Take = {
   archiveFile: string | null;
   characters: number | null;
   credits: number | null;
+  /** Dollars, for a fish.audio take. Never summed with credits. */
+  costUsd: number | null;
+  provider: "elevenlabs" | "fish";
   modelId: string | null;
   createdAt: string;
   createdByName: string | null;
@@ -40,7 +43,8 @@ export type Take = {
 type Row = Omit<Take, "createdAt"> & { createdAt: Date };
 
 const COLUMNS = `t."version", t."isCurrent", t."origin", t."archiveFile", t."characters",
-                 t."credits", t."modelId", t."createdAt", u."name" as "createdByName"`;
+                 t."credits", t."costUsd"::float8 as "costUsd", t."provider", t."modelId",
+                 t."createdAt", u."name" as "createdByName"`;
 
 /** Every take of one file, newest first, without asking the filesystem anything. */
 export async function listTakes(

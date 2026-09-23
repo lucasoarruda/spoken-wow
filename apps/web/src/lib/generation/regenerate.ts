@@ -43,6 +43,8 @@ export type RegenerateSuccess = {
   characters: number;
   /** What this cost, exactly, in ElevenLabs credits. null when it did not say. */
   credits: number | null;
+  /** What this cost in dollars, for a fish.audio take. */
+  costUsd?: number | null;
   seed: number | null;
   voice: string;
   voiceId: string;
@@ -214,6 +216,8 @@ export async function regenerateLine(
         seed,
         characters: spokenText.length,
         credits: speech.credits,
+        provider: speaker.provider,
+        costUsd: speech.costUsd,
         settings: speech.made.settings,
         spokenHash: spokenHash(spokenText),
         dictionaryVersion: speech.made.dictionaryVersion,
@@ -232,6 +236,7 @@ export async function regenerateLine(
       bytes: committed.bytes,
       characters: spokenText.length,
       credits: speech.credits,
+      costUsd: speech.costUsd,
       seed,
       voice: line.voice,
       voiceId,

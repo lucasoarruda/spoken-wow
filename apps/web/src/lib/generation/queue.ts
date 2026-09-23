@@ -62,7 +62,9 @@ export type QueueSnapshot = {
   counts: Record<JobState, number>;
   /** Summed from what ElevenLabs charged, never from the estimate. */
   credits: number;
-  /** Takes ElevenLabs did not price, counted rather than assumed to be free. */
+  /** Summed from what fish.audio jobs cost, in dollars; never added to `credits`. */
+  costUsd: number;
+  /** Takes neither provider priced, counted rather than assumed to be free. */
   unpriced: number;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
@@ -202,14 +204,14 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
 
 export async function finishJob(
   id: string,
-  result: { version: number; credits: number | null },
+  result: { version: number; credits: number | null; costUsd?: number | null },
 ): Promise<void> {
   await db().query(
     `update "regeneration_job"
-        set "state" = 'done', "version" = $2, "credits" = $3,
+        set "state" = 'done', "version" = $2, "credits" = $3, "costUsd" = $4,
             "finishedAt" = now(), "leaseUntil" = null
       where "id" = $1`,
-    [id, result.version, result.credits],
+    [id, result.version, result.credits, result.costUsd ?? null],
   );
 }
 
@@ -300,6 +302,7 @@ type JobAggregateRow = {
   failed: string;
   cancelled: string;
   credits: string;
+  costUsd: string;
   unpriced: string;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
@@ -364,7 +367,9 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
            count(*) filter (where "state" = 'failed')::text as failed,
            count(*) filter (where "state" = 'cancelled')::text as cancelled,
            coalesce(sum("credits"), 0)::text as credits,
-           count(*) filter (where "state" = 'done' and "credits" is null)::text as unpriced
+           coalesce(sum("costUsd"), 0)::text as "costUsd",
+           count(*) filter (where "state" = 'done' and "credits" is null and "costUsd" is null)::text
+             as unpriced
          from "regeneration_job"
          where ${window}
        ),
@@ -416,6 +421,7 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
       cancelled: Number(row.cancelled),
     },
     credits: Number(row.credits),
+    costUsd: Number(row.costUsd),
     unpriced: Number(row.unpriced),
     running: row.running,
     failures: row.failures,
