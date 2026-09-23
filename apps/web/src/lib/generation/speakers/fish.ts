@@ -10,11 +10,15 @@
  */
 import "server-only";
 
+import crypto from "node:crypto";
+
 import type { Lang } from "@/lib/lang";
 import { fishCost, type FishOptions } from "@/lib/voices/fish";
 import { listReferences, loadReferences } from "@/lib/voices/references";
 
+import { readLexicon } from "../dictionary";
 import { failure } from "../errors";
+import { applyFishLexicon, fishRules, type FishRule } from "../fish-lexicon";
 import { fishSpeech, type FishSettings } from "../fish-tts";
 import { accentTagged, audioTags } from "../narration";
 import type { Speaker, SpeakRequest, Spoken, Voices } from "./speaker";
@@ -64,9 +68,16 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
         };
       }
 
+      // Read per request, as ElevenLabs' locator is: an edit mid-batch applies to the lines
+      // after it, and each take records the rules it was actually made with.
+      const rules = fishRules((await readLexicon(lang)).entries, lang);
+
       const speech = await fishSpeech(
         {
-          turns: turns.map((turn) => ({ text: turn.text, speaker: speakers.indexOf(turn.voiceId) })),
+          turns: turns.map((turn) => ({
+            text: applyFishLexicon(turn.text, rules),
+            speaker: speakers.indexOf(turn.voiceId),
+          })),
           references: speakers.map((hash) => [clips.get(hash)!]),
           settings,
         },
@@ -86,10 +97,23 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
           modelId: settings.model,
           settings: { temperature: settings.temperature, top_p: settings.topP, speed: settings.speed },
           outputFormat: FISH_OUTPUT_FORMAT,
+          // There is no dictionary on fish.audio's side; the version names the rules applied.
           dictionaryId: null,
-          dictionaryVersion: null,
+          dictionaryVersion: fishLexiconVersion(rules),
         },
       };
     },
   };
+}
+
+/**
+ * What a fish.audio take records as its dictionaryVersion: which lexicon made it.
+ *
+ * A digest of the rules actually applied rather than of the stored entries, so an edit
+ * fish.audio cannot use (another language's IPA) does not look like a change to its takes.
+ */
+export function fishLexiconVersion(rules: FishRule[]): string | null {
+  if (rules.length === 0) return null;
+  const digest = crypto.createHash("sha256").update(JSON.stringify(rules)).digest("hex");
+  return `fish:${digest.slice(0, 16)}`;
 }
