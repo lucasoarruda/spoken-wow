@@ -30,7 +30,12 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const spends = spendsCredits(await viewerOf(session));
   // The status, never the key. Sent to a client component as props, so this is the shape
   // that decides what the browser can possibly learn.
-  const status = spends ? await apiKeyStatus(session.user.id) : null;
+  const [status, fishStatus] = spends
+    ? await Promise.all([
+        apiKeyStatus(session.user.id),
+        apiKeyStatus(session.user.id, "fish"),
+      ])
+    : [null, null];
 
   return (
     <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
@@ -46,7 +51,10 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
       </dl>
 
       {spends ? (
-        <ApiKeySection initial={status} />
+        <div className="space-y-10">
+          <ApiKeySection initial={status} />
+          <ApiKeySection initial={fishStatus} provider="fish" />
+        </div>
       ) : (
         // Said rather than hidden: a member who has been told "go and regenerate that line"
         // needs to know which of the two things they are missing.
