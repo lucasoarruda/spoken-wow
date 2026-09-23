@@ -21,6 +21,11 @@ import { readSettings } from "./settings";
 import { generationStatus } from "./status";
 import type { Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
+import { fishConcurrency, getWallet } from "@/lib/voices/fish";
+import type { FishSettings } from "./fish-tts";
+import { readPreference } from "./preference";
+import { speakerFrom } from "./speakers/for";
+import type { Provider, Speaker } from "./speakers/speaker";
 
 /**
  * How many times a rate-limited job is retried before it is failed.
@@ -54,13 +59,37 @@ export function backoffFor(attempts: number, random: () => number = Math.random)
  * none, budgetFor's floor of one applies, which is the right answer before the first claim:
  * one job is enough to learn who is next.
  */
-export async function currentBudget(apiKey: string | null = null): Promise<number> {
+export async function currentBudget(
+  apiKey: string | null = null,
+  provider: Provider = "elevenlabs",
+): Promise<number> {
+  if (provider === "fish" && apiKey) return clampToPool(await fishBudget(apiKey), POOL_MAX);
   const [status, settings] = await Promise.all([
     generationStatus(apiKey ? { apiKey } : {}),
     readSettings(),
   ]);
   const plan = budgetFor(status.subscription?.tier ?? null, settings.config.modelId);
   return clampToPool(plan, POOL_MAX);
+}
+
+/** fish.audio's tier, read at most once a minute per key: a pump runs every time a job settles. */
+const FISH_BUDGET_TTL_MS = 60_000;
+const fishBudgets = new Map<string, { at: number; value: Promise<number> }>();
+
+/**
+ * What a fish.audio account may have in flight, less one for the single-line button, as
+ * budgetFor leaves ElevenLabs. A balance that cannot be read is the lowest tier's, since
+ * guessing high is how a batch meets 429s.
+ */
+async function fishBudget(apiKey: string): Promise<number> {
+  const cached = fishBudgets.get(apiKey);
+  if (cached && Date.now() - cached.at < FISH_BUDGET_TTL_MS) return cached.value;
+  const value = getWallet({ apiKey })
+    .then((wallet) => fishConcurrency(wallet.cumulativeTopUp))
+    .catch(() => fishConcurrency(0))
+    .then((limit) => Math.max(1, limit - 1));
+  fishBudgets.set(apiKey, { at: Date.now(), value });
+  return value;
 }
 
 /**
@@ -74,7 +103,7 @@ export async function currentBudget(apiKey: string | null = null): Promise<numbe
 export type Generator = (
   lineId: string,
   userId: string,
-  options: { apiKey: string; lang: Lang },
+  options: { apiKey: string; lang: Lang; speaker?: Speaker },
 ) => Promise<RegenerateResult>;
 
 export type WorkerOptions = {
@@ -83,9 +112,11 @@ export type WorkerOptions = {
    * generator for it; there is no default that would quietly generate the wrong corpus.
    */
   regenerate?: Partial<Record<Source, Generator>>;
-  budget?: (apiKey: string | null) => Promise<number>;
+  budget?: (apiKey: string | null, provider: Provider) => Promise<number>;
   /** The owner's stored key. Injectable so a test never needs one sealed in a database. */
-  apiKeyFor?: (userId: string) => Promise<string | null>;
+  apiKeyFor?: (userId: string, provider: Provider) => Promise<string | null>;
+  /** The owner's fish.audio settings, read when a fish.audio job runs. */
+  fishSettingsFor?: (userId: string) => Promise<FishSettings>;
   backoffMs?: (attempts: number) => number;
   leaseMs?: number;
   /** How long to wait before looking again when the queue was empty. */
@@ -113,6 +144,8 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
 
   const budget = options.budget ?? currentBudget;
   const apiKeyFor = options.apiKeyFor ?? readApiKey;
+  const fishSettingsFor =
+    options.fishSettingsFor ?? (async (userId: string) => (await readPreference(userId)).fish);
   const backoff = options.backoffMs ?? backoffFor;
   const idleMs = options.idleMs ?? 2_000;
 
@@ -131,21 +164,25 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
    * width for a tick.
    */
   let lastKey: string | null = null;
+  let lastProvider: Provider = "elevenlabs";
 
   async function run(job: QueueJob): Promise<void> {
     // Whose credits this line is spent from. A batch is enqueued by someone who had a key at
     // the time, so reaching here without one means it was cleared or the master key changed
     // underneath it - and every remaining job in the batch would fail identically.
+    //
+    // For the provider the job was queued with, not whichever the owner has chosen since.
     let apiKey: string | null;
     try {
-      apiKey = await apiKeyFor(job.createdBy ?? "");
+      apiKey = await apiKeyFor(job.createdBy ?? "", job.provider);
     } catch {
       apiKey = null;
     }
 
     if (!apiKey) {
+      const name = job.provider === "fish" ? "fish.audio" : "ElevenLabs";
       const message =
-        "the account that started this batch has no usable ElevenLabs key; set one in your" +
+        `the account that started this batch has no usable ${name} key; set one in your` +
         " profile and start it again";
       try {
         await failJob(job.id, { kind: "auth", message });
@@ -156,6 +193,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       return;
     }
     lastKey = apiKey;
+    lastProvider = job.provider;
 
     const generate = generators[job.source];
     if (!generate) {
@@ -171,9 +209,17 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
 
     // A batch whose owner's account was deleted still has takes to attribute, and
     // take."createdBy" is nullable for exactly that case.
+    //
+    // ElevenLabs needs only the key, and gets its Speaker from it as it always did; fish.audio
+    // needs the owner's own settings as well, read now so an edit applies to later lines.
+    const speaker =
+      job.provider === "fish"
+        ? speakerFrom("fish", apiKey, await fishSettingsFor(job.createdBy ?? ""))
+        : undefined;
     const result = await generate(job.lineId, job.createdBy ?? "", {
       apiKey,
       lang: job.lang,
+      ...(speaker ? { speaker } : {}),
     }).catch(
       (error: unknown): RegenerateResult => ({
         ok: false,
@@ -243,7 +289,11 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     try {
       if (!isLeader()) return;
 
-      const allowed = afterRateLimit(await budget(lastKey), rateLimitedAt, Date.now());
+      const allowed = afterRateLimit(
+        await budget(lastKey, lastProvider),
+        rateLimitedAt,
+        Date.now(),
+      );
 
       while (!stopped && isLeader() && running.size < allowed) {
         const job = await claimNext(options.leaseMs);

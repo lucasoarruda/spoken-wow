@@ -11,6 +11,9 @@
 import { headers } from "next/headers";
 
 import { readApiKey, type KeyProvider } from "@/lib/api-key";
+import { readPreference } from "@/lib/generation/preference";
+import { speakerFrom } from "@/lib/generation/speakers/for";
+import type { Provider, Speaker } from "@/lib/generation/speakers/speaker";
 import { auth } from "@/lib/auth";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { langParam } from "@/lib/lang-server";
@@ -118,6 +121,27 @@ export async function requireApiKey(
   }
 
   return { key, denied: null };
+}
+
+export type SpeakerGuard =
+  | { speaker: Speaker; provider: Provider; key: string; denied: null }
+  | { speaker: null; provider: Provider; key: null; denied: Response };
+
+/**
+ * The signed-in user's Speaker: the provider they chose on /profile, with their own key for
+ * it. The 428 names that provider, so a collaborator who switched to fish.audio without a
+ * key is told which key is missing.
+ */
+export async function requireSpeaker(userId: string): Promise<SpeakerGuard> {
+  const preference = await readPreference(userId);
+  const { key, denied } = await requireApiKey(userId, preference.provider);
+  if (denied) return { speaker: null, provider: preference.provider, key: null, denied };
+  return {
+    speaker: speakerFrom(preference.provider, key, preference.fish),
+    provider: preference.provider,
+    key,
+    denied: null,
+  };
 }
 
 //------------------------------------------------------------------------------

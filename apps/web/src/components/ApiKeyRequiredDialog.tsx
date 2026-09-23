@@ -21,7 +21,8 @@ import {
  * surfacing a status code next to a row.
  *
  * Shared by both sections, because the guard is: requireApiKey refuses a quests
- * regeneration exactly as it refuses a zones one.
+ * regeneration exactly as it refuses a zones one. Worded for either provider, because the
+ * message it is handed -- requireApiKey's -- already names which key is missing.
  */
 export default function ApiKeyRequiredDialog({
   message,
@@ -36,14 +37,15 @@ export default function ApiKeyRequiredDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>An ElevenLabs key is needed</DialogTitle>
+          <DialogTitle>A key is needed</DialogTitle>
           <DialogDescription>{message}</DialogDescription>
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Generating audio spends credits from your own ElevenLabs account, not from the
-          site&apos;s. Add a key to your profile and this will work; it is encrypted before
-          it is stored, and never shown again.
+          Generating audio spends from your own account with the generator chosen on your
+          profile — ElevenLabs or fish.audio — not from the site&apos;s. Add that key to your
+          profile and this will work; it is encrypted before it is stored, and never shown
+          again.
         </p>
 
         <DialogFooter>

@@ -21,6 +21,7 @@
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
+import type { Provider } from "./speakers/speaker";
 
 export type JobState = "pending" | "running" | "done" | "failed" | "cancelled";
 
@@ -54,6 +55,8 @@ export type QueueJob = {
   characters: number;
   attempts: number;
   createdBy: string | null;
+  /** Fixed when the job was queued: the provider its estimate was shown for. */
+  provider: Provider;
 };
 
 export type QueueSnapshot = {
@@ -138,6 +141,7 @@ export async function enqueue(
   jobs: QueueEntry[],
   source: Source,
   lang: Lang = BASE_LANG,
+  provider: Provider = "elevenlabs",
 ): Promise<{ queued: number; skipped: number }> {
   if (jobs.length === 0) return { queued: 0, skipped: 0 };
 
@@ -149,8 +153,8 @@ export async function enqueue(
 
   const { rowCount } = await db().query(
     `insert into "regeneration_job"
-       ("batchId", "source", "lang", "lineId", "file", "npcName", "preview", "characters")
-     select $1, $2, $8, * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
+       ("batchId", "source", "lang", "provider", "lineId", "file", "npcName", "preview", "characters")
+     select $1, $2, $8, $9, * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
      on conflict ("source", "lang", "file") where "state" in ('pending', 'running') do nothing`,
     [
       batchId,
@@ -161,6 +165,7 @@ export async function enqueue(
       jobs.map((job) => job.preview),
       jobs.map((job) => job.characters),
       lang,
+      provider,
     ],
   );
 
@@ -194,7 +199,7 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
          limit 1
       )
       returning j."id"::text, j."batchId", j."source", j."lang", j."lineId", j."file", j."npcName",
-                j."preview", j."characters", j."attempts",
+                j."preview", j."characters", j."attempts", j."provider",
                 (select b."createdBy" from "regeneration_batch" b where b."id" = j."batchId")
                   as "createdBy"`,
     [leaseMs / 1000],

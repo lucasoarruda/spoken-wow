@@ -15,7 +15,7 @@
  * addon artifact to keep up to date.
  */
 import { regenerateBookLine } from "@/lib/books/regenerate";
-import { requireApiKey, requireIn } from "@/lib/generation/authz";
+import { requireIn, requireSpeaker } from "@/lib/generation/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   // After the role check, never instead of it: a key is a credential, not a permission.
-  const { key, denied: noKey } = await requireApiKey(session.user.id);
+  const { speaker, key, denied: noKey } = await requireSpeaker(session.user.id);
   if (noKey) return noKey;
 
   const body = (await request.json().catch(() => ({}))) as { lineId?: unknown };
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "lineId is required", kind: "bad-request" }, { status: 400 });
   }
 
-  const result = await regenerateBookLine(body.lineId, session.user.id, { apiKey: key, lang });
+  const result = await regenerateBookLine(body.lineId, session.user.id, { apiKey: key, lang, speaker });
 
   if (!result.ok) {
     return Response.json(

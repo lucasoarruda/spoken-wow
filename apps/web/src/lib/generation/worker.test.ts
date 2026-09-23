@@ -46,10 +46,14 @@ const OK: RegenerateResult = {
   sharedWith: 0,
 };
 
-async function seed(count: number, source: Source = "quests"): Promise<string> {
+async function seed(
+  count: number,
+  source: Source = "quests",
+  provider: "elevenlabs" | "fish" = "elevenlabs",
+): Promise<string> {
   const id = await createBatch("test", null as unknown as string, source);
   batches.push(id);
-  await enqueue(id, Array.from({ length: count }, (_, i) => line(i + 1)), source);
+  await enqueue(id, Array.from({ length: count }, (_, i) => line(i + 1)), source, "enUS", provider);
   return id;
 }
 
@@ -456,5 +460,73 @@ describe("stop()", () => {
 
     expect(worker.inFlight()).toBe(0);
     expect(await statesOf(batch)).toEqual({ done: 1 });
+  });
+});
+
+describe("a fish.audio batch", () => {
+  const SETTINGS = { model: "s2.1-pro-free", temperature: 0.5, topP: 0.6, speed: 1.1 };
+
+  it("runs on the provider it was queued with, with the owner's fish.audio key and settings", async () => {
+    const batch = await seed(1, "quests", "fish");
+    const asked: string[] = [];
+    const seen: { apiKey: string; provider?: string }[] = [];
+
+    const worker = startWorker(() => true, {
+      apiKeyFor: async (_user, provider) => {
+        asked.push(provider);
+        return `${provider}-key`;
+      },
+      fishSettingsFor: async () => SETTINGS,
+      budget: async () => 1,
+      regenerate: {
+        quests: async (_line, _user, options) => {
+          seen.push({ apiKey: options.apiKey, provider: options.speaker?.provider });
+          return { ...OK, credits: null, costUsd: 0.001 };
+        },
+      },
+    });
+    await until(async () => (await statesOf(batch)).done === 1);
+    await worker.stop();
+
+    expect(asked).toEqual(["fish"]);
+    expect(seen).toEqual([{ apiKey: "fish-key", provider: "fish" }]);
+    const { rows } = await db().query(`select "costUsd"::float8 as usd from "regeneration_job" where "batchId" = $1`, [batch]);
+    expect(rows[0].usd).toBeCloseTo(0.001);
+  });
+
+  it("stops, naming fish.audio, when the owner has no fish.audio key", async () => {
+    const batch = await seed(2, "quests", "fish");
+    const worker = startWorker(() => true, {
+      apiKeyFor: async (_user, provider) => (provider === "fish" ? null : "eleven-key"),
+      budget: async () => 1,
+      regenerate: { quests: async () => OK },
+    });
+    await until(async () => (await statesOf(batch)).failed === 1);
+    await worker.stop();
+
+    const { rows } = await db().query<{ error: string }>(
+      `select "error" from "regeneration_job" where "batchId" = $1 and "state" = 'failed'`,
+      [batch],
+    );
+    expect(rows[0].error).toMatch(/no usable fish\.audio key/);
+    expect((await statesOf(batch)).cancelled).toBe(1);
+  });
+
+  it("sizes itself by the provider of the job it last claimed", async () => {
+    const batch = await seed(2, "quests", "fish");
+    const budgets: string[] = [];
+    const worker = startWorker(() => true, {
+      apiKeyFor: async (_user, provider) => `${provider}-key`,
+      fishSettingsFor: async () => SETTINGS,
+      budget: async (_key, provider) => {
+        budgets.push(provider);
+        return 1;
+      },
+      regenerate: { quests: async () => OK },
+    });
+    await until(async () => (await statesOf(batch)).done === 2);
+    await worker.stop();
+
+    expect(budgets).toContain("fish");
   });
 });

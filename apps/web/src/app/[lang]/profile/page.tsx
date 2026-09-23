@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import ApiKeySection from "@/components/ApiKeySection";
+import GeneratorSection from "@/components/GeneratorSection";
 import { apiKeyStatus } from "@/lib/api-key";
+import { readPreference } from "@/lib/generation/preference";
+import { FISH_MODELS } from "@/lib/voices/fish";
 import { viewerOf } from "@/lib/grants/store";
 import { localeHref } from "@/lib/lang";
 import { pageLang } from "@/lib/lang-server";
@@ -30,12 +33,24 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const spends = spendsCredits(await viewerOf(session));
   // The status, never the key. Sent to a client component as props, so this is the shape
   // that decides what the browser can possibly learn.
-  const [status, fishStatus] = spends
+  const [status, fishStatus, preference] = spends
     ? await Promise.all([
         apiKeyStatus(session.user.id),
         apiKeyStatus(session.user.id, "fish"),
+        readPreference(session.user.id),
       ])
-    : [null, null];
+    : [null, null, null];
+  const models = FISH_MODELS.map((model) => ({
+    id: model.id,
+    label: model.label,
+    preview: model.preview,
+    price:
+      model.usdPerMillionBytes === null
+        ? "price not published"
+        : model.usdPerMillionBytes === 0
+          ? "free"
+          : `$${model.usdPerMillionBytes} per million bytes`,
+  }));
 
   return (
     <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
@@ -52,6 +67,13 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
 
       {spends ? (
         <div className="space-y-10">
+          {preference && (
+            <GeneratorSection
+              initial={preference}
+              hasFishKey={fishStatus !== null}
+              models={models}
+            />
+          )}
           <ApiKeySection initial={status} />
           <ApiKeySection initial={fishStatus} provider="fish" />
         </div>
