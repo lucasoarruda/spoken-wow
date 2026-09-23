@@ -465,6 +465,11 @@ describe("stop()", () => {
 
 describe("a fish.audio batch", () => {
   const SETTINGS = { model: "s2.1-pro-free", temperature: 0.5, topP: 0.6, speed: 1.1 };
+  const ELEVEN = {
+    modelId: "eleven_v3",
+    voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0, use_speaker_boost: true },
+    seedStrategy: "npc" as const,
+  };
 
   it("runs on the provider it was queued with, with the owner's fish.audio key and settings", async () => {
     const batch = await seed(1, "quests", "fish");
@@ -476,7 +481,7 @@ describe("a fish.audio batch", () => {
         asked.push(provider);
         return `${provider}-key`;
       },
-      fishSettingsFor: async () => SETTINGS,
+      preferenceFor: async () => ({ fish: SETTINGS, elevenlabs: ELEVEN }),
       budget: async () => 1,
       regenerate: {
         quests: async (_line, _user, options) => {
@@ -512,14 +517,14 @@ describe("a fish.audio batch", () => {
     expect((await statesOf(batch)).cancelled).toBe(1);
   });
 
-  it("sizes itself by the provider of the job it last claimed", async () => {
+  it("sizes itself by the provider and model of the job it last claimed", async () => {
     const batch = await seed(2, "quests", "fish");
     const budgets: string[] = [];
     const worker = startWorker(() => true, {
       apiKeyFor: async (_user, provider) => `${provider}-key`,
-      fishSettingsFor: async () => SETTINGS,
-      budget: async (_key, provider) => {
-        budgets.push(provider);
+      preferenceFor: async () => ({ fish: SETTINGS, elevenlabs: ELEVEN }),
+      budget: async (_key, provider, model) => {
+        budgets.push(`${provider}:${model}`);
         return 1;
       },
       regenerate: { quests: async () => OK },
@@ -527,6 +532,35 @@ describe("a fish.audio batch", () => {
     await until(async () => (await statesOf(batch)).done === 2);
     await worker.stop();
 
-    expect(budgets).toContain("fish");
+    expect(budgets).toContain("fish:s2.1-pro-free");
+  });
+});
+
+describe("an ElevenLabs batch", () => {
+  it("is spoken with the owner's own ElevenLabs settings", async () => {
+    const batch = await seed(1);
+    const seen: { provider?: string; seed?: string }[] = [];
+    const worker = startWorker(() => true, {
+      apiKeyFor: async () => "eleven-key",
+      preferenceFor: async () => ({
+        elevenlabs: {
+          modelId: "eleven_multilingual_v2",
+          voiceSettings: { stability: 0.9, similarity_boost: 0.1, style: 0, use_speaker_boost: false },
+          seedStrategy: "none",
+        },
+        fish: { model: "s2.1-pro", temperature: 0.7, topP: 0.7, speed: 1 },
+      }),
+      budget: async () => 1,
+      regenerate: {
+        quests: async (_line, _user, options) => {
+          seen.push({ provider: options.speaker?.provider, seed: options.speaker?.seedStrategy });
+          return OK;
+        },
+      },
+    });
+    await until(async () => (await statesOf(batch)).done === 1);
+    await worker.stop();
+
+    expect(seen).toEqual([{ provider: "elevenlabs", seed: "none" }]);
   });
 });

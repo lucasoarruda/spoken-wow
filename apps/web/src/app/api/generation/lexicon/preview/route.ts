@@ -17,6 +17,7 @@ import { requireApiKey, requireIn } from "@/lib/generation/authz";
 import { BASE_LANG } from "@/lib/lang";
 import { LexiconError, validateEntry } from "@/lib/generation/lexicon";
 import { isPreviewMode, renderPreview, voicePicker } from "@/lib/generation/preview";
+import { readPreference } from "@/lib/generation/preference";
 import { currentConfig } from "@/lib/generation/settings";
 import { generationStatus } from "@/lib/generation/status";
 
@@ -48,10 +49,14 @@ export async function POST(request: Request) {
     return Response.json({ error: message }, { status: 400 });
   }
 
-  const [config, status] = await Promise.all([
+  // Heard the way this collaborator would generate it: their own ElevenLabs settings, with
+  // English's accent tags, which are still the language's.
+  const [english, preference, status] = await Promise.all([
     currentConfig(),
+    readPreference(session.user.id),
     generationStatus({ apiKey: key }),
   ]);
+  const config = { ...preference.elevenlabs, raceTags: english.raceTags };
   if (status.error && status.voiceIds.size === 0) {
     return Response.json({ error: status.error }, { status: 502 });
   }

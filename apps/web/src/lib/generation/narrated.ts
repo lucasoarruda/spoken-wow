@@ -1,8 +1,8 @@
 /**
  * Narrating one line in a section read by the single narrator: zones and books.
  *
- * Both sections voice every line with the one narrator resolved from generation_setting and
- * the pronunciation lexicon, give every line a file of its own, and record a duration --
+ * Both sections voice every line with the one narrator, the generating collaborator's own
+ * settings and the pronunciation lexicon, give every line a file of its own, and record a duration --
  * so everything from resolving that narrator to committing the take is the same, and was
  * written twice until a new take field (the lead-in) had to be added to both copies. What
  * stays in each section is what is actually about it: how a line is found and whether it
@@ -17,9 +17,10 @@
  * The narrator is the `narrator-male` slot on /voices, resolved by name against the account
  * the request is spending from. It is the same roster entry the quests side narrates its
  * stage directions with; the two were always the same voice on the same account, and only
- * the zones site's old config file made them look separate. The model, settings and
- * lexicon are the ones both sections read, so a narrator is never cut with a different
- * model from the NPC beside it without somebody choosing that.
+ * the zones site's old config file made them look separate. The model and settings are the
+ * collaborator's own and the lexicon the language's, the same for both sections, so a
+ * narrator is never cut with a different model from the NPC beside it without somebody
+ * choosing that.
  */
 import { BASE_LANG } from "@/lib/lang";
 import "server-only";

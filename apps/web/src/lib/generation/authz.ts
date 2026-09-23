@@ -137,7 +137,7 @@ export async function requireSpeaker(userId: string): Promise<SpeakerGuard> {
   const { key, denied } = await requireApiKey(userId, preference.provider);
   if (denied) return { speaker: null, provider: preference.provider, key: null, denied };
   return {
-    speaker: speakerFrom(preference.provider, key, preference.fish),
+    speaker: speakerFrom(preference.provider, key, preference),
     provider: preference.provider,
     key,
     denied: null,

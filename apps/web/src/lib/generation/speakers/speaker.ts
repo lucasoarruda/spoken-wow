@@ -15,6 +15,7 @@
 import type { Lang } from "@/lib/lang";
 
 import type { Failure } from "../errors";
+import type { SeedStrategy } from "../config";
 
 export type Provider = "elevenlabs" | "fish";
 
@@ -81,6 +82,8 @@ export type Voices = {
 
 export interface Speaker {
   readonly provider: Provider;
+  /** How lines are seeded: the collaborator's choice for ElevenLabs; fish.audio has no seed. */
+  readonly seedStrategy: SeedStrategy;
   /** The slots this provider can speak in `lang`, as the key in hand sees them. */
   voices(lang: Lang): Promise<Voices>;
   /** How a slot with no voice is named to the person who has to go and make one. */

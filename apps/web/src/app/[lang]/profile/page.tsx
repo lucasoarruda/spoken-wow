@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 
 import ApiKeySection from "@/components/ApiKeySection";
 import GeneratorSection from "@/components/GeneratorSection";
-import { apiKeyStatus } from "@/lib/api-key";
+import { apiKeyStatus, readApiKey } from "@/lib/api-key";
 import { readPreference } from "@/lib/generation/preference";
+import { listModels } from "@/lib/voices/elevenlabs";
 import { FISH_MODELS } from "@/lib/voices/fish";
 import { viewerOf } from "@/lib/grants/store";
 import { localeHref } from "@/lib/lang";
@@ -40,6 +41,14 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         readPreference(session.user.id),
       ])
     : [null, null, null];
+  // The models this collaborator's own ElevenLabs account offers, which is the only honest
+  // list: a plan decides which exist. None without a key, or when the account will not say.
+  const elevenKey = spends ? await readApiKey(session.user.id).catch(() => null) : null;
+  const elevenLabsModels = elevenKey
+    ? await listModels({ apiKey: elevenKey })
+        .then((models) => models.map((model) => ({ id: model.id, name: model.name })))
+        .catch(() => null)
+    : null;
   const models = FISH_MODELS.map((model) => ({
     id: model.id,
     label: model.label,
@@ -72,6 +81,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
               initial={preference}
               hasFishKey={fishStatus !== null}
               models={models}
+              elevenLabsModels={elevenLabsModels}
             />
           )}
           <ApiKeySection initial={status} />

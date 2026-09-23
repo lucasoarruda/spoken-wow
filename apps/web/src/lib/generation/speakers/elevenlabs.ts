@@ -3,8 +3,8 @@
  *
  * A wrapper and not a rewrite: the requests are still built and sent by ../tts.ts, and the
  * roster is still ../status.ts's memoised account read. What this adds is only the choices
- * the callers used to make for ElevenLabs themselves -- which model and settings, which
- * dictionary version, and which endpoint narration goes to.
+ * the callers used to make for ElevenLabs themselves -- which of the collaborator's settings,
+ * which dictionary version, and which endpoint narration goes to.
  */
 import "server-only";
 
@@ -12,7 +12,7 @@ import { elevenLabsCode, type Lang } from "@/lib/lang";
 import type { ElevenLabsOptions } from "@/lib/voices/elevenlabs";
 
 import { currentLocator } from "../dictionary";
-import { currentConfig } from "../settings";
+import { defaultElevenLabs, type ElevenLabsSettings } from "../preference";
 import { generationStatus } from "../status";
 import { textToDialogue, textToSpeech } from "../tts";
 import { SHAPE } from "./shape";
@@ -35,9 +35,15 @@ export const OUTPUT_FORMAT = "mp3_44100_128";
  * exist, and resolving a slot against somebody else's would hand ElevenLabs an id the
  * spending account does not own.
  */
-export function elevenLabsSpeaker(options: ElevenLabsOptions): Speaker {
+export function elevenLabsSpeaker(
+  options: ElevenLabsOptions & { settings?: ElevenLabsSettings },
+): Speaker {
+  // The collaborator's own (see preference.ts). The built-in settings only where no caller
+  // said, which is a test or a path that predates the choice.
+  const config = options.settings ?? defaultElevenLabs();
   return {
     provider: "elevenlabs",
+    seedStrategy: config.seedStrategy,
 
     async voices(lang: Lang): Promise<Voices> {
       // The account, not the provenance table: a voice created in the ElevenLabs dashboard
@@ -54,10 +60,10 @@ export function elevenLabsSpeaker(options: ElevenLabsOptions): Speaker {
 
     async speak(request: SpeakRequest): Promise<Spoken> {
       const { turns, lang, seed, dialogue = turns.length > 1 } = request;
-      // Read per request, not per batch: an admin saving the settings or the lexicon
-      // mid-batch should affect the lines after the save, and pinning one locator for a
-      // whole batch would record a version that some of its takes were not made with.
-      const [config, dictionary] = await Promise.all([currentConfig(lang), currentLocator(lang)]);
+      // Read per request, not per batch: an admin saving the lexicon mid-batch should affect
+      // the lines after the save, and pinning one locator for a whole batch would record a
+      // version that some of its takes were not made with.
+      const dictionary = await currentLocator(lang);
       const languageCode = elevenLabsCode(lang);
 
       // Narration goes to the dialogue endpoint, which stitches the turns into one mp3. Two

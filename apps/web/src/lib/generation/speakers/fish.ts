@@ -31,6 +31,8 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
 
   return {
     provider: "fish",
+    // fish.audio takes no seed, so there is nothing to hold steady.
+    seedStrategy: "none",
 
     async voices(lang: Lang): Promise<Voices> {
       const references = await listReferences(lang);

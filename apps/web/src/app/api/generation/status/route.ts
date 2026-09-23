@@ -37,9 +37,12 @@ export async function GET(request: Request) {
   // one only decides whether to draw a balance.
   const apiKey = await readApiKey(session.user.id, preference.provider).catch(() => null);
   const settings = await readSettings(lang);
+  // The collaborator's own ElevenLabs settings, with the language's accent tags, which are
+  // the one part of the settings that stayed per language.
+  const config = { ...preference.elevenlabs, raceTags: settings.config.raceTags };
 
   if (preference.provider === "fish") {
-    const speaker = speakerFrom("fish", apiKey ?? "", preference.fish);
+    const speaker = speakerFrom("fish", apiKey ?? "", preference);
     const [voices, wallet, rate] = await Promise.all([
       speaker.voices(lang),
       apiKey ? getWallet({ apiKey }).catch(() => null) : Promise.resolve(null),
@@ -50,7 +53,7 @@ export async function GET(request: Request) {
       subscription: null,
       error: apiKey && !wallet ? "could not read the fish.audio balance" : null,
       noApiKey: !apiKey,
-      settings: settings.config,
+      settings: config,
       settingsSource: settings.source,
       rate,
       provider: "fish",
@@ -62,14 +65,14 @@ export async function GET(request: Request) {
 
   // Calibrated from what this account has actually been charged for this model, because the
   // rate is a property of the plan and cannot be read from the API. See billing.ts.
-  const rate = await observedRate(settings.config.modelId);
+  const rate = await observedRate(preference.elevenlabs.modelId);
 
   return Response.json({
     voices: status.voices,
     subscription: status.subscription,
     error: status.error,
     noApiKey: !apiKey,
-    settings: settings.config,
+    settings: config,
     settingsSource: settings.source,
     rate,
     provider: "elevenlabs",

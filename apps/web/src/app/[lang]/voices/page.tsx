@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import GenerationSettings from "@/components/GenerationSettings";
 import VoiceSlotList from "@/components/VoiceSlotList";
 import { readApiKey } from "@/lib/api-key";
 import { auth } from "@/lib/auth";
@@ -98,7 +97,6 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         </div>
       )}
 
-      <GenerationSettings initial={settings} models={account.models} />
 
       <VoiceSlotList
         slots={all}

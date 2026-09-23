@@ -167,7 +167,7 @@ export async function regenerateLine(
     );
     // Lowest npcId in the group, so a file shared by many NPCs regenerates the same way
     // whichever row the button was pressed on. See canonicalNpcId.
-    const seed = seedFor(canonicalNpcId(group), config.seedStrategy);
+    const seed = seedFor(canonicalNpcId(group), speaker.seedStrategy);
 
     // A capitalised <stage direction> is the game narrating, not the NPC talking, so the line
     // is spoken by two voices and the speaker makes one file of the turns. Everything below -

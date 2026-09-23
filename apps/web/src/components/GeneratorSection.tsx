@@ -9,26 +9,60 @@ import { Label } from "@/components/ui/label";
 /** The models a collaborator may pick. Mirrors FISH_MODELS in lib/voices/fish.ts, which is server-side. */
 export type FishModelOption = { id: string; label: string; preview: boolean; price: string };
 
+/** An ElevenLabs model the collaborator's account may use, read from the account. */
+export type ElevenLabsModelOption = { id: string; name: string };
+
+type VoiceSettings = {
+  stability: number;
+  similarity_boost: number;
+  style: number;
+  use_speaker_boost: boolean;
+};
+
 type Preference = {
   provider: "elevenlabs" | "fish";
+  elevenlabs: { modelId: string; voiceSettings: VoiceSettings; seedStrategy: "npc" | "none" };
   fish: { model: string; temperature: number; topP: number; speed: number };
 };
 
+/** The three 0-1 voice settings, as the admin form described them before they moved here. */
+const SLIDERS: { key: "stability" | "similarity_boost" | "style"; label: string; hint: string }[] = [
+  {
+    key: "stability",
+    label: "Stability",
+    hint: "Low varies the delivery between takes; high flattens it. 0.5 is the API's own default.",
+  },
+  {
+    key: "similarity_boost",
+    label: "Similarity",
+    hint: "How hard the model tries to match the clone, including any noise in the source clips.",
+  },
+  {
+    key: "style",
+    label: "Style",
+    hint: "Exaggerates the source's delivery. Costs latency, and above ~0.5 tends to drift.",
+  },
+];
+
 /**
- * Which generator this collaborator's lines are made with, and how fish.audio is set up.
+ * Which generator this collaborator's lines are made with, and how each is set up.
  *
- * ElevenLabs' model and settings are an admin's and live on /voices; fish.audio's are the
- * collaborator's own, because their own balance pays for them. A batch keeps the generator
- * it was started with, so switching here affects the next batch, not one that is running.
+ * Both providers' settings are the collaborator's own, because their own key pays for them,
+ * and they apply to every language they generate. What stays per language, and an admin's,
+ * is the race accent tags on /voices. A batch keeps the generator it was started with, so
+ * switching here affects the next batch, not one that is running.
  */
 export default function GeneratorSection({
   initial,
   hasFishKey,
   models,
+  elevenLabsModels,
 }: {
   initial: Preference;
   hasFishKey: boolean;
   models: FishModelOption[];
+  /** From the account; null when there is no key to ask with, or the account would not say. */
+  elevenLabsModels: ElevenLabsModelOption[] | null;
 }) {
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState(initial);
@@ -39,6 +73,19 @@ export default function GeneratorSection({
   const fish = draft.fish;
   const setFish = (change: Partial<Preference["fish"]>) =>
     setDraft((current) => ({ ...current, fish: { ...current.fish, ...change } }));
+  const eleven = draft.elevenlabs;
+  const setEleven = (change: Partial<Preference["elevenlabs"]>) =>
+    setDraft((current) => ({ ...current, elevenlabs: { ...current.elevenlabs, ...change } }));
+  const setVoice = (change: Partial<VoiceSettings>) =>
+    setEleven({ voiceSettings: { ...eleven.voiceSettings, ...change } });
+  // The saved model stays offered even when the account no longer lists it, so opening the
+  // page never silently changes it.
+  const elevenOptions = [
+    ...(elevenLabsModels ?? []),
+    ...(elevenLabsModels?.some((model) => model.id === eleven.modelId)
+      ? []
+      : [{ id: eleven.modelId, name: eleven.modelId }]),
+  ];
 
   async function save() {
     setBusy(true);
@@ -101,8 +148,71 @@ export default function GeneratorSection({
         </label>
       </fieldset>
 
+      <h3 className="mb-2 text-sm font-medium">ElevenLabs</h3>
+      <div className="mb-2 grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-3 gap-y-2 text-sm">
+        <Label htmlFor="eleven-model">Model</Label>
+        <select
+          id="eleven-model"
+          value={eleven.modelId}
+          onChange={(event) => setEleven({ modelId: event.target.value })}
+          className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+        >
+          {elevenOptions.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.name}
+            </option>
+          ))}
+        </select>
+
+        {SLIDERS.map(({ key, label, hint }) => (
+          <div key={key} className="contents">
+            <Label htmlFor={`eleven-${key}`} title={hint}>
+              {label}
+            </Label>
+            <Input
+              id={`eleven-${key}`}
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              title={hint}
+              value={eleven.voiceSettings[key]}
+              onChange={(event) => setVoice({ [key]: Number(event.target.value) })}
+              className="h-8 w-24"
+            />
+          </div>
+        ))}
+
+        <Label htmlFor="eleven-boost">Speaker boost</Label>
+        <input
+          id="eleven-boost"
+          type="checkbox"
+          checked={eleven.voiceSettings.use_speaker_boost}
+          onChange={(event) => setVoice({ use_speaker_boost: event.target.checked })}
+          className="size-4 justify-self-start"
+        />
+
+        <Label htmlFor="eleven-seed">Seed</Label>
+        <select
+          id="eleven-seed"
+          value={eleven.seedStrategy}
+          onChange={(event) => setEleven({ seedStrategy: event.target.value as "npc" | "none" })}
+          className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+        >
+          <option value="npc">Per NPC — every line an NPC speaks draws the same way</option>
+          <option value="none">None — each line is an independent draw</option>
+        </select>
+      </div>
+      <p className="text-muted-foreground mb-5 text-xs">
+        {elevenLabsModels === null
+          ? "The models your account offers appear once an ElevenLabs key is stored."
+          : "The models your ElevenLabs account offers."}{" "}
+        Accent tags per race stay with the language, on /voices.
+      </p>
+
+      <h3 className="mb-2 text-sm font-medium">fish.audio</h3>
       <div className="mb-4 grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-3 gap-y-2 text-sm">
-        <Label htmlFor="fish-model">fish.audio model</Label>
+        <Label htmlFor="fish-model">Model</Label>
         <select
           id="fish-model"
           value={fish.model}

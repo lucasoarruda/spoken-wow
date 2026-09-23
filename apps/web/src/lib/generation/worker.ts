@@ -17,13 +17,11 @@ import { batchStopped, cancelPending, claimNext, failJob, finishJob, retryJob, t
 import { regenerateLine, type RegenerateResult } from "./regenerate";
 import { regenerateBookLine } from "@/lib/books/regenerate";
 import { regenerateZoneLine } from "@/lib/zones/regenerate";
-import { readSettings } from "./settings";
 import { generationStatus } from "./status";
 import type { Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
 import { fishConcurrency, getWallet } from "@/lib/voices/fish";
-import type { FishSettings } from "./fish-tts";
-import { readPreference } from "./preference";
+import { defaultElevenLabs, readPreference, type Preference } from "./preference";
 import { speakerFrom } from "./speakers/for";
 import type { Provider, Speaker } from "./speakers/speaker";
 
@@ -62,13 +60,13 @@ export function backoffFor(attempts: number, random: () => number = Math.random)
 export async function currentBudget(
   apiKey: string | null = null,
   provider: Provider = "elevenlabs",
+  modelId: string = defaultElevenLabs().modelId,
 ): Promise<number> {
   if (provider === "fish" && apiKey) return clampToPool(await fishBudget(apiKey), POOL_MAX);
-  const [status, settings] = await Promise.all([
-    generationStatus(apiKey ? { apiKey } : {}),
-    readSettings(),
-  ]);
-  const plan = budgetFor(status.subscription?.tier ?? null, settings.config.modelId);
+  const status = await generationStatus(apiKey ? { apiKey } : {});
+  // The model of whoever's job was claimed last: the flash and turbo families have their own
+  // concurrency, and the model is the collaborator's choice now, not the site's.
+  const plan = budgetFor(status.subscription?.tier ?? null, modelId);
   return clampToPool(plan, POOL_MAX);
 }
 
@@ -112,11 +110,11 @@ export type WorkerOptions = {
    * generator for it; there is no default that would quietly generate the wrong corpus.
    */
   regenerate?: Partial<Record<Source, Generator>>;
-  budget?: (apiKey: string | null, provider: Provider) => Promise<number>;
+  budget?: (apiKey: string | null, provider: Provider, modelId: string) => Promise<number>;
   /** The owner's stored key. Injectable so a test never needs one sealed in a database. */
   apiKeyFor?: (userId: string, provider: Provider) => Promise<string | null>;
-  /** The owner's fish.audio settings, read when a fish.audio job runs. */
-  fishSettingsFor?: (userId: string) => Promise<FishSettings>;
+  /** The owner's settings for each provider, read as each job runs. */
+  preferenceFor?: (userId: string) => Promise<Pick<Preference, "elevenlabs" | "fish">>;
   backoffMs?: (attempts: number) => number;
   leaseMs?: number;
   /** How long to wait before looking again when the queue was empty. */
@@ -144,8 +142,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
 
   const budget = options.budget ?? currentBudget;
   const apiKeyFor = options.apiKeyFor ?? readApiKey;
-  const fishSettingsFor =
-    options.fishSettingsFor ?? (async (userId: string) => (await readPreference(userId)).fish);
+  const preferenceFor = options.preferenceFor ?? readPreference;
   const backoff = options.backoffMs ?? backoffFor;
   const idleMs = options.idleMs ?? 2_000;
 
@@ -165,6 +162,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
    */
   let lastKey: string | null = null;
   let lastProvider: Provider = "elevenlabs";
+  let lastModel = defaultElevenLabs().modelId;
 
   async function run(job: QueueJob): Promise<void> {
     // Whose credits this line is spent from. A batch is enqueued by someone who had a key at
@@ -195,6 +193,12 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     lastKey = apiKey;
     lastProvider = job.provider;
 
+    // The owner's own settings, read per job so an edit on /profile applies to later lines.
+    const preference = await preferenceFor(job.createdBy ?? "");
+    lastModel =
+      job.provider === "fish" ? preference.fish.model : preference.elevenlabs.modelId;
+    const speaker = speakerFrom(job.provider, apiKey, preference);
+
     const generate = generators[job.source];
     if (!generate) {
       const message = `no generator for ${job.source} jobs in this build`;
@@ -209,17 +213,10 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
 
     // A batch whose owner's account was deleted still has takes to attribute, and
     // take."createdBy" is nullable for exactly that case.
-    //
-    // ElevenLabs needs only the key, and gets its Speaker from it as it always did; fish.audio
-    // needs the owner's own settings as well, read now so an edit applies to later lines.
-    const speaker =
-      job.provider === "fish"
-        ? speakerFrom("fish", apiKey, await fishSettingsFor(job.createdBy ?? ""))
-        : undefined;
     const result = await generate(job.lineId, job.createdBy ?? "", {
       apiKey,
       lang: job.lang,
-      ...(speaker ? { speaker } : {}),
+      speaker,
     }).catch(
       (error: unknown): RegenerateResult => ({
         ok: false,
@@ -290,7 +287,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       if (!isLeader()) return;
 
       const allowed = afterRateLimit(
-        await budget(lastKey, lastProvider),
+        await budget(lastKey, lastProvider, lastModel),
         rateLimitedAt,
         Date.now(),
       );

@@ -6,12 +6,17 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const { closeDb, db } = await import("@/lib/db");
-const { DEFAULT_PREFERENCE, readPreference, validateFish, writePreference } = await import(
-  "./preference"
-);
+const { defaultPreference, readPreference, validateElevenLabs, validateFish, writePreference } =
+  await import("./preference");
+const DEFAULT_PREFERENCE = defaultPreference();
 
 const USER = "test-generator-preference";
 const FISH = { model: "s2.1-pro-free", temperature: 0.4, topP: 0.8, speed: 1.2 };
+const ELEVEN = {
+  modelId: "eleven_multilingual_v2",
+  voiceSettings: { stability: 0.3, similarity_boost: 0.9, style: 0.1, use_speaker_boost: false },
+  seedStrategy: "none" as const,
+};
 
 beforeAll(async () => {
   await db().query(
@@ -43,14 +48,29 @@ describe("fish.audio settings", () => {
   });
 });
 
+describe("ElevenLabs settings", () => {
+  it("take the admin form's shape, less the accent tags", () => {
+    expect(validateElevenLabs(ELEVEN)).toEqual(ELEVEN);
+    expect(validateElevenLabs({ ...ELEVEN, raceTags: { dwarf: "[x]" } })).not.toHaveProperty("raceTags");
+  });
+
+  it.each([
+    [{ ...ELEVEN, modelId: "" }, /modelId/],
+    [{ ...ELEVEN, voiceSettings: { ...ELEVEN.voiceSettings, stability: 2 } }, /stability/],
+    [{ ...ELEVEN, seedStrategy: "random" }, /seed strategy/],
+  ])("refuse %j", (input, message) => {
+    expect(() => validateElevenLabs(input)).toThrow(message);
+  });
+});
+
 describe("a preference", () => {
   it("is ElevenLabs with fish.audio's defaults until one is saved", async () => {
     expect(await readPreference(USER)).toEqual(DEFAULT_PREFERENCE);
   });
 
   it("is what was saved", async () => {
-    await writePreference(USER, { provider: "fish", fish: FISH });
-    expect(await readPreference(USER)).toEqual({ provider: "fish", fish: FISH });
+    await writePreference(USER, { provider: "fish", elevenlabs: ELEVEN, fish: FISH });
+    expect(await readPreference(USER)).toEqual({ provider: "fish", elevenlabs: ELEVEN, fish: FISH });
   });
 
   it("falls back to the defaults for settings naming a withdrawn model", async () => {
