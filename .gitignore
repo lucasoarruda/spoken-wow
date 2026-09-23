@@ -39,6 +39,10 @@ superpowers/
 # them means a voice can never be remade, so back them up.
 /pipelines/quests/voice/samples/
 
+# The fish.audio reference cut from each slot's clips, per language. Cut again from the
+# samples if lost, but a take records the clip's hash, so a re-cut is a different reference.
+/pipelines/quests/voice/references/
+
 # Every take of every line, pulled from the droplet: the only quests audio there is. Some of
 # it predates this project's ability to reproduce it - back it up too.
 /pipelines/quests/audio-history/
