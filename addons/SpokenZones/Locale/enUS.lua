@@ -165,16 +165,6 @@ L.MAP_SUBZONE_MORE = "click a subzone on the map for more"
 -- the interface language rather than each language's own endonym.
 --------------------------------------------------------------------------------
 
-L.LANG_enUS = "English"
-L.LANG_deDE = "German"
-L.LANG_esES = "Spanish (Spain)"
-L.LANG_esMX = "Spanish (Latin America)"
-L.LANG_frFR = "French"
-L.LANG_ptBR = "Portuguese"
-L.LANG_ruRU = "Russian"
-L.LANG_koKR = "Korean"
-L.LANG_zhCN = "Chinese (Simplified)"
-L.LANG_zhTW = "Chinese (Traditional)"
 L.PACK_QUALITY_HIGH = "High"
 L.PACK_QUALITY_STANDARD = "Standard"
 L.OPT_PACK_NONE_INSTALLED = "none installed"

@@ -806,7 +806,7 @@ local function CmdLanguage(arg)
 			if not SpokenZones:CanRenderLanguage(locale.code) then
 				SpokenZones:Print(
 					"|cffffcc00this client has no fonts for %s|r -- it would draw as boxes",
-					SpokenZones:GetLanguageName(locale.code)
+					locale.code
 				)
 			else
 				SpokenZones:Print(

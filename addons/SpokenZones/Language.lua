@@ -36,20 +36,23 @@ local ADDON_NAME, SpokenZones = ...
 --
 -- `script` is what the client's fonts must be able to draw. `name` is ASCII so
 -- it survives being printed on a client whose fonts cannot draw `native`.
+-- `native` is the endonym shown wherever a language is listed -- Latin-script
+-- endonyms draw on every client, and anything else is only ever listed where
+-- CanRenderLanguage already passed, so no list can show boxes.
 --
 -- Must stay in step with LOCALES in tools/lib/locales.mjs; tools/validate.mjs
 -- fails the build if the two lists drift.
 SpokenZones.LOCALES = {
 	{ code = "enUS", name = "English", native = "English", script = "latin" },
 	{ code = "deDE", name = "German", native = "Deutsch", script = "latin" },
-	{ code = "esES", name = "Spanish (EU)", native = "Espanol", script = "latin" },
-	{ code = "esMX", name = "Spanish (AL)", native = "Espanol (AL)", script = "latin" },
-	{ code = "frFR", name = "French", native = "Francais", script = "latin" },
-	{ code = "ptBR", name = "Portuguese", native = "Portugues", script = "latin" },
-	{ code = "ruRU", name = "Russian", native = "Russkiy", script = "cyrillic" },
-	{ code = "koKR", name = "Korean", native = "Hangugeo", script = "korean" },
-	{ code = "zhCN", name = "Chinese (S)", native = "Zhongwen", script = "simplifiedchinese" },
-	{ code = "zhTW", name = "Chinese (T)", native = "Zhongwen", script = "traditionalchinese" },
+	{ code = "esES", name = "Spanish (EU)", native = "Español (España)", script = "latin" },
+	{ code = "esMX", name = "Spanish (AL)", native = "Español (América Latina)", script = "latin" },
+	{ code = "frFR", name = "French", native = "Français", script = "latin" },
+	{ code = "ptBR", name = "Portuguese", native = "Português", script = "latin" },
+	{ code = "ruRU", name = "Russian", native = "Русский", script = "cyrillic" },
+	{ code = "koKR", name = "Korean", native = "한국어", script = "korean" },
+	{ code = "zhCN", name = "Chinese (S)", native = "简体中文", script = "simplifiedchinese" },
+	{ code = "zhTW", name = "Chinese (T)", native = "繁體中文", script = "traditionalchinese" },
 }
 
 local BASE = "enUS"
@@ -183,23 +186,16 @@ function SpokenZones:GetLocaleInfo(code)
 	return byCode[code]
 end
 
--- Display name of a language code in the interface language, for everywhere a
--- language is listed: the options dropdown, /spz lang, pack labels. Falls back
--- to the built-in English name, then the code itself, so an unknown code reads
--- as something rather than nothing.
+-- Display name of a language: its own endonym. Only call it where the name is
+-- drawable -- the dropdown, the language list and the pack label all list
+-- renderable languages only. Anywhere else (the no-fonts warning) uses the code,
+-- which is ASCII on every client.
 function SpokenZones:GetLanguageName(code)
-	if code then
-		local entry = self.L["LANG_" .. code]
-		if entry then
-			return entry
-		end
-		local locale = byCode[code]
-		if locale then
-			return locale.name
-		end
-		return code
+	local locale = byCode[code or BASE]
+	if not locale then
+		return tostring(code)
 	end
-	return self.L.LANG_enUS or "English"
+	return locale.native or locale.name
 end
 
 -- Stores the preference. Returns false when the language is not selectable, so
