@@ -23,7 +23,9 @@
 // It also writes tools/seed/area-names.json: every corpus zone and subzone's name in
 // each language, same-as-English ones included, zones from UiMap and subzones from
 // AreaTable. That is what the site names places with (tools/lore/import-names.mjs); the
-// alias tables cannot serve for it, see lib/area-names.mjs.
+// alias tables cannot serve for it, see lib/area-names.mjs. The Era build names what it
+// has, and the Camelot build (seed/camelot-areas.json) fills in the places only it has
+// -- Mount Hyjal, the Darkspear Islands -- which Era's tables have no row for.
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -32,7 +34,7 @@ import { areaNames, mapNames } from "../lib/area-names.mjs";
 import { fetchTable, PINNED_BUILD } from "../lib/db2.mjs";
 import { BASE_LOCALE, LOCALES } from "../lib/locales.mjs";
 import { readSubzones, readZones } from "../lib/loredata.mjs";
-import { luaString, normaliseKey, ROOT } from "../lib/wiki.mjs";
+import { luaString, normaliseKey, readJson, ROOT } from "../lib/wiki.mjs";
 
 const SEED = join(ROOT, "pipelines/zones/tools/seed/area-names.json");
 
@@ -77,6 +79,9 @@ async function main() {
   console.log(`fetching AreaTable for ${build}`);
   const english = await fetchTable("AreaTable", { build });
   const mapIDs = new Set((await readZones()).map((z) => z.mapID));
+  const camelot = (await readJson(join(ROOT, "pipelines/zones/tools/seed/camelot-areas.json"))).build;
+  console.log(`fetching AreaTable for ${camelot}`);
+  const camelotEnglish = await fetchTable("AreaTable", { build: camelot });
   const seed = {};
   const englishById = new Map(english.map((row) => [row.ID, (row.AreaName_lang || "").trim()]));
 
@@ -85,11 +90,19 @@ async function main() {
 
     const rows = await fetchTable("AreaTable", { build, locale: locale.code });
     const maps = await fetchTable("UiMap", { build, locale: locale.code });
+    const [camelotRows, camelotMaps] = await Promise.all([
+      fetchTable("AreaTable", { build: camelot, locale: locale.code }),
+      fetchTable("UiMap", { build: camelot, locale: locale.code }),
+    ]);
+    // Era first, so a name both builds carry is Era's; Camelot only adds.
+    const zones = new Map([...mapNames(camelotMaps, mapIDs), ...mapNames(maps, mapIDs)]);
+    const areas = new Map([
+      ...areaNames(camelotEnglish, camelotRows, wanted),
+      ...areaNames(english, rows, wanted),
+    ]);
     seed[locale.code] = {
-      zones: Object.fromEntries(mapNames(maps, mapIDs)),
-      subzones: Object.fromEntries(
-        [...areaNames(english, rows, wanted)].sort(([a], [b]) => (a < b ? -1 : 1)),
-      ),
+      zones: Object.fromEntries([...zones].sort(([a], [b]) => a - b)),
+      subzones: Object.fromEntries([...areas].sort(([a], [b]) => (a < b ? -1 : 1))),
     };
 
     const aliases = new Map();
@@ -142,11 +155,12 @@ async function main() {
     _comment: [
       "What each corpus zone and subzone is called in each client language, from the",
       "client's own tables via wago.tools: zones from UiMap by uiMapID, subzones from",
-      "AreaTable by English key. Names the same as English are kept: they are that",
-      "language's name too. Read by tools/lore/import-names.mjs.",
+      "AreaTable by English key, the Era build first and the Camelot build for places",
+      "only it has. Names the same as English are kept: they are that language's",
+      "name too. Read by tools/lore/import-names.mjs.",
       "Regenerate with:  make zones-aliases",
     ],
-    build,
+    builds: [build, camelot],
     names: seed,
   };
   await writeFile(SEED, JSON.stringify(out, null, 2) + "\n");
