@@ -18,9 +18,10 @@ THE TRANSLATION IS CLEANED THE WAY THE ENGLISH IS, WITH TWO EXCEPTIONS:
     splits the line id into :m and :f. A translation with a $G where the English has none
     takes the male form; one without where the English has one is the same text twice.
   * $N, $C and $R are left as they are. The English cleaner writes "adventurer" and
-    "Traveler" in their place, which is English. Left in, they trip the same invalid-chars
-    rule the English uses, so the line shows up as not voiceable -- for a translator to
-    rewrite -- rather than being voiced with an English word in the middle of it.
+    "Traveler" in their place, which is English. The site speaks them as the language's own
+    words when it judges and voices the line (apps/web/src/lib/player-words.ts), so the
+    skipReason written here, which is this module's invalid-chars rule, is stricter than
+    the site's: the site re-decides it from the text and does not read this one.
 
 PRECEDENCE is import-corpus's: unchanged text is skipped, changed text is promoted unless
 somebody edited the line here, in which case the dump's version is recorded but not made

@@ -40,7 +40,12 @@ From the 1.12 patch rows of one dump:
   runtime, 26 are empty, 26 say "Missing Text". They stay in the corpus, labelled: the game
   has them, and a corpus that dropped them would look like it had missed them.
 
-That leaves **1103 voiceable pages, 385,631 characters**.
+That leaves **1103 voiceable pages, 385,631 characters** by the extract's count. The site
+counts the 36 token pages as voiceable too: it speaks `$N`, `$C` and `$R` as "adventurer"
+and "traveler", or the page's language's own words, and takes `$G`'s first branch
+(`apps/web/src/lib/player-words.ts`, applied in `lib/books/catalogue.ts` before the text is
+flattened, hashed and judged). The extract's stored `substitution` label is left as it was;
+the catalogue re-judges every page from its text.
 
 Vanilla only. WoW: Forever is a Classic+ fork, so most of its books are vanilla books with
 unchanged text, and the addon matches on the text rather than on an id — those play with no

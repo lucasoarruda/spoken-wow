@@ -194,6 +194,7 @@ async function buildTranslated(lang: Lang): Promise<CorpusLine[]> {
     const { textMissing, titleMissing, nameMissing, englishTitle, englishName, ...row } = raw;
     return {
       ...row,
+      lang,
       english: { questTitle: englishTitle, npcName: englishName },
       npcType: row.npcType as CorpusLine["npcType"],
       source: row.source as CorpusLine["source"],

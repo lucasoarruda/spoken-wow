@@ -111,10 +111,13 @@ describe("whether a page can be voiced", () => {
 
     await saveBookText({ lineId, text: "Saudações, viajante.", editedBy: "a", lang: "ptBR" });
     expect(await voiceable("ptBR")).toEqual({ generatable: true, skipReason: null });
-    // The English keeps its token, and stays blocked.
+    // The English row is not the Portuguese one's to judge.
     expect(await voiceable("enUS")).toEqual({ generatable: false, skipReason: "substitution" });
 
+    // A $N is spoken as the language's word (player-words.ts); a token nothing speaks is not.
     await saveBookText({ lineId, text: "Saudações, $N.", editedBy: "a", lang: "ptBR" });
+    expect(await voiceable("ptBR")).toEqual({ generatable: true, skipReason: null });
+    await saveBookText({ lineId, text: "Saudações, $Nama.", editedBy: "a", lang: "ptBR" });
     expect(await voiceable("ptBR")).toEqual({ generatable: false, skipReason: "substitution" });
   });
 

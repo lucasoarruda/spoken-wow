@@ -369,6 +369,22 @@ them, and clearing filters returns it to hidden.
 Lines with no audio are marked. `no audio` is a real gap; `progress` and `invalid-chars`
 are lines the generator deliberately never voices.
 
+A translation keeps Blizzard's `$N`, `$C` and `$R` in its stored text, and they are not what
+makes it `invalid-chars`: `apps/web/src/lib/player-words.ts` speaks them as the language's
+word for "adventurer" and "traveler" (`Abenteurer`, `aventurier`, `путник`, `冒险者`…) wherever
+the line is judged or sent — the voiceability gate, the request, and the staleness and dirt
+hashes, which go through one function (`sentText`) so they cannot disagree. Case follows the
+position, not the token: lowercase mid-sentence, capitalised at a sentence's start and always
+in German. A line's female variant, which exists where the English branches on `$G`, gets the
+feminine word, and a leftover `$g…;` takes that variant's branch. English quest text has
+nothing left for it to replace, its words having been written in at extraction; a book page
+in any language, English included, goes through the same table (`docs/books/README.md`). A
+token glued to a following letter (`$Nama`) is left in, so the line stays unvoiceable until a
+translator rewrites it. Doing this at send time rather than in the rows covers every way a
+translation arrives — the dump, the ptBR import, a player's contribution, a translator's edit
+— and lets a word be changed later without rewriting any of them; the changed word then marks
+those takes stale.
+
 #### Accounts and roles
 
 Registration at `/register` is open and needs no email confirmation. Everyone starts as a

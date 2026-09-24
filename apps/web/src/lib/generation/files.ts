@@ -16,6 +16,7 @@ import path from "node:path";
 import { VOICE_CONFIG_DIR } from "@/lib/paths";
 
 import { BASE_LANG, type Lang } from "@/lib/lang";
+import { speakPlayerTokens } from "@/lib/player-words";
 
 import { FALLBACK, fromFileShape, type GenerationConfig } from "./config";
 import { applyPronunciation } from "./pronunciation";
@@ -88,4 +89,18 @@ export function fileDefaults(): FileDefaults {
  */
 export function committedPronunciation(text: string, lang: Lang): string {
   return lang === BASE_LANG ? applyPronunciation(text, fileDefaults().rules) : text;
+}
+
+/**
+ * A quest line's text as it goes to the provider, before the provider's own shaping: a
+ * translation's $N/$C/$R spoken as its language's words (player-words.ts), then the committed
+ * rules. The same one function for the reason committedPronunciation is: regenerating hashes
+ * this, and the staleness and dirt checks must arrive at the identical string.
+ */
+export function sentText(
+  text: string,
+  lang: Lang,
+  playerGender: "m" | "f" | null,
+): string {
+  return committedPronunciation(speakPlayerTokens(text, lang, playerGender), lang);
 }

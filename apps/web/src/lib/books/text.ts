@@ -27,6 +27,7 @@ import { db, query } from "@/lib/db";
 
 import { BASE_LANG, type Lang } from "@/lib/lang";
 
+import { speakPlayerTokens } from "@/lib/player-words";
 import { isGeneratable } from "./tools";
 
 export type BookVersion = {
@@ -152,10 +153,9 @@ export async function saveBookText(args: {
     // this one insert rather than an insert plus a lookup.
     //
     // Whether the page can be voiced is not structure: it is a property of this language's
-    // text, judged again on every save. A $N the English carries blocks the English; a
-    // translation that writes the name out is voiceable, and one that keeps the token is not,
-    // whatever the other languages say.
-    const { generatable, skipReason } = isGeneratable(text);
+    // text, judged again on every save, with its $N spoken as this language's word
+    // (player-words.ts) as the catalogue speaks it.
+    const { generatable, skipReason } = isGeneratable(speakPlayerTokens(text, lang));
     const { rows: inserted } = await client.query<Row>(
       `insert into "book_line"
          ("lineId", "lang", "version", "isCurrent", "origin", "pageId", "bookId",
