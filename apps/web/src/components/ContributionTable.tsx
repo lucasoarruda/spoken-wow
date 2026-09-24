@@ -172,6 +172,7 @@ export default function ContributionTable({
   client,
   existing,
   flavorScopes,
+  canAnswerNpc,
 }: {
   initial: ContributionRow[];
   status: ContributionStatus | "all";
@@ -181,6 +182,8 @@ export default function ContributionTable({
   existing: Record<number, string>;
   /** facets().flavorScopes -- what lets that state's flavor select narrow to whatever race-gender was just chosen, without a round trip. */
   flavorScopes: FlavorScope[];
+  /** Whether the viewer may set an NPC's race, gender and flavor; if not, they are shown only. */
+  canAnswerNpc: boolean;
 }) {
   const router = useRouter();
   const lang = useLang();
@@ -480,6 +483,7 @@ export default function ContributionTable({
                           <SpeakerCell
                             npc={npc}
                             flavorScopes={flavorScopes}
+                            readOnly={!canAnswerNpc}
                             busy={npcBusy === row.id}
                             onSave={(answer) => void overrideNpc(row.id, npc, answer)}
                           />
@@ -708,11 +712,13 @@ function contributionKey(contributionId: number): string {
 function SpeakerCell({
   npc,
   flavorScopes,
+  readOnly,
   busy,
   onSave,
 }: {
   npc: NpcSummary;
   flavorScopes: FlavorScope[];
+  readOnly: boolean;
   busy: boolean;
   onSave: (answer: Partial<{ npcKind: NpcKind; race: string; gender: string; flavor: string }>) => void;
 }) {
@@ -728,7 +734,9 @@ function SpeakerCell({
   // away from silently overwriting a considered "no race" with an empty save.
   const [editing, setEditing] = useState(false);
 
-  if (npc.provenance === "corpus") {
+  // Read-only too for somebody api/contributions/npc would refuse: the answer as it stands,
+  // with no form that could only end in a 403.
+  if (npc.provenance === "corpus" || readOnly) {
     // The corpus is the exact answer, taken from the same display data the game itself uses --
     // there is nothing for a moderator to decide, and unlike a `moderator` row (below) there is
     // no "edit" affordance either: overriding the corpus's own answer would need to be a
@@ -737,7 +745,7 @@ function SpeakerCell({
       <div>
         <div className="flex items-center gap-1 whitespace-nowrap">
           <span>{speaker(npc)}</span>
-          <ProvenanceBadge provenance="corpus" />
+          <ProvenanceBadge provenance={npc.provenance} />
         </div>
         {speakerNote(npc) ? <p className="text-muted-foreground mt-0.5">{speakerNote(npc)}</p> : null}
       </div>
