@@ -16,7 +16,7 @@
 import { BASE_LANG, type Lang } from "../lang";
 import { fileIndex } from "../audio";
 import { db } from "../db";
-import { committedPronunciation } from "../generation/files";
+import { sentText } from "../generation/files";
 import { spokenHash } from "../generation/spoken-hash";
 import { SHAPE } from "../generation/speakers/shape";
 import { currentConfig } from "../generation/settings";
@@ -71,7 +71,7 @@ export async function staleFiles(
     // string that was sent, so a take of "[hic]" must be compared against "[hic]" and not
     // "<hic>", and a dwarf take made with its accent direction against that same direction -
     // otherwise every dwarf line reads as stale forever rather than once.
-    const pronounced = committedPronunciation(text, lang);
+    const pronounced = sentText(text, lang, line.playerGender);
     // By the provider that made the take: what it would be sent now is its question.
     const spoken = SHAPE[row.provider](pronounced, raceTags[line.race]);
     if (spokenHash(spoken) !== row.spokenHash) {

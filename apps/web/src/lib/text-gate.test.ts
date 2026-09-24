@@ -51,7 +51,7 @@ describe("isVoiceable", () => {
   });
 
   it("still refuses a template token beside a direction", () => {
-    expect(isVoiceable({ skipReason: "invalid-chars" }, "Hello $N. <He waves.>")).toBe(false);
+    expect(isVoiceable({ skipReason: "invalid-chars" }, "Hello $2113w. <He waves.>")).toBe(false);
   });
 
   it("still refuses progress text whatever its brackets", () => {

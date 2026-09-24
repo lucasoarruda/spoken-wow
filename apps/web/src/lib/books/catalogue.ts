@@ -16,7 +16,8 @@ import { nameStamp, versionStamp } from "@/lib/stamp";
 import { loadDirtyContext, NO_DIRT, type DirtyContext } from "@/lib/generation/dirty";
 
 import { ownerEntityKind, type OwnerKind } from "./filters";
-import { spokenText, textHash, fileFor } from "./tools";
+import { spokenText, textHash, fileFor, isGeneratable } from "./tools";
+import { speakPlayerTokens } from "@/lib/player-words";
 import { liveTakes } from "@/lib/takes/store";
 
 import { BASE_LANG, type Lang } from "@/lib/lang";
@@ -161,11 +162,25 @@ async function stampOf(lang: Lang): Promise<string> {
  * A title is the owner's name, so it comes from entity_name under the first owner, the one
  * a page is filed under.
  */
+/**
+ * A page as a narrator would be sent it: its $N, $C and $R spoken as the language's words
+ * (player-words.ts) before the pipeline's own rules flatten it, hash it and judge it. The
+ * hash is of that same string, so a take and the page it is compared against agree.
+ *
+ * Judged here rather than read off the row: the extract and the site's own saves wrote a
+ * page holding a $N down as `substitution`, which the word now speaks. isGeneratable is the
+ * extract's rule, so asking it again changes nothing else.
+ */
+function voiced(text: string, lang: Lang) {
+  const said = speakPlayerTokens(text, lang);
+  return { spoken: spokenText(said), hash: textHash(said), ...isGeneratable(said) };
+}
+
 async function buildTranslated(lang: Lang): Promise<BookPage[]> {
   const [english, own, names] = await Promise.all([
     catalogue(BASE_LANG),
-    query<{ lineId: string; text: string; generatable: boolean; skipReason: string | null }>(
-      `select "lineId", "text", "generatable", "skipReason" from "book_line"
+    query<{ lineId: string; text: string }>(
+      `select "lineId", "text" from "book_line"
         where "lang" = $1 and "isCurrent"`,
       [lang],
     ),
@@ -185,13 +200,7 @@ async function buildTranslated(lang: Lang): Promise<BookPage[]> {
     return {
       ...page,
       ...(text
-        ? {
-            text: text.text,
-            spoken: spokenText(text.text),
-            hash: textHash(text.text),
-            generatable: text.generatable,
-            skipReason: text.skipReason,
-          }
+        ? { text: text.text, ...voiced(text.text, lang) }
         : { spoken: "", hash: textHash(""), generatable: false, skipReason: "untranslated" }),
       title: title ?? page.title,
       english: page.text,
@@ -216,11 +225,9 @@ async function build(lang: Lang): Promise<BookPage[]> {
     ownerIds: number[];
     material: number;
     text: string;
-    generatable: boolean;
-    skipReason: string | null;
   }>(
     `select "lineId", "pageId", "bookId", "pageNumber", "pageCount", "title",
-            "ownerKind", "ownerIds", "material", "text", "generatable", "skipReason"
+            "ownerKind", "ownerIds", "material", "text"
        from "book_line"
       where "lang" = $1 and "isCurrent"
       order by "bookId", "pageNumber"`,
@@ -229,7 +236,6 @@ async function build(lang: Lang): Promise<BookPage[]> {
   if (rows.length === 0) throw new CorpusEmpty(lang);
 
   return rows.map((row) => {
-    const spoken = spokenText(row.text);
     return {
       id: row.lineId,
       pageId: row.pageId,
@@ -241,11 +247,8 @@ async function build(lang: Lang): Promise<BookPage[]> {
       ownerIds: row.ownerIds,
       material: row.material,
       text: row.text,
-      spoken,
-      hash: textHash(row.text),
+      ...voiced(row.text, lang),
       file: fileFor(row.pageId),
-      generatable: row.generatable,
-      skipReason: row.skipReason,
     };
   });
 }

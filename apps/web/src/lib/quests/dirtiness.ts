@@ -15,7 +15,7 @@ import { BASE_LANG, type Lang } from "../lang";
 import { fileIndex } from "../audio";
 import { db } from "../db";
 import { dirtyFiles, loadDirtyContext } from "../generation/dirty";
-import { committedPronunciation } from "../generation/files";
+import { sentText } from "../generation/files";
 import { readOverrides } from "./overrides";
 
 /**
@@ -65,7 +65,7 @@ export async function dirtyQuestFiles(
       file: row.file,
       // The regex rules, as regenerate.ts applies them: a rule that rewrites a name before
       // the request is sent changes which lexicon entries the text can still match.
-      text: committedPronunciation(text, lang),
+      text: sentText(text, lang, line.playerGender),
       generatedAt: row.generatedAt?.getTime() ?? null,
     });
   }

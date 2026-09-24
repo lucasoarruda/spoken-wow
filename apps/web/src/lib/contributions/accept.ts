@@ -30,7 +30,7 @@ import { normaliseText } from "@books-tools/lib/text.mjs";
 import { db } from "@/lib/db";
 import { observedFrom } from "@/lib/npc/resolve";
 import { getResolution, getResolutionsById, type NpcKind } from "@/lib/npc/store";
-import { BASE_LANG, isLang } from "@/lib/lang";
+import { BASE_LANG, isLang, type Lang } from "@/lib/lang";
 import { corpus } from "@/lib/quests/catalogue";
 import { isVoice } from "@/lib/voices/voices";
 
@@ -265,8 +265,9 @@ async function insertLine(
  * of something, and a line nobody has sent in English is contributed in English first.
  *
  * The text keeps its $N, $C and $R. The English accept writes "adventurer" in their place,
- * which in another language is an English word, so here they stay in and the line waits,
- * unvoiceable, for a translator to word around them -- as the dump's own translations do.
+ * which in another language is an English word, so here they stay in, as the dump's own
+ * translations keep theirs, and the language's own word is put in when the line is voiced
+ * (player-words.ts).
  * A line this language already has is left alone: an import or a translator got there first.
  */
 async function acceptTranslation(
@@ -299,12 +300,15 @@ async function acceptTranslation(
   }
 
   const text = contribution.text;
-  const skipReason = skipReasonFor(identity.source, text);
   const seen = new Set<string>();
   for (const line of english) {
     const key = `${line.lineId}#${line.variant ?? 0}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    // Per variant: its $N is spoken in the form the variant's player gender takes.
+    const skipReason = skipReasonFor(
+      identity.source, text, contribution.locale as Lang, line.playerGender,
+    );
     await client.query(
       `insert into "quest_line"
          ("lineId", "variant", "lang", "version", "isCurrent", "origin", "source", "questId",

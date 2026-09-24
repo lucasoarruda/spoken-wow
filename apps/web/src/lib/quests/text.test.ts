@@ -61,12 +61,28 @@ describe("a first translation", () => {
     expect(rows[0]).toEqual({ fileName: english.fileName, source: english.source, generatable: true });
   });
 
-  it("is not voiceable while it still holds a player-name token", async () => {
+  it("is voiceable with a player-name token, which is spoken as the language's word", async () => {
     await saveQuestText({
       lineId: english.lineId,
       variant: english.variant,
       lang: LANG,
-      text: "Grazie, $N.",
+      text: "고맙소, $N.",
+      editedBy: userId,
+    });
+    const rows = await query<{ generatable: boolean; skipReason: string | null }>(
+      `select "generatable", "skipReason" from "quest_line"
+        where "lineId" = $1 and "lang" = $2 and "isCurrent"`,
+      [english.lineId, LANG],
+    );
+    expect(rows[0]).toEqual({ generatable: true, skipReason: null });
+  });
+
+  it("is not voiceable while it holds a token nothing can speak", async () => {
+    await saveQuestText({
+      lineId: english.lineId,
+      variant: english.variant,
+      lang: LANG,
+      text: "$2113w 상자, $N.",
       editedBy: userId,
     });
     const rows = await query<{ generatable: boolean; skipReason: string | null }>(

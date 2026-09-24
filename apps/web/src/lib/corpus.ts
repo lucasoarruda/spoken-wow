@@ -11,6 +11,7 @@
  * filename differing by one character addresses a file the addon can never find, and it
  * fails silently.
  */
+import type { Lang } from "./lang";
 import type { NpcType, Source } from "./line-fields";
 
 /** Mirrors the line schema built in tts_cli/corpus.py:build_corpus. */
@@ -52,6 +53,11 @@ export type CorpusLine = {
    * build CorpusLines by hand.
    */
   variant?: number;
+  /**
+   * The language the text is in, set on another language's rows: its $N is spoken as that
+   * language's word (player-words.ts), so the gate has to know which. Absent means English.
+   */
+  lang?: Lang;
   /** The English names, for a translator to work from. Absent when reading English. */
   english?: { questTitle: string | null; npcName: string };
 };

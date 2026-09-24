@@ -20,6 +20,9 @@
  * the copy that counts.
  */
 
+import { BASE_LANG, type Lang } from "./lang";
+import { speakPlayerTokens } from "./player-words";
+
 /** Kept as a string, character for character, so the two files can be diffed by eye. */
 export const INVALID_CHARS = "$<>";
 
@@ -51,19 +54,28 @@ export function hasInvalidChars(text: string): boolean {
  * recording under another language.
  */
 export function isVoiceable(
-  line: { skipReason: string | null },
+  line: { skipReason: string | null; lang?: Lang; playerGender?: "m" | "f" | null },
   effectiveText: string,
 ): boolean {
   if (line.skipReason === "progress" || line.skipReason === "untranslated") return false;
-  return !hasInvalidChars(effectiveText);
+  // Judged on what would be sent: a translation's $N is spoken as its language's word
+  // (player-words.ts), so it is not what stops the line.
+  const spoken = speakPlayerTokens(effectiveText, line.lang ?? BASE_LANG, line.playerGender ?? null);
+  return !hasInvalidChars(spoken);
 }
 
 /**
  * Why a quest line written here would not be voiced, or null: the extract's own rule
  * (tts_cli/corpus.py _skip_reason), for text the extract never saw -- a translation typed on
- * the site or accepted from a player.
+ * the site or accepted from a player. Asked of the text as it is spoken in `lang`, as
+ * isVoiceable asks it.
  */
-export function skipReasonFor(source: string, text: string): "progress" | "invalid-chars" | null {
+export function skipReasonFor(
+  source: string,
+  text: string,
+  lang: Lang = BASE_LANG,
+  playerGender: "m" | "f" | null = null,
+): "progress" | "invalid-chars" | null {
   if (source === "progress") return "progress";
-  return hasInvalidChars(text) ? "invalid-chars" : null;
+  return hasInvalidChars(speakPlayerTokens(text, lang, playerGender)) ? "invalid-chars" : null;
 }

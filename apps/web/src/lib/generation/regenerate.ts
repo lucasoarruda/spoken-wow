@@ -23,7 +23,7 @@ import { readOverrides } from "@/lib/quests/overrides";
 import { commitTake } from "@/lib/takes/commit";
 import { INVALID_CHARS, isVoiceable } from "@/lib/text-gate";
 
-import { committedPronunciation } from "./files";
+import { sentText } from "./files";
 import { canonicalNpcId, seedFor } from "./seed";
 import { spokenHash } from "./spoken-hash";
 import { currentConfig } from "./settings";
@@ -161,7 +161,7 @@ export async function regenerateLine(
     // The committed pronunciation rules are English's spellings of English words; another
     // language is spoken with its own lexicon, which the speaker applies, and nothing else.
     const spokenText = SHAPE[speaker.provider](
-      committedPronunciation(source, lang),
+      sentText(source, lang, line.playerGender),
       config.raceTags[line.race],
     );
     // Lowest npcId in the group, so a file shared by many NPCs regenerates the same way

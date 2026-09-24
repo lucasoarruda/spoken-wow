@@ -93,8 +93,12 @@ export async function saveQuestText(args: {
     );
     const current = currentRows[0];
 
-    const { rows: englishRows } = await client.query<{ version: number; source: string }>(
-      `select "version", "source" from "quest_line"
+    const { rows: englishRows } = await client.query<{
+      version: number;
+      source: string;
+      playerGender: "m" | "f" | null;
+    }>(
+      `select "version", "source", "playerGender" from "quest_line"
         where "lineId" = $1 and "variant" = $2 and "lang" = $3 and "isCurrent"`,
       [args.lineId, args.variant, BASE_LANG],
     );
@@ -132,9 +136,10 @@ export async function saveQuestText(args: {
     );
 
     // Whether the line can be voiced is decided from the text now being written, by the
-    // same rules the English uses: progress text never is, and a line still holding a $N
-    // or a stray bracket would have it read aloud.
-    const skipReason = skipReasonFor(english.source, text);
+    // same rules the English uses: progress text never is, and a stray bracket or a token
+    // this language has no word for would be read aloud. Its $N does have one
+    // (player-words.ts), in the form the line's player gender takes.
+    const skipReason = skipReasonFor(english.source, text, args.lang, english.playerGender);
 
     // Structure from the row being replaced, or from the English one for a first
     // translation; localeText from the replaced row only, since the English has none.
