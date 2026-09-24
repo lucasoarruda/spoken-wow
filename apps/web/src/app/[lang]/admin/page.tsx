@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Users · Spoken" };
 export const dynamic = "force-dynamic";
 
 /** Users per page, oldest first. */
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 25;
 
 /**
  * Who may do what, in one place: a global admin's whole user list with each person's role
