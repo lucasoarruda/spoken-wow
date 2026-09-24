@@ -21,7 +21,7 @@ import { generationStatus } from "./status";
 import type { Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
 import { fishConcurrency, getWallet } from "@/lib/voices/fish";
-import { defaultElevenLabs, readPreference, type Preference } from "./preference";
+import { defaultElevenLabs, readGenerationSettings, type Preference } from "./preference";
 import { speakerFrom } from "./speakers/for";
 import type { Provider, Speaker } from "./speakers/speaker";
 import { PROVIDER_NAME } from "./providers";
@@ -143,7 +143,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
 
   const budget = options.budget ?? currentBudget;
   const apiKeyFor = options.apiKeyFor ?? readApiKey;
-  const preferenceFor = options.preferenceFor ?? readPreference;
+  const preferenceFor = options.preferenceFor ?? readGenerationSettings;
   const backoff = options.backoffMs ?? backoffFor;
   const idleMs = options.idleMs ?? 2_000;
 
@@ -193,7 +193,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       }
       return;
     }
-    // The owner's own settings, read per job so an edit on /profile applies to later lines.
+    // The owner's own settings, read per job so an edit on /voices applies to later lines.
     // Caught like the key above: a database that will not answer here is one line's failure,
     // recorded on the job, never a rejection that nothing awaits.
     let speaker: Speaker;

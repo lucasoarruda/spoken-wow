@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   // After the role check, never instead of it: a key is a credential, not a permission.
-  const { speaker, denied: noKey } = await requireSpeaker(session.user.id);
+  const { speaker, denied: noKey } = await requireSpeaker(session.user.id, lang);
   if (noKey) return noKey;
 
   const body = (await request.json().catch(() => ({}))) as { lineId?: unknown };

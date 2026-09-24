@@ -1,15 +1,18 @@
 import { cloneName } from "@/lib/voices/clone-name";
 import { pageLang } from "@/lib/lang-server";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import VoiceSlotList from "@/components/VoiceSlotList";
-import { readApiKey } from "@/lib/api-key";
-import { auth } from "@/lib/auth";
+import VoicesTabs from "@/components/voices/VoicesTabs";
+import { apiKeyStatus, readApiKey } from "@/lib/api-key";
+import { readPreference } from "@/lib/generation/preference";
+import { isProvider } from "@/lib/generation/providers";
 import { readSettings } from "@/lib/generation/settings";
-import { canManageVoices } from "@/lib/permissions";
 import { generationStatus } from "@/lib/generation/status";
+import { viewerOf } from "@/lib/grants/store";
+import { canManageVoices, canViewVoices } from "@/lib/permissions";
+import { currentSession } from "@/lib/session";
+import { FISH_MODELS } from "@/lib/voices/fish";
 import { listReferences } from "@/lib/voices/references";
 import { listSamples, type Sample } from "@/lib/voices/samples";
 import { slots } from "@/lib/voices/slots";
@@ -17,37 +20,47 @@ import { slots } from "@/lib/voices/slots";
 export const metadata: Metadata = { title: "Voices · Spoken" };
 
 // The account state is read live on every view: a voice created in the ElevenLabs dashboard
-// rather than here should still show up, since tts_cli/voices.py would find it either way.
+// rather than here should still show up, since the generator would find it either way.
 export const dynamic = "force-dynamic";
 
-export default async function Page({ params }: { params: Promise<{ lang: string }> }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const lang = await pageLang(params);
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await currentSession();
 
   // 404 rather than a redirect, matching /admin: a member has no business learning that
-  // this page exists.
-  if (!session || !canManageVoices(session.user.role)) notFound();
+  // this page exists. Open to whoever spends in the language, because this is where they
+  // choose what they spend with; what the voices are made from stays an admin's, inside.
+  if (!session || !canViewVoices(await viewerOf(session), lang)) notFound();
+  const userId = session.user.id;
 
-  const all = await slots();
+  // The statuses, never the keys: sent to a client component as props.
+  const [all, elevenStatus, fishStatus, preference, elevenKey, settings, references] =
+    await Promise.all([
+      slots(),
+      apiKeyStatus(userId),
+      apiKeyStatus(userId, "fish"),
+      readPreference(userId, lang),
+      // A row that will not open reads as none; /profile says which of the two it was.
+      readApiKey(userId).catch(() => null),
+      // The accent tags: the voices are everyone's, but how each language speaks them is its own.
+      readSettings(lang),
+      // Not the account's: a fish.audio reference is a row here, the same for every key.
+      listReferences(lang),
+    ]);
 
-  // One memoised read of the account: which voices exist, which models the plan allows, and
-  // what is left of the character budget. The page has to be useful before the ElevenLabs key
-  // exists — that is the state the project was in until a plan was bought — so a failure here
-  // is reported, not thrown.
-  // The admin's own key, because there is no server-wide one: the roster this page shows is
-  // the roster of whichever account is about to be generated from. A row that will not open
-  // reads as none, and the message below covers both.
-  const apiKey = await readApiKey(session.user.id).catch(() => null);
-  // The page's language's clones: a slot filled in English is empty in German until German
-  // clips are cloned into it.
-  const account = await generationStatus(apiKey ? { apiKey } : {}, lang);
-  const existing = account.error && account.voiceIds.size === 0 ? null : account.voiceIds;
-  const error = apiKey
-    ? account.error
-    : "No ElevenLabs key on your account. Set one in your profile to see which voices exist" +
-      " and to create them.";
+  // The viewer's own account, since the generator resolves voices by name against the key
+  // generating: this is the roster their lines would be spoken from. The page's language's
+  // clones only -- a slot filled in English is empty in German until German clips are cloned.
+  const account = elevenKey ? await generationStatus({ apiKey: elevenKey }, lang) : null;
+  const readable = account !== null && !(account.error && account.voiceIds.size === 0);
 
-  // Twenty readdir calls, so the roster arrives with its clip counts already filled in
+  // One readdir per slot, so the roster arrives with its clip counts already filled in
   // rather than each row fetching its own once expanded.
   const samples: Record<string, Sample[]> = Object.fromEntries(
     await Promise.all(
@@ -55,44 +68,39 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
     ),
   );
 
-  const created = existing ? all.filter((slot) => existing.has(slot.name)).length : 0;
-
-  // Not the account's: a fish.audio reference is a row here, the same for every key.
-  const references = Object.fromEntries(await listReferences(lang));
-  const referenced = all.filter((slot) => slot.name in references).length;
-
-  // The page's language's settings and accent tags: the voices are everyone's, but how each
-  // language generates with them is its own.
-  const settings = await readSettings(lang);
+  const { tab } = await searchParams;
 
   return (
     <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
-      <h1 className="text-xl font-semibold">Voices</h1>
-      <p className="text-muted-foreground mt-1 mb-5 text-sm">
-        The roster has {all.length} voices: one per race, gender and flavor — the two or
-        three distinct voice sets the game gives every race-gender. The generator resolves
-        them by name, so a voice only counts once it is called exactly{" "}
-        <code className="text-foreground">race-gender-flavor</code> in the ElevenLabs account.
-        {existing && ` ${created} of ${all.length} exist.`} fish.audio has a reference for{" "}
-        {referenced} of {all.length}.
-      </p>
-
-      {error && (
-        <div
-          role="alert"
-          className="border-destructive/40 bg-destructive/10 text-destructive mb-5 rounded-md border px-3 py-2 text-sm"
-        >
-          Could not read the ElevenLabs account: {error}
-        </div>
-      )}
-
-
-      <VoiceSlotList
+      <h1 className="mb-4 text-xl font-semibold">Voices</h1>
+      <VoicesTabs
+        initialTab={isProvider(tab) ? tab : preference.provider}
+        active={preference.provider}
+        keys={{ elevenlabs: elevenStatus !== null, fish: fishStatus !== null }}
+        settings={{ elevenlabs: preference.elevenlabs, fish: preference.fish }}
+        elevenLabsModels={
+          readable ? account.models.map((model) => ({ id: model.id, name: model.name })) : null
+        }
+        fishModels={FISH_MODELS.map((model) => ({
+          id: model.id,
+          label: model.label,
+          preview: model.preview,
+          price:
+            model.usdPerMillionBytes === null
+              ? "price not published"
+              : model.usdPerMillionBytes === 0
+                ? "free"
+                : `$${model.usdPerMillionBytes} per million bytes`,
+        }))}
         slots={all}
-        existing={existing ? [...existing.keys()] : null}
         initialSamples={samples}
+        initialReferences={Object.fromEntries(references)}
         raceTags={settings.config.raceTags}
-        initialReferences={references}
+        existing={readable ? [...account.voiceIds.keys()] : null}
+        accountError={account?.error ?? null}
+        slotsUsed={account?.subscription?.voiceSlotsUsed ?? null}
+        slotLimit={account?.subscription?.voiceLimit ?? null}
+        manager={canManageVoices(session.user.role)}
       />
     </main>
   );

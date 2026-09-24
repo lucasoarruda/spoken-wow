@@ -51,7 +51,7 @@ export function isAdmin(role: string | null | undefined): boolean {
   return role === "admin";
 }
 
-/** The one definition of who may create and replace voices. */
+/** The one definition of who may change what the voices are made from. */
 export function canManageVoices(role: string | null | undefined): boolean {
   return role === "admin";
 }
@@ -116,6 +116,15 @@ export function langsWhere(viewer: Viewer | null, capability: Capability): Lang[
  */
 export function spendsCredits(viewer: Viewer | null): boolean {
   return CODES.some((lang) => can(viewer, "regenerate", lang) || can(viewer, "configure", lang));
+}
+
+/**
+ * Whether somebody may open a language's /voices: anybody who spends in it, since that is
+ * where they choose their generator for it and put its voices into their own account. What
+ * the voices are made from -- the clips, the fish.audio references -- stays canManageVoices.
+ */
+export function canViewVoices(viewer: Viewer | null, lang: Lang): boolean {
+  return can(viewer, "regenerate", lang) || can(viewer, "configure", lang);
 }
 
 /** Whether somebody may hand out `capability` in `lang`. */

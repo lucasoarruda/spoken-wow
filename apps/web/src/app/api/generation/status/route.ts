@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   // Whichever generator this collaborator spends with: the voices, the balance and the rate
   // all belong to it, and an estimate in the other provider's unit would be no estimate.
-  const preference = await readPreference(session.user.id);
+  const preference = await readPreference(session.user.id, lang);
   // A row that will not open reads as no key here. The distinction between the two is worth
   // making where it can be acted on, which is requireApiKey on the routes that spend; this
   // one only decides whether to draw a balance.

@@ -17,7 +17,7 @@ import { requireApiKey, requireIn } from "@/lib/generation/authz";
 import { BASE_LANG } from "@/lib/lang";
 import { LexiconError, validateEntry } from "@/lib/generation/lexicon";
 import { isPreviewMode, renderPreview, voicePicker } from "@/lib/generation/preview";
-import { readPreference, speakingConfig } from "@/lib/generation/preference";
+import { readGenerationSettings, speakingConfig } from "@/lib/generation/preference";
 import { generationStatus } from "@/lib/generation/status";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   // Heard the way this collaborator would generate it. English's accent tags, because the
   // preview sentences are English's.
   const [preference, status] = await Promise.all([
-    readPreference(session.user.id),
+    readGenerationSettings(session.user.id),
     generationStatus({ apiKey: key }),
   ]);
   const config = await speakingConfig(preference.elevenlabs, BASE_LANG);

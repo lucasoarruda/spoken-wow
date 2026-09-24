@@ -78,8 +78,8 @@ export async function requireConfigure(): Promise<
 //------------------------------------------------------------------------------
 
 /**
- * The session of somebody who spends somewhere, or null: the gate on every profile route
- * that stores a key or a generator choice. Somewhere includes a language grant -- a
+ * The session of somebody who spends somewhere, or null: the gate on the routes that store a
+ * key or a collaborator's generator settings. Somewhere includes a language grant -- a
  * translator who may regenerate Portuguese pays with their own key like anybody else.
  */
 export async function currentSpender() {
@@ -141,12 +141,12 @@ export type SpeakerGuard =
   | { speaker: null; provider: Provider; key: null; denied: Response };
 
 /**
- * The signed-in user's Speaker: the provider they chose on /profile, with their own key for
- * it. The 428 names that provider, so a collaborator who switched to fish.audio without a
- * key is told which key is missing.
+ * The signed-in user's Speaker: the provider they activated for `lang` on /voices, with their
+ * own key for it. The 428 names that provider, so a collaborator who switched to fish.audio
+ * without a key is told which key is missing.
  */
-export async function requireSpeaker(userId: string): Promise<SpeakerGuard> {
-  const preference = await readPreference(userId);
+export async function requireSpeaker(userId: string, lang: Lang): Promise<SpeakerGuard> {
+  const preference = await readPreference(userId, lang);
   const { key, denied } = await requireApiKey(userId, preference.provider);
   if (denied) return { speaker: null, provider: preference.provider, key: null, denied };
   return {

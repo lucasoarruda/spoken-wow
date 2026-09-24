@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
   // that can only fail - and the person who pressed the button is no longer here to be told.
   //
   // The provider is fixed here too: the estimate the batch was started on was for it, and
-  // switching on /profile mid-batch must not move the jobs already waiting.
-  const { provider, denied: noKey } = await requireSpeaker(session.user.id);
+  // switching on /voices mid-batch must not move the jobs already waiting.
+  const { provider, denied: noKey } = await requireSpeaker(session.user.id, lang);
   if (noKey) return noKey;
 
   // Nothing starts the queue on boot - see lib/generation/boot.ts for why - so every route

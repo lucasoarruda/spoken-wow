@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { signOut, useSession } from "@/lib/auth-client";
-import { canManageVoices, langsWhere } from "@/lib/permissions";
+import { langsWhere } from "@/lib/permissions";
 
 /**
  * What every visitor gets, signed in or not: the three sections, and the page an addon's
@@ -73,7 +73,9 @@ export default function UserMenu() {
   // Everything only a signed-in person can reach, in one menu rather than a header row that
   // grew a button per role until it wrapped.
   const links = [
-    canManageVoices(role) && { href: "/voices", label: "Voices" },
+    // Anybody who spends in the page's language: it is where they choose their generator.
+    // canViewVoices, in the page's language like the rest.
+    (may("regenerate") || may("configure")) && { href: "/voices", label: "Voices" },
     // Each of these is the page's language's own, and gated on the same capability there as
     // the page it opens -- so a link is never offered to a page that would answer 404.
     may("configure") && { href: "/lexicon", label: "Pronunciation" },

@@ -2,11 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import ApiKeySection from "@/components/ApiKeySection";
-import GeneratorSection from "@/components/GeneratorSection";
-import { apiKeyStatus, readApiKey } from "@/lib/api-key";
-import { readPreference } from "@/lib/generation/preference";
-import { generationStatus } from "@/lib/generation/status";
-import { FISH_MODELS } from "@/lib/voices/fish";
+import Link from "@/components/LocaleLink";
+import { apiKeyStatus } from "@/lib/api-key";
 import { viewerOf } from "@/lib/grants/store";
 import { localeHref } from "@/lib/lang";
 import { pageLang } from "@/lib/lang-server";
@@ -34,33 +31,9 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const spends = spendsCredits(await viewerOf(session));
   // The status, never the key. Sent to a client component as props, so this is the shape
   // that decides what the browser can possibly learn.
-  const [status, fishStatus, preference, elevenKey] = spends
-    ? await Promise.all([
-        apiKeyStatus(session.user.id),
-        apiKeyStatus(session.user.id, "fish"),
-        readPreference(session.user.id),
-        readApiKey(session.user.id).catch(() => null),
-      ])
-    : [null, null, null, null];
-  // The models this collaborator's own ElevenLabs account offers, which is the only honest
-  // list: a plan decides which exist. From the memoised account read, which asks for them
-  // anyway. None without a key, or when the account will not say.
-  const account = elevenKey ? await generationStatus({ apiKey: elevenKey }) : null;
-  const elevenLabsModels =
-    account && !(account.error && account.models.length === 0)
-      ? account.models.map((model) => ({ id: model.id, name: model.name }))
-      : null;
-  const models = FISH_MODELS.map((model) => ({
-    id: model.id,
-    label: model.label,
-    preview: model.preview,
-    price:
-      model.usdPerMillionBytes === null
-        ? "price not published"
-        : model.usdPerMillionBytes === 0
-          ? "free"
-          : `$${model.usdPerMillionBytes} per million bytes`,
-  }));
+  const [status, fishStatus] = spends
+    ? await Promise.all([apiKeyStatus(session.user.id), apiKeyStatus(session.user.id, "fish")])
+    : [null, null];
 
   return (
     <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
@@ -77,14 +50,15 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
 
       {spends ? (
         <div className="space-y-10">
-          {preference && (
-            <GeneratorSection
-              initial={preference}
-              hasFishKey={fishStatus !== null}
-              models={models}
-              elevenLabsModels={elevenLabsModels}
-            />
-          )}
+          {/* Which one is spent with, and how, is per language on Voices; only the keys,
+              which are the account's, live here. */}
+          <p className="text-muted-foreground max-w-xl text-sm">
+            Choose which generator you use, and set it up, on{" "}
+            <Link href="/voices" className="text-foreground underline underline-offset-2">
+              Voices
+            </Link>
+            .
+          </p>
           <ApiKeySection initial={status} />
           <ApiKeySection initial={fishStatus} provider="fish" />
         </div>

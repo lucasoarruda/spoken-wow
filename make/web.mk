@@ -11,7 +11,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help dev build typecheck test bootstrap deploy-scripts releases rollback logs \
-        ssh-check store migrate-books db-pull import-locale push-npc-lines
+        ssh-check store migrate-books db-pull import-locale push-npc-lines push-voice-sources
 
 APP := @spoken/web
 
@@ -144,6 +144,12 @@ push-npc-lines: require-droplet ## Copy local NPC barks (tools/fetch_npc_lines.p
 	@test -d "$(NPC_LINES)" || { echo "no $(NPC_LINES): run tools/fetch_npc_lines.py first"; exit 1; }
 	$(RSYNC) -a --exclude .DS_Store -e "$(SSH)" "$(NPC_LINES)/" $(DROPLET):$(REMOTE_ROOT)/shared/npc-lines/
 	@echo "==> pushed"
+
+# The clips and fish.audio references apps/web/scripts/seed-voice-sources.mts wrote locally,
+# onto the droplet: files, and the fish_reference rows. Replaces only the voices that run
+# listed in pipelines/quests/voice/samples/.seeded; see scripts/voice/push-sources.sh.
+push-voice-sources: require-droplet ## Push seeded voice clips + fish references to the droplet (ADMIN_EMAIL=...)
+	@$(DB_ENV) RSYNC="$(RSYNC)" ADMIN_EMAIL="$(ADMIN_EMAIL)" bash scripts/voice/push-sources.sh
 
 migrate-books: require-droplet ## Copy the local books corpus onto the droplet (REPLACES book_line)
 	@echo "local:"

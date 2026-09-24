@@ -5,9 +5,8 @@
  */
 import fs from "node:fs";
 
-import { langParam } from "@/lib/lang-server";
 import { serveFile } from "@/lib/stream";
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { requireVoiceViewer } from "@/lib/voices/authz";
 import { readReference, referencePath } from "@/lib/voices/references";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +15,9 @@ type Context = { params: Promise<{ voice: string }> };
 
 export async function GET(request: Request, context: Context) {
   const { voice } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  // Anybody who spends in the language may hear what fish.audio is sent for this voice.
+  const { lang, denied } = await requireVoiceViewer(request, voice);
   if (denied) return denied;
-  const { lang, denied: noLang } = await langParam(request);
-  if (noLang) return noLang;
 
   const reference = await readReference(voice, lang);
   if (!reference) return new Response("no reference", { status: 404 });
