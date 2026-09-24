@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/auth-client";
 import type { Facets } from "@/lib/facets";
 import { NARRATOR_VOICE } from "@/lib/generation/narration";
+import { PROVIDER_NAME } from "@/lib/generation/providers";
 import {
   dismissQueue,
   fetchBatchJobs,
@@ -443,15 +444,24 @@ export default function Explorer({ facets }: { facets: Facets }) {
       // Before the voice checks: with no key the roster is empty, so every line would
       // otherwise be blocked for the wrong reason - "no voice named orc-male-shady" when
       // the truth is that nothing has been asked.
-      if (status?.noApiKey) {
-        return "No ElevenLabs key on your account — set one in your profile";
+      if (!status) return null;
+      // Named for the generator this collaborator has chosen, not always ElevenLabs: someone
+      // on fish.audio with a key and references was otherwise told to go and set up a
+      // provider they do not use.
+      const provider = PROVIDER_NAME[status.provider];
+      const missing = (voice: string) =>
+        status.provider === "fish"
+          ? `No fish.audio reference for "${voice}" in this language yet — cut one on /voices`
+          : `No ElevenLabs voice named "${voice}" yet — create it on /voices`;
+      if (status.noApiKey) {
+        return `No ${provider} key on your account — set one in your profile`;
       }
-      if (status && !status.voices.includes(line.voice)) {
-        return `No ElevenLabs voice named "${line.voice}" yet — create it on /voices`;
+      if (!status.voices.includes(line.voice)) {
+        return missing(line.voice);
       }
       // A narrated line needs both voices, and the server refuses it for the same reason.
-      if (line.narration && status && !status.voices.includes(NARRATOR_VOICE)) {
-        return `No ElevenLabs voice named "${NARRATOR_VOICE}" yet — create it on /voices`;
+      if (line.narration && !status.voices.includes(NARRATOR_VOICE)) {
+        return `Narrated line: ${missing(NARRATOR_VOICE)}`;
       }
       return null;
     },

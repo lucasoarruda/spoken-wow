@@ -25,16 +25,19 @@ type Props = {
 export default function RegenerateButton({ onClick, busy = false, blocked }: Props) {
   const label = blocked ?? "Regenerate this line";
 
+  // The title sits on a wrapper, not the button: a disabled Button is pointer-events-none,
+  // so a title on it never shows - which is exactly when the reason is needed.
   return (
-    <Button
-      variant="ghost"
-      size="icon-xs"
-      title={label}
-      aria-label={label}
-      disabled={busy || Boolean(blocked)}
-      onClick={onClick}
-    >
-      {busy ? <Loader2 className={cn("animate-spin")} /> : <RefreshCw />}
-    </Button>
+    <span title={label} className="inline-flex">
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={label}
+        disabled={busy || Boolean(blocked)}
+        onClick={onClick}
+      >
+        {busy ? <Loader2 className={cn("animate-spin")} /> : <RefreshCw />}
+      </Button>
+    </span>
   );
 }
