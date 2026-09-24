@@ -19,6 +19,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { zonesLua, subzonesLua, readZones, readSubzones } from "../lib/loredata.mjs";
+import { BASE_LOCALE } from "../lib/locales.mjs";
 import { makeShort } from "../lib/wiki.mjs";
 import { isEnabled, query, transaction } from "../voice/db.mjs";
 import { emitZones, emitSubzones } from "./lua.mjs";
@@ -40,16 +41,38 @@ export async function readLinesFromLua() {
 }
 
 /**
- * The live version of every line, from the database.
+ * The live version of every line in one language, from the database.
+ *
+ * One language, never all of them: every language shares a lineId, so an unfiltered read
+ * hands back one row per place per language, and an export built from it writes whichever
+ * came back last into the English file.
  */
-export async function readCurrent() {
+export async function readCurrent(lang = BASE_LOCALE) {
   const { rows } = await query(
     `select "lineId", "version", "origin", "mapID", "kind", "key", "name", "full",
             "short", "shortIsManual", "source", "editedBy", "note", "createdAt"
        from "lore_line"
-      where "isCurrent"`,
+      where "isCurrent" and "lang" = $1`,
+    [lang],
   );
   return rows;
+}
+
+/**
+ * A language's place names, lineId -> name.
+ *
+ * Not lore_line's own `name`: a translation row is seeded with the English one, and the
+ * game's own name for a place is kept in entity_name under the line's id, where the site
+ * reads it too.
+ */
+export async function readNames(lang) {
+  const { rows } = await query(
+    `select "entityId", "name"
+       from "entity_name"
+      where "isCurrent" and "lang" = $1 and "kind" in ('zone', 'subzone')`,
+    [lang],
+  );
+  return new Map(rows.map((row) => [row.entityId, row.name]));
 }
 
 /** Every version of one line, newest first. The history panel's query. */
@@ -82,33 +105,33 @@ function assertComplete(entries) {
   }
 }
 
-export async function writeZonesLua(zones) {
-  if (zones.length === 0) throw new Error("refusing to write Zones.lua: no entries");
+export async function writeZonesLua(zones, lang = BASE_LOCALE) {
+  if (zones.length === 0) throw new Error(`refusing to write ${lang}/Zones.lua: no entries`);
   assertComplete(zones);
-  const path = zonesLua();
+  const path = zonesLua(lang);
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, emitZones(zones));
+  await writeFile(path, emitZones(zones, lang));
   return zones.length;
 }
 
-export async function writeSubzonesLua(subzones, zoneNames) {
-  if (subzones.length === 0) throw new Error("refusing to write Subzones.lua: no entries");
+export async function writeSubzonesLua(subzones, zoneNames, lang = BASE_LOCALE) {
+  if (subzones.length === 0) throw new Error(`refusing to write ${lang}/Subzones.lua: no entries`);
   assertComplete(subzones);
-  const path = subzonesLua();
+  const path = subzonesLua(lang);
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, emitSubzones(subzones, zoneNames));
+  await writeFile(path, emitSubzones(subzones, zoneNames, lang));
   return subzones.length;
 }
 
-/** Both data files, from one corpus. The export's only writer. */
-export async function writeCorpus(entries) {
+/** Both data files for one language, from one corpus. The export's only writer. */
+export async function writeCorpus(entries, lang = BASE_LOCALE) {
   const zones = entries.filter((e) => e.kind === "zone");
   const subzones = entries.filter((e) => e.kind === "subzone");
   const zoneNames = new Map(zones.map((z) => [z.mapID, z.name]));
 
   return {
-    zones: await writeZonesLua(zones),
-    subzones: await writeSubzonesLua(subzones, zoneNames),
+    zones: await writeZonesLua(zones, lang),
+    subzones: await writeSubzonesLua(subzones, zoneNames, lang),
   };
 }
 

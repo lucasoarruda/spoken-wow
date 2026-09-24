@@ -124,7 +124,7 @@ lore-import-names: ## Name zones and subzones in a language from tools/seed/area
 	@test -n "$(LOCALE)" || { echo "lore-import-names: set LOCALE, e.g. LOCALE=deDE"; exit 2; }
 	@node pipelines/zones/tools/lore/import-names.mjs --lang $(LOCALE)
 
-lore-export: ## Write addons/SpokenZones/Data/enUS/*.lua from the database
+lore-export: ## Write addons/SpokenZones/Data/<lang>/*.lua, every translated language, from the database
 	@node pipelines/zones/tools/lore/export.mjs
 
 lore-check: ## Confirm the committed Lua matches the database
