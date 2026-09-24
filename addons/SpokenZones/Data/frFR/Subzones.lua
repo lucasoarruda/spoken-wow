@@ -867,8 +867,8 @@ local subzones = {
 		},
 		["gunthers retreat"] = {
 			name = "Retraite de Gunther",
-			short = "Sur une île du lac Étincelant se dresse la Retraite de Gunther, revendiquée par la liche réprouvée Gunther Arcanus et ses serviteurs zombies.",
-			full = "Sur une île du lac Étincelant se dresse la Retraite de Gunther, revendiquée par la liche réprouvée Gunther Arcanus et ses serviteurs zombies. Au large de sa rive sud-ouest, sur un îlot nu et sans nom, se trouve un étrange repère connu seulement sous le nom de Table de dîner de Lillith.",
+			short = "Sur une île du lac Étincelant se dresse la Retraite de Gunther, revendiquée par la liche réprouvée Gunther et ses serviteurs zombies.",
+			full = "Sur une île du lac Étincelant se dresse la Retraite de Gunther, revendiquée par la liche réprouvée Gunther et ses serviteurs zombies. Au large de sa rive sud-ouest, sur un îlot nu et sans nom, se trouve un étrange repère connu seulement sous le nom de Table de dîner de Lillith.",
 			source = "https://warcraft.wiki.gg/wiki/Gunther's_Retreat",
 		},
 		["night webs hollow"] = {
