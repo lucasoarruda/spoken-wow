@@ -301,30 +301,31 @@ export default function VoiceSlotList({
                   </span>
                 </button>
 
-                {/* ElevenLabs only: fish.audio is sent no accent direction. */}
-                {tab === "elevenlabs" &&
-                  (manager ? (
-                    <Input
-                      aria-label={`Accent direction for ${group.race}`}
-                      value={tags[group.race] ?? ""}
-                      placeholder="no accent direction"
-                      disabled={savingRace !== null}
-                      onChange={(event) =>
-                        setTags((current) => ({ ...current, [group.race]: event.target.value }))
-                      }
-                      onBlur={() => void saveTags(group.race)}
-                      className="h-7 w-56 shrink-0 font-mono text-xs"
-                    />
-                  ) : (
-                    tags[group.race] && (
-                      <span
-                        title="Accent direction"
-                        className="text-muted-foreground w-56 shrink-0 truncate font-mono text-xs"
-                      >
-                        {tags[group.race]}
-                      </span>
-                    )
-                  ))}
+                {/* On both tabs: the language holds one set, and speakers/shape.ts puts it in
+                    front of the NPC's words whichever provider speaks them. */}
+                {manager ? (
+                  <Input
+                    aria-label={`Accent direction for ${group.race}`}
+                    title="Accent direction, sent to ElevenLabs and fish.audio alike"
+                    value={tags[group.race] ?? ""}
+                    placeholder="no accent direction"
+                    disabled={savingRace !== null}
+                    onChange={(event) =>
+                      setTags((current) => ({ ...current, [group.race]: event.target.value }))
+                    }
+                    onBlur={() => void saveTags(group.race)}
+                    className="h-7 w-56 shrink-0 font-mono text-xs"
+                  />
+                ) : (
+                  tags[group.race] && (
+                    <span
+                      title="Accent direction"
+                      className="text-muted-foreground w-56 shrink-0 truncate font-mono text-xs"
+                    >
+                      {tags[group.race]}
+                    </span>
+                  )
+                )}
               </div>
 
               {openGroup &&
