@@ -867,8 +867,8 @@ local subzones = {
 		},
 		["gunthers retreat"] = {
 			name = "Gunthers Zufluchtsort",
-			short = "Auf einer Insel im Blendwassersee liegt Gunthers Zufluchtsort, in Besitz genommen vom Lich der Verlassenen Gunther und seinen Zombiedienern.",
-			full = "Auf einer Insel im Blendwassersee liegt Gunthers Zufluchtsort, in Besitz genommen vom Lich der Verlassenen Gunther und seinen Zombiedienern. Vor seinem Südwestufer, auf einem kahlen, namenlosen Inselchen, steht ein seltsames Wahrzeichen, das nur als Lilliths Esstisch bekannt ist.",
+			short = "Auf einer Insel im Blendwassersee liegt Gunthers Zufluchtsort, in Besitz genommen vom Lich der Verlassenen Gunther Arcanus und seinen Zombiedienern.",
+			full = "Auf einer Insel im Blendwassersee liegt Gunthers Zufluchtsort, in Besitz genommen vom Lich der Verlassenen Gunther Arcanus und seinen Zombiedienern. Vor seinem Südwestufer, auf einem kahlen, namenlosen Inselchen, steht ein seltsames Wahrzeichen, das nur als Lilliths Esstisch bekannt ist.",
 			source = "https://warcraft.wiki.gg/wiki/Gunther's_Retreat",
 		},
 		["night webs hollow"] = {
