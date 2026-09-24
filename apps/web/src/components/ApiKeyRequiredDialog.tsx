@@ -42,8 +42,8 @@ export default function ApiKeyRequiredDialog({
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Generating audio spends from your own account with the generator chosen on your
-          profile — ElevenLabs or fish.audio — not from the site&apos;s. Add that key to your
+          Generating audio spends from your own account with the generator active for this
+          language on Voices — ElevenLabs or fish.audio — not from the site&apos;s. Add that key to your
           profile and this will work; it is encrypted before it is stored, and never shown
           again.
         </p>

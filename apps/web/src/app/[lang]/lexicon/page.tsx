@@ -12,7 +12,7 @@ import { readLexicon } from "@/lib/generation/dictionary";
 import { previewCache, voicePicker } from "@/lib/generation/preview";
 import { generationStatus } from "@/lib/generation/status";
 import { can } from "@/lib/permissions";
-import { readPreference, speakingConfig } from "@/lib/generation/preference";
+import { readGenerationSettings, speakingConfig } from "@/lib/generation/preference";
 
 export const metadata: Metadata = { title: "Pronunciation · Spoken" };
 
@@ -37,7 +37,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
 
   const [lexicon, preference, status] = await Promise.all([
     readLexicon(lang),
-    readPreference(session.user.id),
+    readGenerationSettings(session.user.id),
     generationStatus(apiKey ? { apiKey } : {}, lang),
   ]);
   // This editor's own ElevenLabs settings, which are what a preview is spoken with and what

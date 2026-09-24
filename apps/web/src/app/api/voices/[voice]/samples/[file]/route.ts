@@ -12,7 +12,7 @@ import fs from "node:fs";
 
 import { parseRange } from "@/lib/range";
 import { streamOf } from "@/lib/stream";
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { denyVoiceRequest, requireVoiceViewer } from "@/lib/voices/authz";
 import { deleteSample, isStoredSampleName, samplePath } from "@/lib/voices/samples";
 
 export const dynamic = "force-dynamic";
@@ -31,11 +31,9 @@ const CONTENT_TYPES: Record<string, string> = {
 
 export async function GET(request: Request, context: Context) {
   const { voice, file } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  // Anybody who spends in the language may hear what its voices are cloned from.
+  const { lang, denied } = await requireVoiceViewer(request, voice);
   if (denied) return denied;
-  // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
-  const { lang, denied: noLang } = await langParam(request);
-  if (noLang) return noLang;
   const clone = cloneName(voice, lang);
   if (!isStoredSampleName(file)) return new Response("bad clip name", { status: 400 });
 
@@ -52,7 +50,7 @@ export async function GET(request: Request, context: Context) {
 
   // A clip is immutable once written - the stored name is unique per upload, and an edit
   // means deleting and uploading again - so this can be cached hard. Private, because it is
-  // only ever served to an admin.
+  // only ever served to somebody signed in.
   const cacheControl = "private, max-age=3600, immutable";
 
   if (request.headers.get("if-none-match") === etag) {

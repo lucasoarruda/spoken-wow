@@ -1,21 +1,22 @@
 /**
- * Turn a voice's clips into an ElevenLabs voice.
+ * Turn a voice's clips into an ElevenLabs voice, in the caller's own account.
  *
- * This is the endpoint that spends something: a custom voice slot, capped by the plan (30
- * on Creator). Replacing is delete-then-add rather than an update, because ElevenLabs has no
- * "re-train this voice" call and two voices sharing a name would make fetch_voice_map
- * ambiguous — the Python side resolves by name, and would pick whichever came back first.
+ * Open to anybody who spends in the language, not only to admins: the generator resolves
+ * voices by name against the key generating, so each collaborator needs the roster in their
+ * own account, and this is how they put it there. It changes nothing anybody else uses — the
+ * clips it reads stay an admin's to change.
+ *
+ * This is the endpoint that spends something: a custom voice slot, capped by the plan.
+ * Replacing is delete-then-add rather than an update, because ElevenLabs has no "re-train
+ * this voice" call and two voices sharing a name would make the lookup by name ambiguous —
+ * it would pick whichever came back first.
  */
 import { cloneName } from "@/lib/voices/clone-name";
-import { langParam } from "@/lib/lang-server";
 import fs from "node:fs/promises";
-
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 
 import { requireApiKey } from "@/lib/generation/authz";
 import { invalidateStatus } from "@/lib/generation/status";
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { requireVoiceViewer } from "@/lib/voices/authz";
 import { recordClone } from "@/lib/voices/clones";
 import { addVoice, deleteVoice, listVoices } from "@/lib/voices/elevenlabs";
 import { listSamples, samplePath } from "@/lib/voices/samples";
@@ -26,15 +27,10 @@ type Context = { params: Promise<{ voice: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { voice } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  const { session, lang, manager, denied } = await requireVoiceViewer(request, voice);
   if (denied) return denied;
   // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
-  const { lang, denied: noLang } = await langParam(request);
-  if (noLang) return noLang;
   const clone = cloneName(voice, lang);
-
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) return Response.json({ error: "not allowed" }, { status: 403 });
 
   // A clone is created on somebody's account, and there is no server account to create it
   // on. Which one it lands in matters beyond the bill: the generator resolves voices by name
@@ -48,7 +44,7 @@ export async function POST(request: Request, context: Context) {
 
   const samples = await listSamples(clone);
   if (samples.length === 0) {
-    return Response.json({ error: "upload at least one clip first" }, { status: 400 });
+    return Response.json({ error: "this voice has no clips to clone from yet" }, { status: 400 });
   }
 
   // Read the account rather than the provenance table: a voice created in the ElevenLabs
@@ -104,19 +100,25 @@ export async function POST(request: Request, context: Context) {
   // The voice exists by this point, and this table is explicitly not what decides that -
   // listVoices is. So a provenance write that fails must not report the clone as failed,
   // which would leave the operator re-creating a voice they already have.
+  //
+  // An admin's clone only. The table holds one row per voice and language, and is the answer
+  // to where the roster came from; every collaborator populating their own account would
+  // otherwise overwrite it with themselves.
   let warning: string | undefined;
-  try {
-    await recordClone({
-      voice,
-      voiceId,
-      clonedBy: session.user.id,
-      sampleCount: samples.length,
-      sampleBytes: samples.reduce((sum, sample) => sum + sample.bytes, 0),
-      lang,
-    });
-  } catch (error) {
-    warning = `the voice was created but its provenance was not recorded: ${message(error)}`;
-    console.error(`voice_clone insert failed for ${clone}:`, error);
+  if (manager) {
+    try {
+      await recordClone({
+        voice,
+        voiceId,
+        clonedBy: session.user.id,
+        sampleCount: samples.length,
+        sampleBytes: samples.reduce((sum, sample) => sum + sample.bytes, 0),
+        lang,
+      });
+    } catch (error) {
+      warning = `the voice was created but its provenance was not recorded: ${message(error)}`;
+      console.error(`voice_clone insert failed for ${clone}:`, error);
+    }
   }
 
   return Response.json({ voice, voiceId, replaced: Boolean(current), warning }, { status: 201 });

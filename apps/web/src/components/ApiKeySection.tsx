@@ -95,7 +95,8 @@ export default function ApiKeySection({
   const entering = status === null || replacing;
 
   return (
-    <section className="max-w-xl">
+    // Anchored so /voices can send somebody straight to the key its Activate is waiting on.
+    <section id={`${provider}-key`} className="max-w-xl scroll-mt-20">
       <h2 className="mb-1 font-medium">{PROVIDER_NAME[provider]} key</h2>
       {provider === "elevenlabs" ? (
         <p className="text-muted-foreground mb-4 text-sm">
@@ -109,7 +110,8 @@ export default function ApiKeySection({
         <p className="text-muted-foreground mb-4 text-sm">
           fish.audio is a second generator, spent from{" "}
           <strong className="text-foreground">your own</strong> prepaid fish.audio balance by
-          the byte of text. It is optional: without a key everything here uses ElevenLabs. Like
+          the byte of text. It is optional: without a key everything here uses ElevenLabs, and with one you choose it
+          per language on Voices. Like
           the ElevenLabs key it is encrypted before it is stored and never shown again. Find
           yours on fish.audio, under API keys.
         </p>

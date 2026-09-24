@@ -2,9 +2,10 @@
  * Which generator a collaborator spends with, and how they have set each one up.
  *
  * The collaborator's, not an admin's (migrations 0041 and 0044): each generates with their
- * own key, so each decides which provider that key is for and how it is used. One set per
- * provider, for every language. What stays an admin's, per language, is the race accent
- * tags, because they change the text that is sent and staleness hashes that text.
+ * own key, so each decides which provider that key is for and how it is used. One set of
+ * settings per provider, for every language; the choice between them is per language (0046).
+ * What stays an admin's, per language, is the race accent tags, because they change the text
+ * that is sent and staleness hashes that text.
  *
  * No row is ElevenLabs with the built-in settings, which is what everybody had before this.
  */
@@ -84,7 +85,7 @@ export function validateFish(input: unknown): FishSettings {
  *
  * The admin form's own validation, less the accent tags, so the two can never disagree about
  * what a valid setting is. The model is not checked against a list: which models exist is the
- * account's answer, and /profile offers only those.
+ * account's answer, and /voices offers only those.
  */
 export function validateElevenLabs(input: unknown): ElevenLabsSettings {
   try {
@@ -99,17 +100,41 @@ export function validateElevenLabs(input: unknown): ElevenLabsSettings {
   }
 }
 
-export async function readPreference(userId: string): Promise<Preference> {
+/** A collaborator's settings for both providers, which are one set for every language. */
+export async function readGenerationSettings(
+  userId: string,
+): Promise<Pick<Preference, "elevenlabs" | "fish">> {
+  const { elevenlabs, fish } = await readPreference(userId, null);
+  return { elevenlabs, fish };
+}
+
+/**
+ * The generator a collaborator spends with in `lang`, and their settings.
+ *
+ * The choice is per language (0046) and falls back to the one made before it was: a
+ * collaborator who has never activated a provider on a language's /voices keeps whatever
+ * they had chosen on /profile. `lang` null reads that fallback alone, for callers that only
+ * want the settings.
+ */
+export async function readPreference(userId: string, lang: Lang | null): Promise<Preference> {
   const defaults = defaultPreference();
-  const { rows } = await db().query<{ provider: Provider; elevenlabs: unknown; fish: unknown }>(
-    `select "provider", "elevenlabs", "fish" from "generation_preference" where "userId" = $1`,
-    [userId],
+  const { rows } = await db().query<{
+    provider: Provider | null;
+    localeProvider: Provider | null;
+    elevenlabs: unknown;
+    fish: unknown;
+  }>(
+    `select p."provider", l."provider" as "localeProvider", p."elevenlabs", p."fish"
+       from (select $1::text as "userId") u
+       left join "generation_preference" p on p."userId" = u."userId"
+       left join "generation_preference_locale" l on l."userId" = u."userId" and l."lang" = $2`,
+    [userId, lang],
   );
   const row = rows[0];
   if (!row) return defaults;
 
   // Stored settings that no longer validate -- a model fish.audio has since withdrawn -- read
-  // as the defaults rather than failing every line: the collaborator sees them on /profile
+  // as the defaults rather than failing every line: the collaborator sees them on /voices
   // and can choose again.
   const valid = <T>(raw: unknown, check: (input: unknown) => T, fallback: T): T => {
     if (!raw) return fallback;
@@ -120,27 +145,43 @@ export async function readPreference(userId: string): Promise<Preference> {
     }
   };
   return {
-    provider: row.provider,
+    provider: row.localeProvider ?? row.provider ?? defaults.provider,
     elevenlabs: valid(row.elevenlabs, validateElevenLabs, defaults.elevenlabs),
     fish: valid(row.fish, validateFish, defaults.fish),
   };
 }
 
-export async function writePreference(userId: string, preference: Preference): Promise<void> {
+/**
+ * Save a collaborator's settings for both providers.
+ *
+ * Leaves generation_preference."provider" alone on an existing row: that column is now only
+ * the fallback for languages with no choice of their own, and saving a setting on one
+ * language's page must not move every other language onto a different generator.
+ */
+export async function writeGenerationSettings(
+  userId: string,
+  settings: Pick<Preference, "elevenlabs" | "fish">,
+): Promise<void> {
   await db().query(
-    `insert into "generation_preference" ("userId", "provider", "elevenlabs", "fish", "updatedAt")
-     values ($1, $2, $3::jsonb, $4::jsonb, now())
+    `insert into "generation_preference" ("userId", "elevenlabs", "fish", "updatedAt")
+     values ($1, $2::jsonb, $3::jsonb, now())
      on conflict ("userId") do update set
-       "provider" = excluded."provider",
        "elevenlabs" = excluded."elevenlabs",
        "fish" = excluded."fish",
        "updatedAt" = now()`,
-    [
-      userId,
-      preference.provider,
-      JSON.stringify(preference.elevenlabs),
-      JSON.stringify(preference.fish),
-    ],
+    [userId, JSON.stringify(settings.elevenlabs), JSON.stringify(settings.fish)],
+  );
+}
+
+/** Make `provider` the generator a collaborator spends with in `lang`. */
+export async function writeProvider(userId: string, lang: Lang, provider: Provider): Promise<void> {
+  await db().query(
+    `insert into "generation_preference_locale" ("userId", "lang", "provider", "updatedAt")
+     values ($1, $2, $3, now())
+     on conflict ("userId", "lang") do update set
+       "provider" = excluded."provider",
+       "updatedAt" = now()`,
+    [userId, lang, provider],
   );
 }
 

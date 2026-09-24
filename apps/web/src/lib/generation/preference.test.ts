@@ -6,8 +6,15 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const { closeDb, db } = await import("@/lib/db");
-const { defaultPreference, readPreference, validateElevenLabs, validateFish, writePreference } =
-  await import("./preference");
+const {
+  defaultPreference,
+  readGenerationSettings,
+  readPreference,
+  validateElevenLabs,
+  validateFish,
+  writeGenerationSettings,
+  writeProvider,
+} = await import("./preference");
 const DEFAULT_PREFERENCE = defaultPreference();
 
 const USER = "test-generator-preference";
@@ -65,12 +72,37 @@ describe("ElevenLabs settings", () => {
 
 describe("a preference", () => {
   it("is ElevenLabs with fish.audio's defaults until one is saved", async () => {
-    expect(await readPreference(USER)).toEqual(DEFAULT_PREFERENCE);
+    expect(await readPreference(USER, "enUS")).toEqual(DEFAULT_PREFERENCE);
   });
 
-  it("is what was saved", async () => {
-    await writePreference(USER, { provider: "fish", elevenlabs: ELEVEN, fish: FISH });
-    expect(await readPreference(USER)).toEqual({ provider: "fish", elevenlabs: ELEVEN, fish: FISH });
+  it("has the settings that were saved, in every language", async () => {
+    await writeGenerationSettings(USER, { elevenlabs: ELEVEN, fish: FISH });
+    expect(await readGenerationSettings(USER)).toEqual({ elevenlabs: ELEVEN, fish: FISH });
+    expect(await readPreference(USER, "deDE")).toEqual({
+      provider: "elevenlabs",
+      elevenlabs: ELEVEN,
+      fish: FISH,
+    });
+  });
+
+  it("activates a provider in one language only", async () => {
+    await writeProvider(USER, "deDE", "fish");
+    expect((await readPreference(USER, "deDE")).provider).toBe("fish");
+    expect((await readPreference(USER, "enUS")).provider).toBe("elevenlabs");
+  });
+
+  it("falls back to the choice made before it was per language", async () => {
+    await db().query(`update "generation_preference" set "provider" = 'fish' where "userId" = $1`, [
+      USER,
+    ]);
+    expect((await readPreference(USER, "frFR")).provider).toBe("fish");
+    await writeProvider(USER, "frFR", "elevenlabs");
+    expect((await readPreference(USER, "frFR")).provider).toBe("elevenlabs");
+  });
+
+  it("keeps the fallback when settings are saved again", async () => {
+    await writeGenerationSettings(USER, { elevenlabs: ELEVEN, fish: FISH });
+    expect((await readPreference(USER, "ptBR")).provider).toBe("fish");
   });
 
   it("falls back to the defaults for settings naming a withdrawn model", async () => {
@@ -78,6 +110,6 @@ describe("a preference", () => {
       `update "generation_preference" set "fish" = $2::jsonb where "userId" = $1`,
       [USER, JSON.stringify({ ...FISH, model: "s0-retired" })],
     );
-    expect((await readPreference(USER)).fish).toEqual(DEFAULT_PREFERENCE.fish);
+    expect((await readPreference(USER, "enUS")).fish).toEqual(DEFAULT_PREFERENCE.fish);
   });
 });

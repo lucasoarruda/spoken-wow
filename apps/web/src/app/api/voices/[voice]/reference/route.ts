@@ -9,7 +9,7 @@
 import { requireApiKey } from "@/lib/generation/authz";
 import { elevenLabsCode } from "@/lib/lang";
 import { langParam } from "@/lib/lang-server";
-import { requireVoiceManager } from "@/lib/voices/authz";
+import { requireVoiceManager, requireVoiceViewer } from "@/lib/voices/authz";
 import { cloneName } from "@/lib/voices/clone-name";
 import { transcribe } from "@/lib/voices/fish";
 import {
@@ -35,10 +35,10 @@ async function guard(request: Request, voice: string) {
 
 export async function GET(request: Request, context: Context) {
   const { voice } = await context.params;
-  const checked = await guard(request, voice);
-  if (checked.denied) return checked.denied;
+  const { lang, denied } = await requireVoiceViewer(request, voice);
+  if (denied) return denied;
 
-  return Response.json({ reference: await readReference(voice, checked.lang) });
+  return Response.json({ reference: await readReference(voice, lang) });
 }
 
 export async function POST(request: Request, context: Context) {

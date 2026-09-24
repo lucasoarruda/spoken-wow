@@ -10,7 +10,7 @@
  */
 import { cloneName } from "@/lib/voices/clone-name";
 import { langParam } from "@/lib/lang-server";
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { denyVoiceRequest, requireVoiceViewer } from "@/lib/voices/authz";
 import { listSamples, rejectUpload, storeSample } from "@/lib/voices/samples";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +19,9 @@ type Context = { params: Promise<{ voice: string }> };
 
 export async function GET(request: Request, context: Context) {
   const { voice } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  // Anybody who spends in the language may hear what its voices are cloned from.
+  const { lang, denied } = await requireVoiceViewer(request, voice);
   if (denied) return denied;
-  // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
-  const { lang, denied: noLang } = await langParam(request);
-  if (noLang) return noLang;
   const clone = cloneName(voice, lang);
 
   return Response.json({ voice, samples: await listSamples(clone) });
