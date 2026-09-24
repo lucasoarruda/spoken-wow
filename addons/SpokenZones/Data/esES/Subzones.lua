@@ -867,8 +867,8 @@ local subzones = {
 		},
 		["gunthers retreat"] = {
 			name = "Refugio de Gunther",
-			short = "En una isla del Lago Aguasclaras se alza el Refugio de Gunther, reclamado por el exánime renegado Gunther y sus esbirros zombis.",
-			full = "En una isla del Lago Aguasclaras se alza el Refugio de Gunther, reclamado por el exánime renegado Gunther y sus esbirros zombis. Frente a su orilla suroccidental, en un islote desnudo y sin nombre, se encuentra un extraño hito conocido solo como la Mesa de cena de Lillith.",
+			short = "En una isla del Lago Aguasclaras se alza el Refugio de Gunther, reclamado por el exánime renegado Gunther Arcanos y sus esbirros zombis.",
+			full = "En una isla del Lago Aguasclaras se alza el Refugio de Gunther, reclamado por el exánime renegado Gunther Arcanos y sus esbirros zombis. Frente a su orilla suroccidental, en un islote desnudo y sin nombre, se encuentra un extraño hito conocido solo como la Mesa de cena de Lillith.",
 			source = "https://warcraft.wiki.gg/wiki/Gunther's_Retreat",
 		},
 		["night webs hollow"] = {

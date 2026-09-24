@@ -867,8 +867,8 @@ local subzones = {
 		},
 		["gunthers retreat"] = {
 			name = "Refúgio de Tertuliano",
-			short = "Numa ilha do Lago Águas Claras fica o Refúgio de Tertuliano, tomado pelo lich Renegado Tertuliano e seus lacaios zumbis.",
-			full = "Numa ilha do Lago Águas Claras fica o Refúgio de Tertuliano, tomado pelo lich Renegado Tertuliano e seus lacaios zumbis. Ao largo de sua margem sudoeste, numa ilhota nua e sem nome, fica um estranho marco conhecido apenas como a Mesa de Jantar de Lillith.",
+			short = "Numa ilha do Lago Águas Claras fica o Refúgio de Tertuliano, tomado pelo lich Renegado Tertuliano Arcanus e seus lacaios zumbis.",
+			full = "Numa ilha do Lago Águas Claras fica o Refúgio de Tertuliano, tomado pelo lich Renegado Tertuliano Arcanus e seus lacaios zumbis. Ao largo de sua margem sudoeste, numa ilhota nua e sem nome, fica um estranho marco conhecido apenas como a Mesa de Jantar de Lillith.",
 			source = "https://warcraft.wiki.gg/wiki/Gunther's_Retreat",
 		},
 		["night webs hollow"] = {
