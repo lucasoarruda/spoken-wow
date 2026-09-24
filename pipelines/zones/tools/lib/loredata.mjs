@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { BASE_LOCALE } from "./locales.mjs";
 
 // The monorepo root. Everything under the zones pipeline derives its paths from this
 // one constant.
@@ -38,12 +39,15 @@ export const ROOT =
 // The corpus, under the enUS directory it has always been committed in. The directory
 // name is kept rather than flattened: the addon's TOC lists these paths, and a path in a
 // shipped TOC is not worth churning to save a level.
-export function zonesLua() {
-  return join(ROOT, "addons/SpokenZones/Data/enUS/Zones.lua");
+//
+// Every other language sits beside it in Data/<lang>/, which is where Language.lua's guard
+// and validate.mjs both expect it.
+export function zonesLua(lang = BASE_LOCALE) {
+  return join(ROOT, `addons/SpokenZones/Data/${lang}/Zones.lua`);
 }
 
-export function subzonesLua() {
-  return join(ROOT, "addons/SpokenZones/Data/enUS/Subzones.lua");
+export function subzonesLua(lang = BASE_LOCALE) {
+  return join(ROOT, `addons/SpokenZones/Data/${lang}/Subzones.lua`);
 }
 
 // The emitter escapes exactly these, so the reader reverses exactly these.

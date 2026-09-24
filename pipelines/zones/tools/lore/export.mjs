@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Writes addons/SpokenZones/Data/enUS/{Zones,Subzones}.lua from lore_line.
+// Writes addons/SpokenZones/Data/<lang>/{Zones,Subzones}.lua from lore_line, English and
+// every language with a translation.
 //
-//   node tools/lore/export.mjs           # write both files
+//   node tools/lore/export.mjs           # write every language's pair
 //   node tools/lore/export.mjs --check   # fail if the files are out of date, write nothing
 //
 // The counterpart to tools/voice/export-manifest.mjs, and there for the same reason: the
@@ -16,8 +17,9 @@ import { readFile } from "node:fs/promises";
 
 import { zonesLua, subzonesLua } from "../lib/loredata.mjs";
 import { loadClientAreas } from "../lib/era.mjs";
+import { BASE_LOCALE, CODES } from "../lib/locales.mjs";
 import { emitZones, emitSubzones } from "./lua.mjs";
-import { isEnabled, readCurrent, writeCorpus } from "./store.mjs";
+import { isEnabled, readCurrent, readNames, writeCorpus } from "./store.mjs";
 import { close } from "../voice/db.mjs";
 import { loadEnvFile } from "../lib/env.mjs";
 
@@ -34,7 +36,7 @@ async function main() {
     process.exit(1);
   }
 
-  const allRows = await readCurrent();
+  const allRows = await readCurrent(BASE_LOCALE);
   if (allRows.length === 0) {
     console.error("error: lore_line has no rows. Seed it with:  make zones-lore-import");
     process.exit(1);
@@ -68,41 +70,71 @@ async function main() {
     console.log(`${unwritten} line(s) ship as pending: discovered, not written yet`);
   }
 
-  const edited = rows.filter((row) => row.origin === "edited").length;
+  // A translation ships only for a line English ships with text. English is the key set
+  // every language is looked up by, so a line outside it is unreachable, and validate.mjs
+  // refuses it ("translated from what?"). A translated line with no text is left out rather
+  // than shipped pending: the addon has no per-line fallback, so the place goes unlisted in
+  // that language, and Languages.lua keeps the language off the switcher until it is whole.
+  const written = new Set(rows.filter((row) => row.full.trim()).map((row) => row.lineId));
 
-  if (checkOnly) {
-    const zones = rows.filter((r) => r.kind === "zone");
-    const subzones = rows.filter((r) => r.kind === "subzone");
-    const zoneNames = new Map(zones.map((z) => [z.mapID, z.name]));
+  const corpora = [{ lang: BASE_LOCALE, rows }];
+  for (const lang of CODES) {
+    if (lang === BASE_LOCALE) continue;
+    // The place is named as that language's client names it, the way the site does; the
+    // row's own name is the English one it was seeded with. English stays where no name is
+    // known, which beats a heading with nothing in it.
+    const names = await readNames(lang);
+    const translated = (await readCurrent(lang))
+      .filter((row) => written.has(row.lineId) && row.full.trim() && row.short.trim())
+      .map((row) => ({ ...row, name: names.get(row.lineId) || row.name }));
+    if (translated.length) corpora.push({ lang, rows: translated });
+  }
 
-    const stale = [];
-    for (const [path, wanted] of [
-      [zonesLua(), emitZones(zones)],
-      [subzonesLua(), emitSubzones(subzones, zoneNames)],
-    ]) {
-      const onDisk = await readFile(path, "utf8").catch(() => null);
-      if (onDisk !== wanted) stale.push(path);
+  const stale = [];
+  for (const { lang, rows: langRows } of corpora) {
+    const edited = langRows.filter((row) => row.origin === "edited").length;
+    const summary = `${lang}: ${langRows.length} lines, ${edited} hand-edited`;
+
+    if (checkOnly) {
+      const zones = langRows.filter((r) => r.kind === "zone");
+      const subzones = langRows.filter((r) => r.kind === "subzone");
+      const zoneNames = new Map(zones.map((z) => [z.mapID, z.name]));
+
+      let upToDate = true;
+      for (const [path, wanted] of [
+        [zonesLua(lang), emitZones(zones, lang)],
+        [subzonesLua(lang), emitSubzones(subzones, zoneNames, lang)],
+      ]) {
+        const onDisk = await readFile(path, "utf8").catch(() => null);
+        if (onDisk !== wanted) {
+          stale.push(path);
+          upToDate = false;
+        }
+      }
+      if (upToDate) console.log(`up to date -- ${summary}`);
+      continue;
     }
 
+    const counts = await writeCorpus(langRows, lang);
+    console.log(
+      `${lang}: wrote ${counts.zones} zones and ${counts.subzones} subzones ` +
+        `(${edited} hand-edited)`,
+    );
+  }
+
+  if (checkOnly) {
     if (stale.length) {
       console.error("out of date with the database:");
       for (const path of stale) console.error(`  ! ${path}`);
       console.error("\nregenerate with:  make lore-export");
       process.exitCode = 1;
-      return;
     }
-
-    console.log(`up to date -- ${rows.length} lines, ${edited} hand-edited`);
     return;
   }
 
-  const written = await writeCorpus(rows);
-  console.log(
-    `wrote ${written.zones} zones and ${written.subzones} subzones ` +
-      `(${edited} hand-edited)`,
-  );
-  console.log("\nreview with:  git diff addon/SpokenZones/Data/");
-  console.log("then rebuild the audio lookup if any text moved:  make lookup");
+  console.log("\nreview with:  git diff addons/SpokenZones/Data/");
+  console.log("a new language also needs its two files in SpokenZones.toc, then:  make zones-languages");
+  console.log("then rebuild the audio lookup if any English text moved:  make zones-lookup");
 }
 
 main()
