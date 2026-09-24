@@ -5,7 +5,7 @@
  * this answers with a proposed voice for each NPC we have a row for (display-voices.ts), next
  * to what that row says now. Nothing is written here: applying goes through
  * api/contributions/npc like any other moderator answer, one NPC at a time, so the page can
- * show which ones landed. Collaborator, matching that route.
+ * show which ones landed. English regenerate, matching that route.
  */
 import { requireRegenerate } from "@/lib/generation/authz";
 import type { CachedCreature } from "@/lib/npc/creature-cache";

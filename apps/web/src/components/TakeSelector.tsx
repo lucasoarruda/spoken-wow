@@ -62,7 +62,7 @@ export default function TakeSelector({
    *
    * The NUMBER is public -- which take is playing and how many there are say nothing a
    * listener should not see, and the row prints them for everyone. The list behind it is
-   * not: /api/takes is collaborator-only, so offering a visitor a dropdown that answers 403
+   * not: /api/takes needs regenerate, so offering a visitor a dropdown that answers 403
    * is worse than offering none.
    */
   canRestore: boolean;

@@ -18,7 +18,7 @@
  * immutably with no ETag dance. That holds for the live take too: restoring an earlier one
  * moves the flag to a different version, which is a different URL.
  *
- * Collaborator-only, unlike the live audio: a signed-out visitor has no business
+ * Behind regenerate, unlike the live audio: a signed-out visitor has no business
  * enumerating takes that were rejected.
  */
 import { NextRequest } from "next/server";

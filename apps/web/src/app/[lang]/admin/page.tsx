@@ -3,55 +3,116 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import LanguageTable from "@/components/LanguageTable";
-import UserTable from "@/components/UserTable";
+import UserTable, { type UserRow } from "@/components/UserTable";
 import { userIdsWithApiKey } from "@/lib/api-key";
 import { auth } from "@/lib/auth";
+import { listGrants, viewerOf } from "@/lib/grants/store";
 import { langName } from "@/lib/lang";
 import { languageStates } from "@/lib/languages/store";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, langsWhere } from "@/lib/permissions";
+import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Users · Spoken" };
 
+export const dynamic = "force-dynamic";
+
+/** Users per page, oldest first. */
+const PAGE_SIZE = 25;
+
 /**
- * The only server-rendered session check in the app, and the real access boundary for user
- * management — the client-side role checks elsewhere only decide what to draw.
+ * Who may do what, in one place: a global admin's whole user list with each person's role
+ * and languages, or -- for somebody who is admin in a language -- the people working in the
+ * languages they look after, and the means to bring more in without asking anybody.
+ *
+ * The real access boundary is api/grants and the admin plugin's own routes; this decides
+ * only what to draw. A 404 for everyone else: a member has no business learning it exists.
  */
-export default async function Page() {
-  const requestHeaders = await headers();
-  const session = await auth.api.getSession({ headers: requestHeaders });
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const session = await currentSession();
+  const viewer = await viewerOf(session);
+  const administered = langsWhere(viewer, "admin");
+  if (!session || !viewer || administered.length === 0) notFound();
 
-  // 404 rather than a redirect: a member has no business learning this page exists.
-  if (!session || !isAdmin(session.user.role)) notFound();
-
-  const { users } = await auth.api.listUsers({
-    headers: requestHeaders,
-    query: { limit: 200, sortBy: "createdAt", sortDirection: "asc" },
-  });
-
-  // Which accounts hold a key, and nothing else about it. An admin hands out the role that
-  // spends, so they must be able to take back what it spends with; reading a colleague's
-  // credential is not part of that, so no value crosses this boundary -- not even the
-  // redacted hint the owner sees on their own profile.
-  const [keyed, languages] = await Promise.all([userIdsWithApiKey(), languageStates()]);
+  const global = isAdmin(viewer.role);
+  const page = Math.max(1, Number.parseInt((await searchParams).page ?? "", 10) || 1);
+  // A language admin's list is built from the grants alone (UserTable adds their holders),
+  // not from listUsers: that is the admin plugin's, and lists every address on the site --
+  // more than looking after one language entitles anybody to.
+  //
+  // Only a global admin's list is paged: a language admin's is however many people work in
+  // their languages, which is a handful.
+  const [{ users, total }, grants, keyed, languages] = global
+    ? await Promise.all([
+        auth.api
+          .listUsers({
+            headers: await headers(),
+            query: {
+              limit: PAGE_SIZE,
+              offset: (page - 1) * PAGE_SIZE,
+              sortBy: "createdAt",
+              sortDirection: "asc",
+            },
+          })
+          .then(({ users, total }) => ({
+            users: users.map((user): UserRow => ({ ...user, createdAt: new Date(user.createdAt).toISOString() })),
+            total,
+          })),
+        listGrants(),
+        // Which accounts hold a key, and nothing else about it. An admin hands out what
+        // spends, so they must be able to take back what it spends with; reading a
+        // colleague's credential is not part of that, so no value crosses this boundary --
+        // not even the redacted hint the owner sees on their own profile.
+        userIdsWithApiKey(),
+        languageStates(),
+      ])
+    : [{ users: [], total: 0 }, await listGrants(administered), null, null];
 
   return (
-    <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
+    <main className={`mx-auto px-5 pt-6 pb-36 ${global ? "max-w-5xl" : "max-w-4xl"}`}>
       <h1 className="text-xl font-semibold">Users</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
-        Collaborators and admins can regenerate voicelines. Everyone who registers starts as
-        a member. Regenerating spends credits from the collaborator&apos;s own ElevenLabs
-        account, so a role is only half of it — the key is theirs, set on their profile.
+        {global ? (
+          <>
+            Everyone who registers starts as a member. What somebody may do beyond reading is
+            granted one language at a time, English included; an admin may do everything
+            everywhere. Regenerating spends credits from the person&apos;s own ElevenLabs or
+            fish.audio account, so a grant is only half of it — the key is theirs, set on
+            their profile.
+          </>
+        ) : (
+          <>
+            Who works on {administered.map(langName).join(", ")}. You may let somebody edit or
+            regenerate there; they need to have registered first.
+          </>
+        )}
       </p>
-      <UserTable users={users} currentUserId={session.user.id} keyedUserIds={keyed} />
-
-      <h2 className="mt-10 text-lg font-semibold">Languages</h2>
-      <p className="text-muted-foreground mt-1 mb-4 text-sm">
-        A language switched on appears in everyone&apos;s header. One that is off can still be
-        opened by an admin at its address, to prepare it before anybody else sees it.
-      </p>
-      <LanguageTable
-        initial={languages.map((state) => ({ ...state, name: langName(state.code) }))}
+      <UserTable
+        // Remounted per page: the table keeps what it was given in state.
+        key={page}
+        users={users}
+        grants={grants}
+        viewer={viewer}
+        currentUserId={session.user.id}
+        keyedUserIds={keyed}
+        page={global ? { page, pageCount: Math.ceil(total / PAGE_SIZE) } : null}
       />
+
+      {languages && (
+        <>
+          <h2 className="mt-10 text-lg font-semibold">Languages</h2>
+          <p className="text-muted-foreground mt-1 mb-4 text-sm">
+            A language switched on appears in everyone&apos;s header. One that is off can still
+            be opened by an admin at its address, to prepare it before anybody else sees it.
+          </p>
+          <LanguageTable
+            initial={languages.map((state) => ({ ...state, name: langName(state.code) }))}
+          />
+        </>
+      )}
     </main>
   );
 }

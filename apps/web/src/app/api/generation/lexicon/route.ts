@@ -2,8 +2,8 @@
  * The pronunciation lexicon.
  *
  * The same boundary as the generation settings, and for the same reason: GET is
- * `collaborator`, because someone about to spend characters is entitled to know how the
- * names in their line will be said, and PUT/DELETE are `admin`, because a phoneme rule
+ * `regenerate`, because someone about to spend characters is entitled to know how the
+ * names in their line will be said, and PUT/DELETE are `configure`, because a phoneme rule
  * applies to everything anyone generates afterwards.
  *
  * PUT answers 200 even when the upload to ElevenLabs failed. The save itself succeeded, the

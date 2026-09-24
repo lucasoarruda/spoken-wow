@@ -1,7 +1,7 @@
 /**
  * Which lines this project has decided never to voice.
  *
- * `admin`, not `collaborator`: an override changes one file and the person who rewrote it
+ * `admin`, not `regenerate`: an override changes one file and the person who rewrote it
  * listens to the result, but ignoring a line hides it from everyone's searches and takes it
  * out of the shipped module. That is the same reach as the generation settings, so it is
  * gated the same way.

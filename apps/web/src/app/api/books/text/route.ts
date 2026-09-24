@@ -6,10 +6,10 @@
  * reported in a book could be read and triaged but not fixed. Feedback about a book was a
  * queue of things nobody could act on.
  *
- * Guarded at the regenerate level -- collaborator and up -- rather than the lexicon's admin
+ * Guarded at the regenerate level -- a grant in the language -- rather than the lexicon's admin
  * level, for the reason the zones route gives: a pronunciation rule is global and changes
  * what every later line costs, while a rewrite is one page, fully reversible through the
- * version history, and belongs with the other per-page judgements a collaborator makes.
+ * version history, and belongs with the other per-page judgements a regenerator makes.
  *
  * EDITING DOES NOT REGENERATE. The new text hashes differently from the take that was
  * spoken, so the page reads "audio outdated" and joins the worklist. Coupling a free action

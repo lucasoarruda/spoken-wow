@@ -5,8 +5,8 @@
  * components only decide what to draw, so the server check cannot be skipped just because
  * the UI would not have offered the control.
  *
- * Two levels. Regenerating and reverting are `collaborator`; changing the global settings is
- * `admin`, because those settings apply to everything anyone generates afterwards.
+ * Two levels. Regenerating and reverting are a language grant; changing the global settings
+ * is `admin`, because those settings apply to everything anyone generates afterwards.
  */
 import { headers } from "next/headers";
 
@@ -48,9 +48,7 @@ export async function requireRegenerate(): Promise<
 /**
  * The session, or a 403, for one capability in one language.
  *
- * English regenerating and editing is what the collaborator role always granted, so for
- * those this answers exactly as canRegenerate did; everything else is lib/permissions.ts's
- * `can`, over the grants the viewer holds.
+ * lib/permissions.ts's `can`, over the grants the viewer holds.
  */
 export async function requireCapability(
   capability: Capability,
@@ -102,7 +100,7 @@ function noKey(message: string): Response {
  * and a member who pasted one must still be refused.
  *
  * There is no fallback to a server-wide ELEVENLABS_API_KEY, deliberately. With one, "who
- * paid for this line" would have no answer, and granting somebody the collaborator role
+ * paid for this line" would have no answer, and granting somebody regenerate in a language
  * would quietly grant them the deployer's bill as well. fish.audio has none for the same
  * reason.
  */

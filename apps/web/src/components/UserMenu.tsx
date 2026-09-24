@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "@/components/LocaleLink";
+import { useGrants } from "@/components/GrantsProvider";
 import { useCan } from "@/components/useCan";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { signOut, useSession } from "@/lib/auth-client";
-import { canManageVoices, isAdmin } from "@/lib/permissions";
+import { canManageVoices, langsWhere } from "@/lib/permissions";
 
 /**
  * What every visitor gets, signed in or not: the three sections, and the page an addon's
@@ -48,6 +49,7 @@ export default function UserMenu() {
   // What this person may do in the page's language. Only that one: a Portuguese translator
   // on an English page is a member there, and is offered what a member is.
   const may = useCan();
+  const grants = useGrants();
 
   // Rendering nothing until the session resolves avoids a "Sign in" flash for a user who
   // is in fact signed in.
@@ -77,9 +79,10 @@ export default function UserMenu() {
     may("configure") && { href: "/lexicon", label: "Pronunciation" },
     may("edit") && { href: "/reports", label: "Reports" },
     may("edit") && { href: "/contributions", label: "Contributions" },
-    isAdmin(role) && { href: "/admin", label: "Users" },
-    may("admin") && { href: "/translators", label: "Translators" },
-    // Everyone signed in has one, and for a collaborator it is where the ElevenLabs key
+    // Any language the viewer looks after, not the page's alone: /admin shows them all, and
+    // is gated the same way.
+    langsWhere({ role, grants }, "admin").length > 0 && { href: "/admin", label: "Users" },
+    // Everyone signed in has one, and for somebody who may regenerate it is where their key
     // lives - which is the thing standing between them and the Regenerate button.
     { href: "/profile", label: "Profile" },
   ].filter((link): link is { href: string; label: string } => Boolean(link));

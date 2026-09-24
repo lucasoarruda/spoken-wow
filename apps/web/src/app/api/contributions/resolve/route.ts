@@ -2,8 +2,8 @@
  * Changing a contribution's status.
  *
  * A sibling route, not a second verb on /api/contributions: that path's POST is open to the
- * whole internet and this one must never be. Collaborator rather than admin, as on the reports
- * side -- these are the people who already act on lines.
+ * whole internet and this one must never be. Whoever edits the language rather than an
+ * admin, as on the reports side -- these are the people who already act on lines.
  */
 import { requireCapability } from "@/lib/generation/authz";
 import { contributionLocale } from "@/lib/contributions/store";
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
   }
 
   // Whoever may edit the language the player sent it in: accepting writes that language's
-  // text. English is the collaborator role's, as it always was. The id is checked for
-  // existence only after the permission, so a member learns nothing about which ids exist.
+  // text, English like any other. The id is checked for existence only after the
+  // permission, so a member learns nothing about which ids exist.
   const locale = await contributionLocale(id);
   const lang = isLang(locale) ? locale : BASE_LANG;
   const { session, denied } = await requireCapability("edit", lang);

@@ -1,7 +1,7 @@
 /**
  * What one line should say instead of what the corpus says it says.
  *
- * `collaborator`, matching regeneration rather than the lexicon: an override changes one file,
+ * `regenerate` in English, matching regeneration rather than the lexicon: an override changes one file,
  * and the person who would have to listen to the result is the person regenerating it. A
  * lexicon rule, by contrast, applies to everything anyone generates afterwards.
  *
