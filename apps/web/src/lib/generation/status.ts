@@ -60,7 +60,12 @@ export type GenerationStatus = {
 export const STATUS_TTL_MS = 60_000;
 
 const cacheKey = Symbol.for("wow-voiceover.generation-status");
-type Entry = { at: number; value: Promise<AccountStatus> };
+/**
+ * The two halves of an account read, cached separately: the subscription endpoint answers in
+ * a second or more where the voice list takes a fraction of that, and /voices draws its
+ * roster from the one without waiting on the other.
+ */
+type Entry = { at: number; roster: Promise<Roster>; subscription: Promise<SubscriptionRead> };
 type Holder = { [cacheKey]?: Map<string, Entry> };
 
 function memo(): Map<string, Entry> {
@@ -89,31 +94,30 @@ export function invalidateStatus(): void {
  */
 const MEMO_MAX = 32;
 
-async function read(options: ElevenLabsOptions): Promise<AccountStatus> {
+/** The account as read, before a language is picked out of it. */
+type AccountStatus = Omit<GenerationStatus, "voices" | "voiceIds">;
+type Roster = Omit<AccountStatus, "subscription">;
+type SubscriptionRead = { subscription: Subscription | null; error: string | null };
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+async function readRoster(options: ElevenLabsOptions): Promise<Roster> {
   const fetchedAt = new Date().toISOString();
   try {
     // Both together: they fail for the same reasons (no key, bad key, ElevenLabs down), so
     // serialising them would only make the failure slower.
-    const [clones, subscription, models] = await Promise.all([
-      listVoices(options),
-      getSubscription(options),
-      listModels(options),
-    ]);
-    return {
-      clones,
-      models,
-      subscription,
-      error: null,
-      fetchedAt,
-    };
+    const [clones, models] = await Promise.all([listVoices(options), listModels(options)]);
+    return { clones, models, error: null, fetchedAt };
   } catch (error) {
-    return {
-      clones: new Map(),
-      models: [],
-      subscription: null,
-      error: error instanceof Error ? error.message : String(error),
-      fetchedAt,
-    };
+    return { clones: new Map(), models: [], error: message(error), fetchedAt };
+  }
+}
+
+async function readSubscription(options: ElevenLabsOptions): Promise<SubscriptionRead> {
+  try {
+    return { subscription: await getSubscription(options), error: null };
+  } catch (error) {
+    return { subscription: null, error: message(error) };
   }
 }
 
@@ -131,11 +135,35 @@ export function generationStatus(
   options: ElevenLabsOptions = {},
   lang: Lang = BASE_LANG,
 ): Promise<GenerationStatus> {
-  return accountStatus(options).then((status) => inLanguage(status, lang));
+  const entry = account(options);
+  return Promise.all([entry.roster, entry.subscription]).then(([roster, read]) =>
+    inLanguage(
+      { ...roster, subscription: read.subscription, error: roster.error ?? read.error },
+      lang,
+    ),
+  );
+}
+
+/**
+ * The same, without the subscription: which voices and models the account has.
+ *
+ * For /voices, which fetches the subscription after the page has drawn (accountSubscription)
+ * rather than holding the whole roster back for the slowest of ElevenLabs' three answers.
+ */
+export function generationRoster(
+  options: ElevenLabsOptions = {},
+  lang: Lang = BASE_LANG,
+): Promise<Omit<GenerationStatus, "subscription">> {
+  return account(options).roster.then((roster) => inLanguage(roster, lang));
+}
+
+/** The subscription half of the same memoised read. */
+export function accountSubscription(options: ElevenLabsOptions = {}): Promise<SubscriptionRead> {
+  return account(options).subscription;
 }
 
 /** The account read once, for every language: which one is asked about is a filter. */
-function inLanguage(status: AccountStatus, lang: Lang): GenerationStatus {
+function inLanguage<T extends Roster>(status: T, lang: Lang): T & Pick<GenerationStatus, "voices" | "voiceIds"> {
   const voiceIds = new Map<string, string>();
   for (const [name, id] of status.clones) {
     const clone = parseCloneName(name);
@@ -144,24 +172,22 @@ function inLanguage(status: AccountStatus, lang: Lang): GenerationStatus {
   return { ...status, voices: [...voiceIds.keys()].sort(), voiceIds };
 }
 
-/** The account as read, before a language is picked out of it. */
-type AccountStatus = Omit<GenerationStatus, "voices" | "voiceIds">;
-
-function accountStatus(options: ElevenLabsOptions): Promise<AccountStatus> {
-  if (options.fetchImpl || options.baseUrl) return read(options);
-  if (!options.apiKey) return read(options);
+function account(options: ElevenLabsOptions): Omit<Entry, "at"> {
+  const fresh = () => ({ roster: readRoster(options), subscription: readSubscription(options) });
+  if (options.fetchImpl || options.baseUrl) return fresh();
+  if (!options.apiKey) return fresh();
 
   const entries = memo();
   const cached = entries.get(options.apiKey);
-  if (cached && Date.now() - cached.at < STATUS_TTL_MS) return cached.value;
+  if (cached && Date.now() - cached.at < STATUS_TTL_MS) return cached;
 
-  // The promise is cached, not the value, so a hundred lines starting at once share one
+  // The promises are cached, not the values, so a hundred lines starting at once share one
   // upstream call rather than each finding an empty cache and making their own.
-  const value = read(options);
+  const entry = { at: Date.now(), ...fresh() };
   // Re-inserted rather than updated, so Map's insertion order is recency and the eviction
   // below takes the oldest.
   entries.delete(options.apiKey);
-  entries.set(options.apiKey, { at: Date.now(), value });
+  entries.set(options.apiKey, entry);
   while (entries.size > MEMO_MAX) entries.delete(entries.keys().next().value!);
-  return value;
+  return entry;
 }

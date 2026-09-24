@@ -8,7 +8,7 @@ import { apiKeyStatus, readApiKey } from "@/lib/api-key";
 import { readPreference } from "@/lib/generation/preference";
 import { isProvider } from "@/lib/generation/providers";
 import { readSettings } from "@/lib/generation/settings";
-import { generationStatus } from "@/lib/generation/status";
+import { generationRoster } from "@/lib/generation/status";
 import { viewerOf } from "@/lib/grants/store";
 import { canManageVoices, canViewVoices } from "@/lib/permissions";
 import { currentSession } from "@/lib/session";
@@ -57,7 +57,9 @@ export default async function Page({
   // The viewer's own account, since the generator resolves voices by name against the key
   // generating: this is the roster their lines would be spoken from. The page's language's
   // clones only -- a slot filled in English is empty in German until German clips are cloned.
-  const account = elevenKey ? await generationStatus({ apiKey: elevenKey }, lang) : null;
+  // Without the subscription, which is the slow one of ElevenLabs' answers: VoicesTabs asks
+  // for the slot count once the page is up.
+  const account = elevenKey ? await generationRoster({ apiKey: elevenKey }, lang) : null;
   const readable = account !== null && !(account.error && account.voiceIds.size === 0);
 
   // One readdir per slot, so the roster arrives with its clip counts already filled in
@@ -98,8 +100,6 @@ export default async function Page({
         raceTags={settings.config.raceTags}
         existing={readable ? [...account.voiceIds.keys()] : null}
         accountError={account?.error ?? null}
-        slotsUsed={account?.subscription?.voiceSlotsUsed ?? null}
-        slotLimit={account?.subscription?.voiceLimit ?? null}
         manager={canManageVoices(session.user.role)}
       />
     </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Loader2, Pencil, Sparkles } from "lucide-react";
 
 import { useLang } from "@/components/LangProvider";
@@ -47,8 +47,6 @@ type Props = {
   existing: string[] | null;
   /** Why the account could not be read, when there is a key to read it with. */
   accountError: string | null;
-  slotsUsed: number | null;
-  slotLimit: number | null;
   manager: boolean;
 };
 
@@ -75,7 +73,28 @@ export default function VoicesTabs(props: Props) {
   // is the account, read fresh on every page view.
   const [present, setPresent] = useState(props.existing === null ? null : new Set(props.existing));
   // Counted up as the dialog fills slots, so its "free" never promises room already spent.
-  const [slotsUsed, setSlotsUsed] = useState(props.slotsUsed);
+  // Null until /api/voices/subscription answers: ElevenLabs takes a second or more to say,
+  // and nothing else on the page should wait for it.
+  const [slotsUsed, setSlotsUsed] = useState<number | null>(null);
+  const [slotLimit, setSlotLimit] = useState<number | null>(null);
+
+  const hasElevenLabsKey = props.keys.elevenlabs;
+  useEffect(() => {
+    if (!hasElevenLabsKey) return;
+    let cancelled = false;
+    fetch(withLang(lang, "/api/voices/subscription"))
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { slotsUsed: number | null; slotLimit: number | null } | null) => {
+        if (cancelled || !body) return;
+        setSlotsUsed(body.slotsUsed);
+        setSlotLimit(body.slotLimit);
+      })
+      // Unknown is drawn as no count at all, which is what a failure should look like too.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [lang, hasElevenLabsKey]);
 
   function cloned(voice: string) {
     if (!present?.has(voice)) setSlotsUsed((used) => (used === null ? null : used + 1));
@@ -235,7 +254,7 @@ export default function VoicesTabs(props: Props) {
               cloneable={cloneable.map((slot) => slot.name)}
               present={present}
               slotsUsed={slotsUsed}
-              slotLimit={props.slotLimit}
+              slotLimit={slotLimit}
               onCloned={cloned}
             />
           </div>
