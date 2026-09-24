@@ -759,7 +759,8 @@ if QuestLogQuests_Update and QuestScrollFrame and QuestScrollFrame.titleFramePoo
                 -- behind it. Named too, since UIPanelButtonTemplate names its pieces after
                 -- its parent and an unnamed one leaves those substitutions unresolved.
                 local header = details.BackFrame or details
-                local playButton = CreateFrame("Button", "SpokenQuestsDetailsPlayButton", header,
+                -- Detached, because the details panel is open (Utils:CreateDetachedFrame).
+                local playButton = Utils:CreateDetachedFrame("Button", "SpokenQuestsDetailsPlayButton", header,
                     "UIPanelButtonTemplate")
                 playButton:SetFrameLevel(header:GetFrameLevel() + 2)
 
