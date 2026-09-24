@@ -92,9 +92,10 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         // Said rather than hidden: a member who has been told "go and regenerate that line"
         // needs to know which of the two things they are missing.
         <p className="text-muted-foreground max-w-xl text-sm">
-          Generating audio needs the <strong className="text-foreground">collaborator</strong>{" "}
-          role, or the right to regenerate in a language. Ask an admin for it, and this page
-          will then ask you for an ElevenLabs key of your own.
+          Generating audio needs the right to{" "}
+          <strong className="text-foreground">regenerate</strong> in a language. Ask an admin,
+          or whoever looks after that language, and this page will then ask you for a key of
+          your own.
         </p>
       )}
     </main>

@@ -1,11 +1,11 @@
 /**
  * The words themselves, read and rewritten.
  *
- * Guarded at the regenerate level -- collaborator and up -- rather than the lexicon's
+ * Guarded at the regenerate level -- a grant in the language -- rather than the lexicon's
  * admin level. A pronunciation rule is global: it changes the spoken text of every line
  * containing the word, and therefore what a regeneration pass costs next. A rewrite is one
  * line, fully reversible through the version history, and belongs with the other per-line
- * judgements a collaborator already makes.
+ * judgements whoever regenerates it already makes.
  *
  * EDITING DOES NOT REGENERATE. The new text hashes differently from the take that was
  * spoken, so the line simply reads "text changed" and joins the worklist like any other

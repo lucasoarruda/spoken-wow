@@ -4,7 +4,7 @@
  * One route for all three sections, because `take` and `take_ack` are one pair of tables
  * keyed by source -- three routes would be three places for the same rule to drift.
  *
- * Collaborators and admins, the same boundary as a regeneration and for the same reason:
+ * Whoever may regenerate the language, the same boundary as a regeneration and for the same reason:
  * this says a take is fine as it stands, which is the decision NOT to spend on replacing
  * it. Both verdicts belong to the same people.
  *

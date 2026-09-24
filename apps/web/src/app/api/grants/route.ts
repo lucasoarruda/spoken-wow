@@ -11,7 +11,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { addGrant, listGrants, removeGrant, userByEmail, viewerOf } from "@/lib/grants/store";
 import { isLang } from "@/lib/lang";
-import { canGrant, isCapability, type Viewer } from "@/lib/permissions";
+import { canGrant, isAdmin, isCapability, langsWhere, type Viewer } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,17 +23,11 @@ async function viewer(): Promise<{ viewer: Viewer; userId: string } | null> {
   return session && seen ? { viewer: seen, userId: session.user.id } : null;
 }
 
-/** The languages somebody administers, or null for all of them. */
-function administered(viewer: Viewer): string[] | null {
-  if (viewer.role === "admin") return null;
-  return viewer.grants.filter((grant) => grant.capability === "admin").map((grant) => grant.lang);
-}
-
 /** What `viewer` may see: every grant for an admin, their own languages' for a language admin. */
 async function listing(viewer: Viewer): Promise<Response> {
-  const langs = administered(viewer);
-  if (langs !== null && langs.length === 0) return FORBIDDEN();
-  return Response.json({ grants: await listGrants(langs ?? undefined), languages: langs });
+  const langs = langsWhere(viewer, "admin");
+  if (langs.length === 0) return FORBIDDEN();
+  return Response.json({ grants: await listGrants(isAdmin(viewer.role) ? undefined : langs) });
 }
 
 export async function GET() {

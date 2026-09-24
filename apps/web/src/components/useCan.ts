@@ -8,8 +8,8 @@ import { useLang } from "./LangProvider";
 
 /**
  * What the viewer may do on this page, in its language: the session's role and the grants
- * GrantsProvider fetched. Until the grants arrive the answer is the role's alone, which for
- * everybody but a translator is already the whole answer.
+ * GrantsProvider fetched. Until the grants arrive the answer is the role's alone, which is
+ * everything for an admin and nothing for anybody else.
  */
 export function useCan(): (capability: Capability) => boolean {
   const lang = useLang();

@@ -6,8 +6,8 @@
  * and the books corpus is built from the same world DB. A file the pipeline pulls is the
  * boundary those two already have.
  *
- * Collaborator-only, like /resolve: accepted text is still text somebody typed into a public
- * form, and the queue it came from is not public reading.
+ * Behind English regenerate, like the other moderator routes: accepted text is still text
+ * somebody typed into a public form, and the queue it came from is not public reading.
  */
 import { requireRegenerate } from "@/lib/generation/authz";
 import { acceptedContributions, observationMeta } from "@/lib/contributions/store";

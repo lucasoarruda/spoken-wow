@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { signOut, useSession } from "@/lib/auth-client";
-import { canManageVoices, isAdmin } from "@/lib/permissions";
+import { canManageVoices, langsWhere } from "@/lib/permissions";
 
 /**
  * What every visitor gets, signed in or not: the three sections, and the page an addon's
@@ -79,12 +79,10 @@ export default function UserMenu() {
     may("configure") && { href: "/lexicon", label: "Pronunciation" },
     may("edit") && { href: "/reports", label: "Reports" },
     may("edit") && { href: "/contributions", label: "Contributions" },
-    // Every language the viewer looks after, not the page's alone: /admin shows them all.
-    (isAdmin(role) || grants.some((grant) => grant.capability === "admin")) && {
-      href: "/admin",
-      label: "Users",
-    },
-    // Everyone signed in has one, and for a collaborator it is where the ElevenLabs key
+    // Any language the viewer looks after, not the page's alone: /admin shows them all, and
+    // is gated the same way.
+    langsWhere({ role, grants }, "admin").length > 0 && { href: "/admin", label: "Users" },
+    // Everyone signed in has one, and for somebody who may regenerate it is where their key
     // lives - which is the thing standing between them and the Regenerate button.
     { href: "/profile", label: "Profile" },
   ].filter((link): link is { href: string; label: string } => Boolean(link));

@@ -10,7 +10,7 @@
  * every line a file of its own, which is a special case of the same thing.
  *
  * Behind requireRegenerate, as the quests versions route was: a take history is the shape
- * of somebody's work, and restoring from it is a collaborator's decision.
+ * of somebody's work, and restoring from it is the decision of whoever regenerates it.
  */
 import { requireIn } from "@/lib/generation/authz";
 

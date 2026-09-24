@@ -30,71 +30,69 @@ export default async function Page() {
   const administered = langsWhere(viewer, "admin");
   if (!session || !viewer || administered.length === 0) notFound();
 
-  if (!isAdmin(viewer.role)) {
-    // Built from the grants rather than listUsers, which is the admin plugin's and lists
-    // every address on the site -- more than looking after one language entitles anybody to.
-    const grants = await listGrants(administered);
-    const users = new Map<string, UserRow>();
-    for (const row of grants) users.set(row.userId, { id: row.userId, name: row.name, email: row.email });
-
-    return (
-      <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
-        <h1 className="text-xl font-semibold">Users</h1>
-        <p className="text-muted-foreground mt-1 mb-5 text-sm">
-          Who works on {administered.map(langName).join(", ")}. You may let somebody edit or
-          regenerate there; they need to have registered first.
-        </p>
-        <UserTable
-          users={[...users.values()]}
-          grants={grants}
-          viewer={viewer}
-          currentUserId={session.user.id}
-          keyedUserIds={null}
-        />
-      </main>
-    );
-  }
-
-  const [{ users }, grants, keyed, languages] = await Promise.all([
-    auth.api.listUsers({
-      headers: await headers(),
-      query: { limit: 200, sortBy: "createdAt", sortDirection: "asc" },
-    }),
-    listGrants(),
-    // Which accounts hold a key, and nothing else about it. An admin hands out what spends,
-    // so they must be able to take back what it spends with; reading a colleague's
-    // credential is not part of that, so no value crosses this boundary -- not even the
-    // redacted hint the owner sees on their own profile.
-    userIdsWithApiKey(),
-    languageStates(),
-  ]);
+  const global = isAdmin(viewer.role);
+  // A language admin's list is built from the grants alone (UserTable adds their holders),
+  // not from listUsers: that is the admin plugin's, and lists every address on the site --
+  // more than looking after one language entitles anybody to.
+  const [users, grants, keyed, languages] = global
+    ? await Promise.all([
+        auth.api
+          .listUsers({
+            headers: await headers(),
+            query: { limit: 200, sortBy: "createdAt", sortDirection: "asc" },
+          })
+          .then(({ users }) =>
+            users.map((user): UserRow => ({ ...user, createdAt: new Date(user.createdAt).toISOString() })),
+          ),
+        listGrants(),
+        // Which accounts hold a key, and nothing else about it. An admin hands out what
+        // spends, so they must be able to take back what it spends with; reading a
+        // colleague's credential is not part of that, so no value crosses this boundary --
+        // not even the redacted hint the owner sees on their own profile.
+        userIdsWithApiKey(),
+        languageStates(),
+      ])
+    : [[], await listGrants(administered), null, null];
 
   return (
-    <main className="mx-auto max-w-5xl px-5 pt-6 pb-36">
+    <main className={`mx-auto px-5 pt-6 pb-36 ${global ? "max-w-5xl" : "max-w-4xl"}`}>
       <h1 className="text-xl font-semibold">Users</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
-        Everyone who registers starts as a member. What somebody may do beyond reading is
-        granted one language at a time, English included; an admin may do everything
-        everywhere. Regenerating spends credits from the person&apos;s own ElevenLabs or
-        fish.audio account, so a grant is only half of it — the key is theirs, set on their
-        profile.
+        {global ? (
+          <>
+            Everyone who registers starts as a member. What somebody may do beyond reading is
+            granted one language at a time, English included; an admin may do everything
+            everywhere. Regenerating spends credits from the person&apos;s own ElevenLabs or
+            fish.audio account, so a grant is only half of it — the key is theirs, set on
+            their profile.
+          </>
+        ) : (
+          <>
+            Who works on {administered.map(langName).join(", ")}. You may let somebody edit or
+            regenerate there; they need to have registered first.
+          </>
+        )}
       </p>
       <UserTable
-        users={users.map((user) => ({ ...user, createdAt: new Date(user.createdAt).toISOString() }))}
+        users={users}
         grants={grants}
         viewer={viewer}
         currentUserId={session.user.id}
         keyedUserIds={keyed}
       />
 
-      <h2 className="mt-10 text-lg font-semibold">Languages</h2>
-      <p className="text-muted-foreground mt-1 mb-4 text-sm">
-        A language switched on appears in everyone&apos;s header. One that is off can still be
-        opened by an admin at its address, to prepare it before anybody else sees it.
-      </p>
-      <LanguageTable
-        initial={languages.map((state) => ({ ...state, name: langName(state.code) }))}
-      />
+      {languages && (
+        <>
+          <h2 className="mt-10 text-lg font-semibold">Languages</h2>
+          <p className="text-muted-foreground mt-1 mb-4 text-sm">
+            A language switched on appears in everyone&apos;s header. One that is off can still
+            be opened by an admin at its address, to prepare it before anybody else sees it.
+          </p>
+          <LanguageTable
+            initial={languages.map((state) => ({ ...state, name: langName(state.code) }))}
+          />
+        </>
+      )}
     </main>
   );
 }

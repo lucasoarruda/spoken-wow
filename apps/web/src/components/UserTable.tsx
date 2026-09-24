@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
-import GrantCell from "@/components/GrantCell";
+import GrantCell, { GrantPicker } from "@/components/GrantCell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +15,11 @@ import {
 } from "@/components/ui/select";
 import { authClient } from "@/lib/auth-client";
 import type { GrantRow } from "@/lib/grants/store";
-import { langName, type Lang } from "@/lib/lang";
+import type { Lang } from "@/lib/lang";
 import {
   CAPABILITIES,
   canGrant,
   isAdmin,
-  langsWhere,
   ROLES,
   type Capability,
   type Role,
@@ -36,6 +34,8 @@ export type UserRow = {
   role?: string | undefined;
   createdAt?: string;
 };
+
+const NONE: readonly GrantRow[] = [];
 
 type Props = {
   users: UserRow[];
@@ -52,28 +52,41 @@ type Props = {
   keyedUserIds: string[] | null;
 };
 
-export default function UserTable({ users, grants: initialGrants, viewer, currentUserId, keyedUserIds }: Props) {
-  const router = useRouter();
+/** `users`, plus whoever in `grants` is not among them yet, in the order they turned up. */
+function withGrantees(users: UserRow[], grants: readonly GrantRow[]): UserRow[] {
+  const seen = new Map(users.map((user) => [user.id, user]));
+  for (const grant of grants) {
+    if (!seen.has(grant.userId)) {
+      seen.set(grant.userId, { id: grant.userId, name: grant.name, email: grant.email });
+    }
+  }
+  return seen.size === users.length ? users : [...seen.values()];
+}
+
+export default function UserTable({ users: initialUsers, grants: initialGrants, viewer, currentUserId, keyedUserIds }: Props) {
   const global = isAdmin(viewer.role);
+  // Busy is per row, or "new" for the form that lets somebody in by email.
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keyed, setKeyed] = useState(() => new Set(keyedUserIds ?? []));
   const [grants, setGrants] = useState(initialGrants);
+  // Only ever grows: somebody let in by email joins the list, and somebody whose last grant
+  // was just removed stays until the page is reloaded rather than vanishing from under the
+  // pointer. For a language admin this is the whole list, since they cannot list the users.
+  const [users, setUsers] = useState(() => withGrantees(initialUsers, initialGrants));
 
-  // A language admin's list is whoever holds something in their languages, so somebody let
-  // in by email joins it -- and stays, with nothing left, until the page is reloaded, rather
-  // than vanishing from under the pointer that just removed their last grant.
-  const [rows, setRows] = useState(users);
-  const shown: UserRow[] = [
-    ...rows,
-    ...grants
-      .filter((grant, index, all) => all.findIndex((other) => other.userId === grant.userId) === index)
-      .filter((grant) => !rows.some((row) => row.id === grant.userId))
-      .map((grant) => ({ id: grant.userId, name: grant.name, email: grant.email })),
-  ];
+  const grantsOf = useMemo(() => {
+    const byUser = new Map<string, GrantRow[]>();
+    for (const grant of grants) {
+      const held = byUser.get(grant.userId);
+      if (held) held.push(grant);
+      else byUser.set(grant.userId, [grant]);
+    }
+    return byUser;
+  }, [grants]);
 
-  async function sendGrant(userId: string, method: "PUT" | "DELETE", target: string, body?: unknown) {
-    setPendingId(userId);
+  async function sendGrant(busyKey: string, method: "PUT" | "DELETE", target: string, body?: unknown) {
+    setPendingId(busyKey);
     setError(null);
     const response = await fetch(target, {
       method,
@@ -87,20 +100,17 @@ export default function UserTable({ users, grants: initialGrants, viewer, curren
       return false;
     }
     // The route answers with every grant the viewer may see, which is this table's.
-    setGrants(data.grants);
-    if (!global) setRows(shown);
+    const next = data.grants;
+    setGrants(next);
+    setUsers((current) => withGrantees(current, next));
     return true;
   }
 
-  const grant = (user: { id: string; email: string }, lang: Lang, capability: Capability) =>
-    sendGrant(user.id, "PUT", "/api/grants", { email: user.email, lang, capability });
+  const grant = (busyKey: string, email: string, lang: Lang, capability: Capability) =>
+    sendGrant(busyKey, "PUT", "/api/grants", { email, lang, capability });
 
-  const revoke = (userId: string, lang: string, capability: Capability) =>
-    void sendGrant(
-      userId,
-      "DELETE",
-      `/api/grants?${new URLSearchParams({ userId, lang, capability })}`,
-    );
+  const revoke = (userId: string, lang: Lang, capability: Capability) =>
+    void sendGrant(userId, "DELETE", `/api/grants?${new URLSearchParams({ userId, lang, capability })}`);
 
   async function changeRole(userId: string, role: Role) {
     setPendingId(userId);
@@ -111,8 +121,7 @@ export default function UserTable({ users, grants: initialGrants, viewer, curren
     if (error) {
       setError(error.message ?? "Could not change that role.");
     } else {
-      router.refresh();
-      setRows((current) => current.map((row) => (row.id === userId ? { ...row, role } : row)));
+      setUsers((current) => current.map((user) => (user.id === userId ? { ...user, role } : user)));
     }
     setPendingId(null);
   }
@@ -164,14 +173,14 @@ export default function UserTable({ users, grants: initialGrants, viewer, curren
           </tr>
         </thead>
         <tbody>
-          {shown.length === 0 && (
+          {users.length === 0 && (
             <tr>
               <td colSpan={2} className="text-muted-foreground py-2">
                 Nobody works in your languages yet.
               </td>
             </tr>
           )}
-          {shown.map((user) => (
+          {users.map((user) => (
             <tr key={user.id} className="border-b align-top last:border-0">
               <td className="py-2 pr-3">{user.name}</td>
               <td className="text-muted-foreground py-2 pr-3">{user.email}</td>
@@ -195,10 +204,10 @@ export default function UserTable({ users, grants: initialGrants, viewer, curren
                   <span className="text-muted-foreground text-xs">every language, as admin</span>
                 ) : (
                   <GrantCell
-                    grants={grants.filter((row) => row.userId === user.id)}
+                    grants={grantsOf.get(user.id) ?? NONE}
                     viewer={viewer}
                     busy={pendingId === user.id}
-                    onGrant={(lang, capability) => grant(user, lang, capability)}
+                    onGrant={(lang, capability) => grant(user.id, user.email, lang, capability)}
                     onRevoke={(lang, capability) => revoke(user.id, lang, capability)}
                   />
                 )}
@@ -231,8 +240,8 @@ export default function UserTable({ users, grants: initialGrants, viewer, curren
       {!global && (
         <AddByEmail
           viewer={viewer}
-          busy={pendingId !== null}
-          onGrant={(email, lang, capability) => grant({ id: "", email }, lang, capability)}
+          busy={pendingId === "new"}
+          onGrant={(email, lang, capability) => grant("new", email, lang, capability)}
         />
       )}
     </>
@@ -293,58 +302,27 @@ function AddByEmail({
   busy: boolean;
   onGrant: (email: string, lang: Lang, capability: Capability) => Promise<boolean>;
 }) {
-  const langs = langsWhere(viewer, "admin");
   const [email, setEmail] = useState("");
-  const [lang, setLang] = useState<Lang | undefined>(langs[0]);
-  const [capability, setCapability] = useState<Capability>("edit");
-  const capabilities = lang ? CAPABILITIES.filter((cap) => canGrant(viewer, cap, lang)) : [];
-
   return (
-    <form
-      className="mt-4 flex flex-wrap items-center gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!lang) return;
-        void onGrant(email, lang, capability).then((ok) => {
-          if (ok) setEmail("");
-        });
-      }}
-    >
-      <Input
-        type="email"
-        required
-        placeholder="their registered email"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        className="w-64"
-      />
-      <Select value={lang} onValueChange={(value) => setLang(value as Lang)}>
-        <SelectTrigger className="w-40" aria-label="Language">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {langs.map((code) => (
-            <SelectItem key={code} value={code}>
-              {langName(code)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={capability} onValueChange={(value) => setCapability(value as Capability)}>
-        <SelectTrigger className="w-32" aria-label="Capability">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {capabilities.map((cap) => (
-            <SelectItem key={cap} value={cap}>
-              {cap}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button type="submit" size="sm" disabled={busy || !lang}>
-        Grant
-      </Button>
-    </form>
+    <div className="mt-4">
+      <GrantPicker
+        offer={(lang) => CAPABILITIES.filter((cap) => canGrant(viewer, cap, lang))}
+        busy={busy}
+        onPick={(lang, capability) =>
+          void onGrant(email, lang, capability).then((ok) => {
+            if (ok) setEmail("");
+          })
+        }
+      >
+        <Input
+          type="email"
+          required
+          placeholder="their registered email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          className="w-64"
+        />
+      </GrantPicker>
+    </div>
   );
 }

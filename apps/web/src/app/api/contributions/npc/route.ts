@@ -3,7 +3,7 @@
  *
  * A sibling of the public POST rather than a verb on it, for the reason
  * api/reports/resolve/route.ts gives: that path is open to the whole internet and this one must
- * never be. Collaborator, matching /resolve.
+ * never be. English regenerate, as the other moderator routes.
  *
  * Writes through to the NPC rather than the contribution, so one correction fixes every line
  * that NPC speaks -- which is the point of keying the table the way it is keyed.

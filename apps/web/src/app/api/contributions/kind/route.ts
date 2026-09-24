@@ -7,7 +7,7 @@
  * (the triage page, accept, the export) reads the row as if its envelope had carried the kind.
  * Refused for a row whose envelope already carried one -- the client's own observation stands.
  *
- * Collaborator-only, like the other moderator routes beside it.
+ * English regenerate only, like the other moderator routes beside it.
  */
 import { requireRegenerate } from "@/lib/generation/authz";
 import { setContributionNpcKind } from "@/lib/contributions/store";

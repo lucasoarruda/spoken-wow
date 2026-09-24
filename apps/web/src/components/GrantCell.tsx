@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GrantRow } from "@/lib/grants/store";
-import { CODES, langName, type Lang } from "@/lib/lang";
+import { CODES, isLang, langName, type Lang } from "@/lib/lang";
 import { CAPABILITIES, canGrant, type Capability, type Viewer } from "@/lib/permissions";
 
 /**
@@ -26,22 +26,30 @@ export default function GrantCell({
   onRevoke,
 }: {
   /** This person's grants, as far as the viewer may see them. */
-  grants: GrantRow[];
+  grants: readonly GrantRow[];
   viewer: Viewer;
   busy: boolean;
   onGrant: (lang: Lang, capability: Capability) => Promise<boolean>;
-  onRevoke: (lang: string, capability: Capability) => void;
+  onRevoke: (lang: Lang, capability: Capability) => void;
 }) {
-  const byLang = new Map<string, Capability[]>();
-  for (const grant of grants) byLang.set(grant.lang, [...(byLang.get(grant.lang) ?? []), grant.capability]);
+  const [open, setOpen] = useState(false);
+  const byLang = new Map<Lang, Capability[]>();
+  for (const grant of grants) {
+    if (!isLang(grant.lang)) continue;
+    const held = byLang.get(grant.lang);
+    if (held) held.push(grant.capability);
+    else byLang.set(grant.lang, [grant.capability]);
+  }
+  const offer = (lang: Lang) =>
+    CAPABILITIES.filter((cap) => canGrant(viewer, cap, lang) && !byLang.get(lang)?.includes(cap));
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {[...byLang].map(([lang, capabilities]) => (
         <span key={lang} className="flex items-center gap-1">
-          <span className="text-muted-foreground text-xs">{langName(lang as Lang)}</span>
+          <span className="text-muted-foreground text-xs">{langName(lang)}</span>
           {capabilities.map((capability) => {
-            const removable = canGrant(viewer, capability, lang as Lang);
+            const removable = canGrant(viewer, capability, lang);
             return (
               <Badge key={capability} variant="outline" className={removable ? "pr-0.5" : undefined}>
                 {capability}
@@ -49,7 +57,7 @@ export default function GrantCell({
                   <button
                     type="button"
                     disabled={busy}
-                    aria-label={`Remove ${capability} in ${langName(lang as Lang)}`}
+                    aria-label={`Remove ${capability} in ${langName(lang)}`}
                     className="text-muted-foreground hover:text-foreground rounded-full px-1 disabled:opacity-50"
                     onClick={() => onRevoke(lang, capability)}
                   >
@@ -61,83 +69,95 @@ export default function GrantCell({
           })}
         </span>
       ))}
-      <AddGrant held={grants} viewer={viewer} busy={busy} onGrant={onGrant} />
+      {CODES.some((lang) => offer(lang).length > 0) ? (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="xs" disabled={busy}>
+              + Grant
+            </Button>
+          </PopoverTrigger>
+          {/* Mounted only while open, so the choice starts fresh each time. */}
+          <PopoverContent align="start" className="w-auto">
+            <GrantPicker
+              offer={offer}
+              busy={busy}
+              onPick={(lang, capability) =>
+                void onGrant(lang, capability).then((ok) => {
+                  if (ok) setOpen(false);
+                })
+              }
+            />
+          </PopoverContent>
+        </Popover>
+      ) : null}
     </div>
   );
 }
 
-function AddGrant({
-  held,
-  viewer,
+/**
+ * A language, a capability in it, and a button: what every grant is made from.
+ *
+ * `offer` says what may be granted in each language; languages it offers nothing in are
+ * left out, and changing the language picks the first thing offered there.
+ */
+export function GrantPicker({
+  offer,
   busy,
-  onGrant,
+  onPick,
+  children,
 }: {
-  held: GrantRow[];
-  viewer: Viewer;
+  offer: (lang: Lang) => readonly Capability[];
   busy: boolean;
-  onGrant: (lang: Lang, capability: Capability) => Promise<boolean>;
+  onPick: (lang: Lang, capability: Capability) => void;
+  /** Anything to put before the selects, such as an email field; the whole is one form. */
+  children?: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const missing = (lang: Lang) =>
-    CAPABILITIES.filter(
-      (capability) =>
-        canGrant(viewer, capability, lang) &&
-        !held.some((grant) => grant.lang === lang && grant.capability === capability),
-    );
-  const langs = CODES.filter((code) => missing(code).length > 0);
-  const [lang, setLang] = useState<Lang | undefined>(langs[0]);
-  const chosen = lang && langs.includes(lang) ? lang : langs[0];
-  const capabilities = chosen ? missing(chosen) : [];
-  const [capability, setCapability] = useState<Capability | undefined>(capabilities[0]);
-  const chosenCapability = capability && capabilities.includes(capability) ? capability : capabilities[0];
-
-  if (langs.length === 0) return null;
+  const langs = CODES.filter((code) => offer(code).length > 0);
+  const [lang, setLang] = useState(langs[0]);
+  const [capability, setCapability] = useState(lang && offer(lang)[0]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="xs" disabled={busy}>
-          + Grant
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="flex w-auto items-center gap-2">
-        <Select value={chosen} onValueChange={(value) => setLang(value as Lang)}>
-          <SelectTrigger className="w-40" aria-label="Language">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {langs.map((code) => (
-              <SelectItem key={code} value={code}>
-                {langName(code)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={chosenCapability} onValueChange={(value) => setCapability(value as Capability)}>
-          <SelectTrigger className="w-32" aria-label="Capability">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {capabilities.map((cap) => (
-              <SelectItem key={cap} value={cap}>
-                {cap}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          disabled={busy || !chosen || !chosenCapability}
-          onClick={() => {
-            if (!chosen || !chosenCapability) return;
-            void onGrant(chosen, chosenCapability).then((ok) => {
-              if (ok) setOpen(false);
-            });
-          }}
-        >
-          Grant
-        </Button>
-      </PopoverContent>
-    </Popover>
+    <form
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (lang && capability) onPick(lang, capability);
+      }}
+    >
+      {children}
+      <Select
+        value={lang}
+        onValueChange={(value) => {
+          setLang(value as Lang);
+          setCapability(offer(value as Lang)[0]);
+        }}
+      >
+        <SelectTrigger className="w-40" aria-label="Language">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {langs.map((code) => (
+            <SelectItem key={code} value={code}>
+              {langName(code)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={capability} onValueChange={(value) => setCapability(value as Capability)}>
+        <SelectTrigger className="w-32" aria-label="Capability">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {(lang ? offer(lang) : []).map((cap) => (
+            <SelectItem key={cap} value={cap}>
+              {cap}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button type="submit" size="sm" disabled={busy || !lang || !capability}>
+        Grant
+      </Button>
+    </form>
   );
 }
