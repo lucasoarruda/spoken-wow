@@ -23,6 +23,7 @@ import {
 import { facets } from "@/lib/facets";
 import { observedFrom, resolveNpc } from "@/lib/npc/resolve";
 import { isProvenance, getResolutions, getResolutionsById, resolutionKey, type NpcKind } from "@/lib/npc/store";
+import { BASE_LANG } from "@/lib/lang";
 import { can } from "@/lib/permissions";
 import { lineByPath } from "@/lib/zones/catalogue";
 
@@ -164,7 +165,8 @@ export default async function Page({
   // 404, matching /reports: a member has no business learning the page exists, and these
   // rows hold text and identifying details a stranger pasted in. Per language, because
   // accepting a contribution writes that language's text.
-  if (!session || !can(await viewerOf(session), "edit", lang)) notFound();
+  const viewer = await viewerOf(session);
+  if (!session || !can(viewer, "edit", lang)) notFound();
 
   const { status: rawStatus, provenance: rawProvenance, client: rawClient } = await searchParams;
   const status: ContributionStatus | "all" = isStatus(rawStatus)
@@ -249,6 +251,10 @@ export default async function Page({
         client={client}
         existing={existing}
         flavorScopes={facetValues.flavorScopes}
+        // What api/contributions/npc asks, so the speaker controls are offered only to
+        // somebody it will answer. An NPC's race and gender decide its voice in every
+        // language, so that stays narrower than triaging this language's text.
+        canAnswerNpc={can(viewer, "regenerate", BASE_LANG)}
       />
     </main>
   );
