@@ -409,7 +409,8 @@ function SpokenZones:GetAudioPackLabel(pack)
 	local language = pack.language
 	if language ~= self:GetLanguage() then
 		if self:CanRenderLanguage(language) then
-			language = self:GetLanguageName(language)
+			local info = self:GetLocaleInfo(language)
+			language = (info and info.native) or language
 		end
 		label = ("%s, %s"):format(label, language)
 	end

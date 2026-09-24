@@ -21,16 +21,16 @@ local ADDON_NAME, SpokenBooks = ...
 -- player makes once and finds half-honoured. tests/lua/books_language_test.lua holds them
 -- together.
 SpokenBooks.LOCALES = {
-	{ code = "enUS", name = "English" },
-	{ code = "deDE", name = "German" },
-	{ code = "esES", name = "Spanish (EU)" },
-	{ code = "esMX", name = "Spanish (AL)" },
-	{ code = "frFR", name = "French" },
-	{ code = "ptBR", name = "Portuguese" },
-	{ code = "ruRU", name = "Russian" },
-	{ code = "koKR", name = "Korean" },
-	{ code = "zhCN", name = "Chinese (S)" },
-	{ code = "zhTW", name = "Chinese (T)" },
+	{ code = "enUS", name = "English", native = "English" },
+	{ code = "deDE", name = "German", native = "Deutsch" },
+	{ code = "esES", name = "Spanish (EU)", native = "Español (España)" },
+	{ code = "esMX", name = "Spanish (AL)", native = "Español (América Latina)" },
+	{ code = "frFR", name = "French", native = "Français" },
+	{ code = "ptBR", name = "Portuguese", native = "Português" },
+	{ code = "ruRU", name = "Russian", native = "Русский" },
+	{ code = "koKR", name = "Korean", native = "한국어" },
+	{ code = "zhCN", name = "Chinese (S)", native = "简体中文" },
+	{ code = "zhTW", name = "Chinese (T)", native = "繁體中文" },
 }
 
 SpokenBooks.BASE_LANGUAGE = "enUS"
@@ -53,7 +53,14 @@ end
 
 function SpokenBooks:GetLanguageName(code)
 	local locale = code and byCode[code]
-	return locale and locale.name or tostring(code)
+	if not locale then
+		return tostring(code)
+	end
+	-- The endonym, so every language names itself: a picker lists all of them at
+	-- once, and translated exonyms would need a table per interface language for
+	-- what one field already says. Latin-script endonyms draw on every client;
+	-- the others stay ASCII transliterations for the same reason.
+	return locale.native or locale.name
 end
 
 function SpokenBooks:GetClientLanguage()
