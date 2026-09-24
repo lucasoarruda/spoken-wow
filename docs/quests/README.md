@@ -376,20 +376,26 @@ Registration at `/register` is open and needs no email confirmation. Everyone st
 
 | Role | Can |
 |---|---|
-| `member` | browse and play, like a signed-out visitor |
-| `collaborator` | the above, plus **Regenerate** on every line, quest and NPC, the take history behind each, and rewriting what a line says out loud |
-| `admin` | the above, plus `/admin` to change anyone's role, `/voices` to manage voices and the global generation settings, `/lexicon` to correct how names are pronounced, and `/issues` to work through what the corpus scan found |
+| `member` | browse and play, like a signed-out visitor, plus whatever their language grants say |
+| `admin` | everything in every language, plus `/admin` to change anyone's role and grants, `/voices` to manage voices and the global generation settings, and `/issues` to work through what the corpus scan found |
 
-**A role is only half of it.** Everything that reaches ElevenLabs — regenerating, cloning a
+Everything between the two is granted one language at a time, English included, on the
+same `/admin` page (“Users”): `edit` a language's text, `regenerate` its takes, `configure`
+its lexicon, `ignore` lines in it, or `admin` there, which is all of those plus letting
+others edit and regenerate in it. A language admin sees `/admin` too, narrowed to the
+people working in their languages. What used to be the `collaborator` role is English
+`edit` and `regenerate`; migration 0045 converted every holder.
+
+**A grant is only half of it.** Everything that reaches ElevenLabs — regenerating, cloning a
 voice, previewing a pronunciation, uploading the lexicon — is spent from the signed-in
 user's own account, using a key they set on `/profile`. There is no server-wide key: the
 site holds one sealed credential per person, AES-256-GCM under `SPOKEN_SECRET_KEY`, and a
 route asked to spend without one answers `428 no_api_key` rather than reaching for
-somebody else's plan. So "who paid for this line" always has an answer, and granting the
-collaborator role does not quietly grant the deployer's bill along with it.
+somebody else's plan. So "who paid for this line" always has an answer, and granting
+`regenerate` does not quietly grant the deployer's bill along with it.
 
 An admin can see which accounts hold a key on `/admin`, and clear one — the counterpart of
-handing out the role. Neither they nor anyone else can read one back: what any surface ever
+handing out `regenerate`. Neither they nor anyone else can read one back: what any surface ever
 shows is the last four characters.
 
 #### Regenerating audio

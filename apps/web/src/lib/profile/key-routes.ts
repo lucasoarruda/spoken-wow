@@ -55,8 +55,8 @@ export function keyRoutes(provider: Provider, verify: (key: string) => Promise<{
     /**
      * Clears a key: the caller's own, or -- with ?userId= -- somebody else's, for admins.
      *
-     * An admin can hand out the collaborator role, so they must be able to take back what it
-     * lets someone spend with; a collaborator who leaves should not need psql to be un-keyed.
+     * An admin can hand out regenerate, so they must be able to take back what it lets
+     * someone spend with; a collaborator who leaves should not need psql to be un-keyed.
      * That is the whole of the power: an admin may remove a key and see that one exists,
      * never read one.
      */

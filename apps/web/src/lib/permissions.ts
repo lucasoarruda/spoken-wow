@@ -1,15 +1,16 @@
 /**
  * The role model, shared by the server and the browser so the list of roles is defined once.
  *
- * Three roles: a `member` is anyone who registered, a `collaborator` may regenerate audio,
- * and an `admin` may also manage users and voices. Registration assigns `member`; the first
- * `admin` is promoted with SQL (see deploy/README.md), and every promotion after that goes
- * through /admin.
+ * Two global roles: a `member` is anyone who registered, and an `admin` may do anything,
+ * including manage users and voices. Everything in between -- writing a language, cutting
+ * takes in it, looking after it -- is a grant for that language (see "Per language" below),
+ * English included. Registration assigns `member`; the first `admin` is promoted with SQL
+ * (see deploy/README.md), and every grant and promotion after that goes through /admin.
  */
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
 
-import { BASE_LANG, CODES, type Lang } from "@/lib/lang";
+import { CODES, type Lang } from "@/lib/lang";
 
 const statement = {
   ...defaultStatements,
@@ -27,7 +28,6 @@ export const ac = createAccessControl(statement);
 
 export const roles = {
   member: ac.newRole({}),
-  collaborator: ac.newRole({ voiceline: ["regenerate"] }),
   // Spreading adminAc keeps the admin plugin's own permissions (user: set-role, list, ...).
   // Declaring a custom `admin` role replaces the built-in one, so without this the admin
   // loses access to the very page that hands out roles.
@@ -38,17 +38,12 @@ export const roles = {
   }),
 };
 
-export const ROLES = ["member", "collaborator", "admin"] as const;
+export const ROLES = ["member", "admin"] as const;
 
 export type Role = (typeof ROLES)[number];
 
 export function isRole(value: unknown): value is Role {
   return typeof value === "string" && (ROLES as readonly string[]).includes(value);
-}
-
-/** The one definition of who sees the Regenerate controls. */
-export function canRegenerate(role: string | null | undefined): boolean {
-  return role === "collaborator" || role === "admin";
 }
 
 /** The one definition of who may reach /admin. */
@@ -93,21 +88,13 @@ export type Viewer = { role: string | null | undefined; grants: readonly Grant[]
 /**
  * The one definition of whether somebody may do something in a language.
  *
- * A global admin may do anything anywhere. A global collaborator keeps what the role has
- * always meant, which is English: editing its text and regenerating it -- so nobody who held
- * the role before languages existed needs a grant to go on. Everything else comes from a
- * grant for that language, `admin` there standing for all of them.
+ * A global admin may do anything anywhere. Everybody else holds what their grants for that
+ * language say, `admin` there standing for all of them -- English no differently from the
+ * rest, since 0045 turned the old collaborator role into English grants.
  */
 export function can(viewer: Viewer | null, capability: Capability, lang: Lang): boolean {
   if (!viewer) return false;
   if (viewer.role === "admin") return true;
-  if (
-    lang === BASE_LANG &&
-    viewer.role === "collaborator" &&
-    (capability === "edit" || capability === "regenerate")
-  ) {
-    return true;
-  }
   return viewer.grants.some(
     (grant) =>
       grant.lang === lang && (grant.capability === capability || grant.capability === "admin"),

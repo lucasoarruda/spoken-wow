@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import GameData from "@/components/GameData";
-import { auth } from "@/lib/auth";
 import { gameScript } from "@/lib/npc/game-script";
 import { listUnconfirmed } from "@/lib/npc/store";
-import { canRegenerate } from "@/lib/permissions";
+import { viewerOf } from "@/lib/grants/store";
+import { BASE_LANG } from "@/lib/lang";
+import { can } from "@/lib/permissions";
+import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Game data · Spoken" };
 
@@ -21,9 +22,8 @@ export const dynamic = "force-dynamic";
  * creature-cache.ts and display-voices.ts for the three steps.
  */
 export default async function Page() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  // 404, matching /contributions, which this writes through.
-  if (!session || !canRegenerate(session.user.role)) notFound();
+  // 404, and gated as api/contributions/npc is (requireRegenerate), which this writes through.
+  if (!can(await viewerOf(await currentSession()), "regenerate", BASE_LANG)) notFound();
 
   const pending = await listUnconfirmed("creature");
 

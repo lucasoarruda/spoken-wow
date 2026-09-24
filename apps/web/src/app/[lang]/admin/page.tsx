@@ -3,46 +3,89 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import LanguageTable from "@/components/LanguageTable";
-import UserTable from "@/components/UserTable";
+import UserTable, { type UserRow } from "@/components/UserTable";
 import { userIdsWithApiKey } from "@/lib/api-key";
 import { auth } from "@/lib/auth";
+import { listGrants, viewerOf } from "@/lib/grants/store";
 import { langName } from "@/lib/lang";
 import { languageStates } from "@/lib/languages/store";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, langsWhere } from "@/lib/permissions";
+import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Users · Spoken" };
 
+export const dynamic = "force-dynamic";
+
 /**
- * The only server-rendered session check in the app, and the real access boundary for user
- * management — the client-side role checks elsewhere only decide what to draw.
+ * Who may do what, in one place: a global admin's whole user list with each person's role
+ * and languages, or -- for somebody who is admin in a language -- the people working in the
+ * languages they look after, and the means to bring more in without asking anybody.
+ *
+ * The real access boundary is api/grants and the admin plugin's own routes; this decides
+ * only what to draw. A 404 for everyone else: a member has no business learning it exists.
  */
 export default async function Page() {
-  const requestHeaders = await headers();
-  const session = await auth.api.getSession({ headers: requestHeaders });
+  const session = await currentSession();
+  const viewer = await viewerOf(session);
+  const administered = langsWhere(viewer, "admin");
+  if (!session || !viewer || administered.length === 0) notFound();
 
-  // 404 rather than a redirect: a member has no business learning this page exists.
-  if (!session || !isAdmin(session.user.role)) notFound();
+  if (!isAdmin(viewer.role)) {
+    // Built from the grants rather than listUsers, which is the admin plugin's and lists
+    // every address on the site -- more than looking after one language entitles anybody to.
+    const grants = await listGrants(administered);
+    const users = new Map<string, UserRow>();
+    for (const row of grants) users.set(row.userId, { id: row.userId, name: row.name, email: row.email });
 
-  const { users } = await auth.api.listUsers({
-    headers: requestHeaders,
-    query: { limit: 200, sortBy: "createdAt", sortDirection: "asc" },
-  });
+    return (
+      <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
+        <h1 className="text-xl font-semibold">Users</h1>
+        <p className="text-muted-foreground mt-1 mb-5 text-sm">
+          Who works on {administered.map(langName).join(", ")}. You may let somebody edit or
+          regenerate there; they need to have registered first.
+        </p>
+        <UserTable
+          users={[...users.values()]}
+          grants={grants}
+          viewer={viewer}
+          currentUserId={session.user.id}
+          keyedUserIds={null}
+        />
+      </main>
+    );
+  }
 
-  // Which accounts hold a key, and nothing else about it. An admin hands out the role that
-  // spends, so they must be able to take back what it spends with; reading a colleague's
-  // credential is not part of that, so no value crosses this boundary -- not even the
-  // redacted hint the owner sees on their own profile.
-  const [keyed, languages] = await Promise.all([userIdsWithApiKey(), languageStates()]);
+  const [{ users }, grants, keyed, languages] = await Promise.all([
+    auth.api.listUsers({
+      headers: await headers(),
+      query: { limit: 200, sortBy: "createdAt", sortDirection: "asc" },
+    }),
+    listGrants(),
+    // Which accounts hold a key, and nothing else about it. An admin hands out what spends,
+    // so they must be able to take back what it spends with; reading a colleague's
+    // credential is not part of that, so no value crosses this boundary -- not even the
+    // redacted hint the owner sees on their own profile.
+    userIdsWithApiKey(),
+    languageStates(),
+  ]);
 
   return (
-    <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
+    <main className="mx-auto max-w-5xl px-5 pt-6 pb-36">
       <h1 className="text-xl font-semibold">Users</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
-        Collaborators and admins can regenerate voicelines. Everyone who registers starts as
-        a member. Regenerating spends credits from the collaborator&apos;s own ElevenLabs
-        account, so a role is only half of it — the key is theirs, set on their profile.
+        Everyone who registers starts as a member. What somebody may do beyond reading is
+        granted one language at a time, English included; an admin may do everything
+        everywhere. Regenerating spends credits from the person&apos;s own ElevenLabs or
+        fish.audio account, so a grant is only half of it — the key is theirs, set on their
+        profile.
       </p>
-      <UserTable users={users} currentUserId={session.user.id} keyedUserIds={keyed} />
+      <UserTable
+        users={users.map((user) => ({ ...user, createdAt: new Date(user.createdAt).toISOString() }))}
+        grants={grants}
+        viewer={viewer}
+        currentUserId={session.user.id}
+        keyedUserIds={keyed}
+      />
 
       <h2 className="mt-10 text-lg font-semibold">Languages</h2>
       <p className="text-muted-foreground mt-1 mb-4 text-sm">

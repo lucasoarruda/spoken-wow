@@ -7,8 +7,8 @@
  *
  * Whoever may edit the report's language rather than an admin: these are the people who
  * already act on its lines, and a report they have read and dismissed should not need an
- * admin to close. English is the collaborator role's, as it always was; a Portuguese report
- * is a Portuguese translator's, and not an English collaborator's.
+ * admin to close. A Portuguese report is a Portuguese translator's, and not an English
+ * one's.
  */
 import { requireCapability } from "@/lib/generation/authz";
 import { BASE_LANG } from "@/lib/lang";

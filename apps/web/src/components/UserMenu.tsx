@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "@/components/LocaleLink";
+import { useGrants } from "@/components/GrantsProvider";
 import { useCan } from "@/components/useCan";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -48,6 +49,7 @@ export default function UserMenu() {
   // What this person may do in the page's language. Only that one: a Portuguese translator
   // on an English page is a member there, and is offered what a member is.
   const may = useCan();
+  const grants = useGrants();
 
   // Rendering nothing until the session resolves avoids a "Sign in" flash for a user who
   // is in fact signed in.
@@ -77,8 +79,11 @@ export default function UserMenu() {
     may("configure") && { href: "/lexicon", label: "Pronunciation" },
     may("edit") && { href: "/reports", label: "Reports" },
     may("edit") && { href: "/contributions", label: "Contributions" },
-    isAdmin(role) && { href: "/admin", label: "Users" },
-    may("admin") && { href: "/translators", label: "Translators" },
+    // Every language the viewer looks after, not the page's alone: /admin shows them all.
+    (isAdmin(role) || grants.some((grant) => grant.capability === "admin")) && {
+      href: "/admin",
+      label: "Users",
+    },
     // Everyone signed in has one, and for a collaborator it is where the ElevenLabs key
     // lives - which is the thing standing between them and the Regenerate button.
     { href: "/profile", label: "Profile" },
