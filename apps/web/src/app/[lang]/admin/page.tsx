@@ -16,6 +16,9 @@ export const metadata: Metadata = { title: "Users · Spoken" };
 
 export const dynamic = "force-dynamic";
 
+/** Users per page, oldest first. */
+const PAGE_SIZE = 100;
+
 /**
  * Who may do what, in one place: a global admin's whole user list with each person's role
  * and languages, or -- for somebody who is admin in a language -- the people working in the
@@ -24,26 +27,40 @@ export const dynamic = "force-dynamic";
  * The real access boundary is api/grants and the admin plugin's own routes; this decides
  * only what to draw. A 404 for everyone else: a member has no business learning it exists.
  */
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await currentSession();
   const viewer = await viewerOf(session);
   const administered = langsWhere(viewer, "admin");
   if (!session || !viewer || administered.length === 0) notFound();
 
   const global = isAdmin(viewer.role);
+  const page = Math.max(1, Number.parseInt((await searchParams).page ?? "", 10) || 1);
   // A language admin's list is built from the grants alone (UserTable adds their holders),
   // not from listUsers: that is the admin plugin's, and lists every address on the site --
   // more than looking after one language entitles anybody to.
-  const [users, grants, keyed, languages] = global
+  //
+  // Only a global admin's list is paged: a language admin's is however many people work in
+  // their languages, which is a handful.
+  const [{ users, total }, grants, keyed, languages] = global
     ? await Promise.all([
         auth.api
           .listUsers({
             headers: await headers(),
-            query: { limit: 200, sortBy: "createdAt", sortDirection: "asc" },
+            query: {
+              limit: PAGE_SIZE,
+              offset: (page - 1) * PAGE_SIZE,
+              sortBy: "createdAt",
+              sortDirection: "asc",
+            },
           })
-          .then(({ users }) =>
-            users.map((user): UserRow => ({ ...user, createdAt: new Date(user.createdAt).toISOString() })),
-          ),
+          .then(({ users, total }) => ({
+            users: users.map((user): UserRow => ({ ...user, createdAt: new Date(user.createdAt).toISOString() })),
+            total,
+          })),
         listGrants(),
         // Which accounts hold a key, and nothing else about it. An admin hands out what
         // spends, so they must be able to take back what it spends with; reading a
@@ -52,7 +69,7 @@ export default async function Page() {
         userIdsWithApiKey(),
         languageStates(),
       ])
-    : [[], await listGrants(administered), null, null];
+    : [{ users: [], total: 0 }, await listGrants(administered), null, null];
 
   return (
     <main className={`mx-auto px-5 pt-6 pb-36 ${global ? "max-w-5xl" : "max-w-4xl"}`}>
@@ -74,11 +91,14 @@ export default async function Page() {
         )}
       </p>
       <UserTable
+        // Remounted per page: the table keeps what it was given in state.
+        key={page}
         users={users}
         grants={grants}
         viewer={viewer}
         currentUserId={session.user.id}
         keyedUserIds={keyed}
+        page={global ? { page, pageCount: Math.ceil(total / PAGE_SIZE) } : null}
       />
 
       {languages && (

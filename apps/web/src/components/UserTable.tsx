@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import GrantCell, { GrantPicker } from "@/components/GrantCell";
+import Pagination from "@/components/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +52,8 @@ type Props = {
    * back.
    */
   keyedUserIds: string[] | null;
+  /** Where a global admin's list is; null for a language admin's, which is not paged. */
+  page: { page: number; pageCount: number } | null;
 };
 
 /** `users`, plus whoever in `grants` is not among them yet, in the order they turned up. */
@@ -63,17 +67,29 @@ function withGrantees(users: UserRow[], grants: readonly GrantRow[]): UserRow[] 
   return seen.size === users.length ? users : [...seen.values()];
 }
 
-export default function UserTable({ users: initialUsers, grants: initialGrants, viewer, currentUserId, keyedUserIds }: Props) {
+export default function UserTable({
+  users: initialUsers,
+  grants: initialGrants,
+  viewer,
+  currentUserId,
+  keyedUserIds,
+  page,
+}: Props) {
+  const router = useRouter();
   const global = isAdmin(viewer.role);
   // Busy is per row, or "new" for the form that lets somebody in by email.
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keyed, setKeyed] = useState(() => new Set(keyedUserIds ?? []));
   const [grants, setGrants] = useState(initialGrants);
-  // Only ever grows: somebody let in by email joins the list, and somebody whose last grant
-  // was just removed stays until the page is reloaded rather than vanishing from under the
-  // pointer. For a language admin this is the whole list, since they cannot list the users.
-  const [users, setUsers] = useState(() => withGrantees(initialUsers, initialGrants));
+  // A language admin's list is the grant holders, since they cannot list the users. It only
+  // ever grows: somebody let in by email joins it, and somebody whose last grant was just
+  // removed stays until the page is reloaded rather than vanishing from under the pointer.
+  // A global admin's is the page of users it was given, and the grants of anybody on
+  // another page are not a reason to show them on this one.
+  const adopt = (current: UserRow[], next: readonly GrantRow[]) =>
+    global ? current : withGrantees(current, next);
+  const [users, setUsers] = useState(() => adopt(initialUsers, initialGrants));
 
   const grantsOf = useMemo(() => {
     const byUser = new Map<string, GrantRow[]>();
@@ -102,7 +118,7 @@ export default function UserTable({ users: initialUsers, grants: initialGrants, 
     // The route answers with every grant the viewer may see, which is this table's.
     const next = data.grants;
     setGrants(next);
-    setUsers((current) => withGrantees(current, next));
+    setUsers((current) => adopt(current, next));
     return true;
   }
 
@@ -175,7 +191,7 @@ export default function UserTable({ users: initialUsers, grants: initialGrants, 
         <tbody>
           {users.length === 0 && (
             <tr>
-              <td colSpan={2} className="text-muted-foreground py-2">
+              <td colSpan={3} className="text-muted-foreground py-2">
                 Nobody works in your languages yet.
               </td>
             </tr>
@@ -236,6 +252,14 @@ export default function UserTable({ users: initialUsers, grants: initialGrants, 
           ))}
         </tbody>
       </table>
+
+      {page && (
+        <Pagination
+          page={page.page}
+          pageCount={page.pageCount}
+          onPage={(next) => router.push(`?page=${next}`)}
+        />
+      )}
 
       {!global && (
         <AddByEmail
