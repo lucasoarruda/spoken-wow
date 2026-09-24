@@ -1,12 +1,14 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { Refreshing } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { localeHref, stripLang, type Lang } from "@/lib/lang";
 
 import { useLang } from "./LangProvider";
+import { usePendingPush } from "./usePendingPush";
 
 type Offered = { code: Lang; name: string; enabled: boolean };
 
@@ -24,7 +26,11 @@ type Offered = { code: Lang; name: string; enabled: boolean };
 export default function LanguageSwitcher() {
   const lang = useLang();
   const pathname = usePathname();
-  const router = useRouter();
+  const { pending, push } = usePendingPush();
+  // The language asked for, shown until it arrives: the select is controlled by the page's
+  // language, and without this it snapped back to the old one for as long as the new page
+  // took to render, which read as a switch that had refused.
+  const [chosen, setChosen] = useState<string>(lang);
   const [offered, setOffered] = useState<Offered[]>([]);
 
   useEffect(() => {
@@ -44,22 +50,26 @@ export default function LanguageSwitcher() {
 
   function choose(next: string) {
     const here = `${stripLang(pathname).path}${window.location.search}`;
-    router.push(localeHref(next as Lang, here));
+    setChosen(next);
+    push(localeHref(next as Lang, here));
   }
 
   return (
-    <Select value={lang} onValueChange={choose}>
-      <SelectTrigger size="sm" className="w-36" aria-label="Language">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {offered.map((language) => (
-          <SelectItem key={language.code} value={language.code}>
-            {language.name}
-            {language.enabled ? "" : " (off)"}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex items-center gap-1.5">
+      {pending && <Refreshing />}
+      <Select value={pending ? chosen : lang} onValueChange={choose}>
+        <SelectTrigger size="sm" className="w-36" aria-label="Language">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {offered.map((language) => (
+            <SelectItem key={language.code} value={language.code}>
+              {language.name}
+              {language.enabled ? "" : " (off)"}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

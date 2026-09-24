@@ -23,9 +23,10 @@
 import { useLang } from "@/components/LangProvider";
 import { localeHref } from "@/lib/lang";
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import FilterChip, { type ChipOption } from "@/components/FilterChip";
+import { Refreshing } from "@/components/Loading";
+import { usePendingPush } from "@/components/usePendingPush";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ContributionStatus } from "@/lib/contributions/contributions";
@@ -41,6 +42,7 @@ import type { NpcConflictOption, NpcSummary, QuestSummary } from "@/lib/contribu
 import { NPC_KINDS, PROVENANCES, type NpcKind, type Provenance } from "@/lib/npc/npc";
 import type { NpcResolution } from "@/lib/npc/store";
 import { GENDERS, gendersOf, RACES, type Gender } from "@/lib/voices/voices";
+import { cn } from "@/lib/utils";
 import { wowheadEntityUrl, wowheadForeverUrl, wowheadQuestUrl } from "@/lib/wowhead";
 
 export type { NpcSummary };
@@ -185,7 +187,7 @@ export default function ContributionTable({
   /** Whether the viewer may set an NPC's race, gender and flavor; if not, they are shown only. */
   canAnswerNpc: boolean;
 }) {
-  const router = useRouter();
+  const { pending, push } = usePendingPush();
   const lang = useLang();
 
   /**
@@ -353,7 +355,7 @@ export default function ContributionTable({
    * lib/contributions/query.ts so it can be tested without rendering FilterChip or this table.
    */
   function go(next: { status?: ContributionStatus | "all"; provenance?: SpeakerFilter; client?: ClientFilter }) {
-    router.push(localeHref(lang, contributionsHref({ status, provenance, client }, next)));
+    push(localeHref(lang, contributionsHref({ status, provenance, client }, next)));
   }
 
   return (
@@ -380,12 +382,16 @@ export default function ContributionTable({
           options={CLIENT_CHIP_OPTIONS}
           onChange={(next) => go({ client: next as ClientFilter | undefined })}
         />
+        {pending && <Refreshing />}
       </nav>
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">Nothing here.</p>
       ) : (
-        <table className="w-full border-separate border-spacing-0 text-sm">
+        <table
+          aria-busy={pending}
+          className={cn("w-full border-separate border-spacing-0 text-sm transition-opacity", pending && "opacity-60")}
+        >
           <thead className="text-muted-foreground text-left text-xs">
             <tr>
               <th className="border-b py-2 pr-3 font-normal">Filed</th>

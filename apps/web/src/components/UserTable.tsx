@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import GrantCell, { GrantPicker } from "@/components/GrantCell";
 import Pagination from "@/components/Pagination";
+import { usePendingPush } from "@/components/usePendingPush";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import type { GrantRow } from "@/lib/grants/store";
 import type { Lang } from "@/lib/lang";
+import { cn } from "@/lib/utils";
 import {
   CAPABILITIES,
   canGrant,
@@ -75,7 +76,7 @@ export default function UserTable({
   keyedUserIds,
   page,
 }: Props) {
-  const router = useRouter();
+  const { pending, push } = usePendingPush();
   const global = isAdmin(viewer.role);
   // Busy is per row, or "new" for the form that lets somebody in by email.
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -177,7 +178,10 @@ export default function UserTable({
         </p>
       )}
 
-      <table className="w-full text-sm">
+      <table
+        aria-busy={pending}
+        className={cn("w-full text-sm transition-opacity", pending && "opacity-60")}
+      >
         <thead>
           <tr className="text-muted-foreground border-b text-left text-xs">
             <th className="py-2 pr-3 font-normal">Name</th>
@@ -257,7 +261,7 @@ export default function UserTable({
         <Pagination
           page={page.page}
           pageCount={page.pageCount}
-          onPage={(next) => router.push(`?page=${next}`)}
+          onPage={(next) => push(`?page=${next}`)}
         />
       )}
 

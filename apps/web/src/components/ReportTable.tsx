@@ -15,12 +15,13 @@ import { useLang } from "@/components/LangProvider";
 import { localeHref } from "@/lib/lang";
 import { Play } from "lucide-react";
 import Link from "@/components/LocaleLink";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import FilterChip from "@/components/FilterChip";
+import { Refreshing } from "@/components/Loading";
 import QuestsPlayer from "@/components/Player";
 import ReportDetail from "@/components/ReportDetail";
+import { usePendingPush } from "@/components/usePendingPush";
 import { Player as BooksPlayer } from "@/components/books/Player";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,7 +89,7 @@ export default function ReportTable({
    * and the table sat unchanged until somebody reloaded the page - which is the bug this
    * shape exists to make impossible. See lib/reports/rows.ts.
    */
-  const router = useRouter();
+  const { pending, push } = usePendingPush();
   const lang = useLang();
   const [resolved, setResolved] = useState<Record<number, Report>>({});
   const [busy, setBusy] = useState<number | null>(null);
@@ -194,7 +195,7 @@ export default function ReportTable({
       source: next.source ?? (("source" in next) ? "all" : source),
       category: next.category ?? (("category" in next) ? "all" : category),
     });
-    router.push(localeHref(lang, `/reports?${params}`));
+    push(localeHref(lang, `/reports?${params}`));
   }
 
   const reports = applyResolutions(initial, resolved);
@@ -228,12 +229,16 @@ export default function ReportTable({
           options={CATEGORY_OPTIONS}
           onChange={(next) => go({ category: next })}
         />
+        {pending && <Refreshing />}
       </nav>
 
       {reports.length === 0 ? (
         <p className="text-muted-foreground text-sm">Nothing here.</p>
       ) : (
-        <table className="w-full border-separate border-spacing-0 text-sm">
+        <table
+          aria-busy={pending}
+          className={cn("w-full border-separate border-spacing-0 text-sm transition-opacity", pending && "opacity-60")}
+        >
           <thead className="text-muted-foreground text-left text-xs">
             <tr>
               <th className="border-b py-2 pr-3 font-normal">Filed</th>
