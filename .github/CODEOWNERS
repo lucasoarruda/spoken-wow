@@ -1,0 +1,3 @@
+# Every path is the owner's to approve. The master ruleset requires a code owner's review, so
+# a PR merges on this approval and not on one collaborator approving another's.
+* @rusty-key
