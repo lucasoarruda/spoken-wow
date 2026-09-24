@@ -614,6 +614,14 @@ function SyncBanner({
           No dictionary has been uploaded yet, so lines are generated without one. Save to put
           these {saved.entries.length} pronunciations in force.
         </span>
+        {/* A seeded lexicon arrives saved but never uploaded, and Save stays disabled until
+            something is edited - so without this the only way to put a seed in force would
+            be a throwaway edit. */}
+        {saved.entries.length > 0 && (
+          <Button size="sm" variant="outline" disabled={busy} onClick={onRetry}>
+            {busy ? "Uploading…" : "Upload"}
+          </Button>
+        )}
       </Banner>
     );
   }
