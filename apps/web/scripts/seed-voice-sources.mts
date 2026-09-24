@@ -5,8 +5,9 @@
  *   cd apps/web
  *   ADMIN_EMAIL=you@example.com npx tsx --conditions=react-server scripts/seed-voice-sources.mts
  *
- * Per <lang>/<race-gender>/<flavor>/ in SRC (default ~/code/own/npc-lines): the barks in name
- * order, 0.5 s apart, until 30 s, replace the slot's clips; the reference is cut from all of
+ * Per <lang>/<race-gender>/<flavor>/ in SRC (default ~/code/own/npc-lines), or <lang>/<slot>/
+ * for a slot with no flavor such as narrator-male: the clips in name order, 0.5 s apart,
+ * until 30 s, replace the slot's clips; the reference is cut from all of
  * it and transcribed on ADMIN_EMAIL's stored fish.audio key (or FISH_API_KEY), and recorded
  * as ADMIN_EMAIL's. Through the app's own
  * storeSample and saveReference, so the stored names and the clipHash are the app's.
@@ -69,7 +70,7 @@ async function duration(file: string): Promise<number> {
   return Number(stdout.trim());
 }
 
-/** The barks in order, GAP apart, cut at TARGET; mono mp3. */
+/** The barks in order, GAP apart, cut at TARGET; mono mp3. No gap after the last. */
 async function concat(clips: string[], out: string) {
   const picked: string[] = [];
   let total = 0;
@@ -79,7 +80,10 @@ async function concat(clips: string[], out: string) {
     total += (await duration(clip)) + GAP;
   }
   const chains = picked
-    .map((_, i) => `[${i}:a]aresample=44100,aformat=channel_layouts=mono,apad=pad_dur=${GAP}[a${i}]`)
+    .map((_, i) => {
+      const pad = i < picked.length - 1 ? `,apad=pad_dur=${GAP}` : "";
+      return `[${i}:a]aresample=44100,aformat=channel_layouts=mono${pad}[a${i}]`;
+    })
     .join(";");
   const labels = picked.map((_, i) => `[a${i}]`).join("");
   await run("ffmpeg", [
@@ -127,15 +131,31 @@ async function seed({ lang, voice, clips }: Job): Promise<string> {
   return `${summary}, clips + reference`;
 }
 
+async function clipsIn(dir: string): Promise<string[]> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  return entries
+    .filter((e) => e.isFile() && !e.name.startsWith("."))
+    .map((e) => path.join(dir, e.name))
+    .sort();
+}
+
 const jobs: Job[] = [];
+const wanted = (voice: string) => !VOICES || VOICES.includes(voice);
 for (const lang of (await dirs(SRC)).filter((l) => !LANGS || LANGS.includes(l))) {
   for (const raceGender of await dirs(path.join(SRC, lang))) {
-    for (const flavor of await dirs(path.join(SRC, lang, raceGender))) {
+    const dir = path.join(SRC, lang, raceGender);
+    // A slot with no flavor, like narrator-male, keeps its clips directly in its directory.
+    // Checked against the roster here, so a directory of loose files that is no slot
+    // (someone's staging) is passed over rather than failing the run.
+    const loose = await clipsIn(dir);
+    if (loose.length && wanted(raceGender) && (await isVoiceSlot(raceGender))) {
+      jobs.push({ lang, voice: raceGender, clips: loose });
+    }
+    for (const flavor of await dirs(dir)) {
       const voice = `${raceGender}-${flavor}`;
-      if (VOICES && !VOICES.includes(voice)) continue;
-      const dir = path.join(SRC, lang, raceGender, flavor);
-      const names = (await fs.readdir(dir)).filter((n) => !n.startsWith(".")).sort();
-      if (names.length) jobs.push({ lang, voice, clips: names.map((n) => path.join(dir, n)) });
+      if (!wanted(voice)) continue;
+      const clips = await clipsIn(path.join(dir, flavor));
+      if (clips.length) jobs.push({ lang, voice, clips });
     }
   }
 }
