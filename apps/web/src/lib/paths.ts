@@ -37,6 +37,16 @@ export const VOICE_SAMPLES_DIR =
   process.env.SPOKEN_QUESTS_VOICE_SAMPLES ?? path.join(DATA_ROOT, "voice", "samples");
 
 /**
+ * The clip each voice slot is spoken from on fish.audio, as <lang>/<voice>.mp3.
+ *
+ * Cut from a clip in VOICE_SAMPLES_DIR and kept rather than re-cut per request, so every
+ * request sends the same bytes the reference's clipHash was taken of. In production it sits
+ * in shared/ beside the samples, for their reason: a deploy or a rollback must not lose it.
+ */
+export const VOICE_REFERENCES_DIR =
+  process.env.SPOKEN_QUESTS_VOICE_REFERENCES ?? path.join(DATA_ROOT, "voice", "references");
+
+/**
  * Blizzard's own NPC greeting barks, as `<race-gender>/<flavor>/<Title>.ogg`.
  *
  * Written by tools/fetch_npc_lines.py and gitignored. This is the ground truth for what a

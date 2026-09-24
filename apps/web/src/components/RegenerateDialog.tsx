@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Estimate } from "@/lib/generation/billing";
 import type { GenerationStatusResponse } from "@/lib/generation/client";
+import { usd } from "@/lib/generation/money";
 
 function n(value: number): string {
   return value.toLocaleString();
@@ -35,9 +36,18 @@ export default function RegenerateDialog({ pending, status, onConfirm, onCancel 
   if (!pending) return null;
 
   const { estimate, label } = pending;
+  // Dollars for fish.audio, credits for ElevenLabs: the estimate, the balance it is weighed
+  // against, and the words around them all follow the rate's unit.
+  const dollars = estimate.rate.unit === "usd";
   const subscription = status?.subscription ?? null;
-  const remaining = subscription ? subscription.characterLimit - subscription.characterCount : null;
-  const overBudget = remaining !== null && estimate.credits > remaining;
+  const remaining = dollars
+    ? (status?.wallet?.credit ?? null)
+    : subscription
+      ? subscription.characterLimit - subscription.characterCount
+      : null;
+  const cost = dollars ? estimate.usd : estimate.credits;
+  const overBudget = remaining !== null && cost !== null && cost > remaining;
+  const amount = (value: number) => (dollars ? usd(value) : `${n(value)} credits`);
 
   // Zero samples means nothing has been generated with this model yet, so the estimate is
   // using the list rate - an upper bound rather than a measurement. Saying so matters,
@@ -67,7 +77,11 @@ export default function RegenerateDialog({ pending, status, onConfirm, onCancel 
 
           <dt className="text-muted-foreground">Estimated cost</dt>
           <dd className="text-right font-mono">
-            {uncalibrated ? `up to ${n(estimate.credits)}` : `~${n(estimate.credits)}`} credits
+            {cost === null
+              ? "unknown"
+              : uncalibrated
+                ? `up to ${amount(cost)}`
+                : `~${amount(cost)}`}
           </dd>
 
           {remaining !== null && (
@@ -76,7 +90,7 @@ export default function RegenerateDialog({ pending, status, onConfirm, onCancel 
               <dd
                 className={`text-right font-mono ${overBudget ? "text-destructive" : ""}`}
               >
-                {n(remaining)} credits
+                {amount(remaining)}
               </dd>
             </>
           )}
@@ -91,7 +105,15 @@ export default function RegenerateDialog({ pending, status, onConfirm, onCancel 
           </p>
         )}
 
-        {uncalibrated ? (
+        {dollars ? (
+          <p className="text-muted-foreground text-xs">
+            {estimate.rate.unknown
+              ? `fish.audio publishes no price for ${estimate.rate.modelId ?? "this model"}, so there is nothing to estimate from. The cost of each line is recorded as it runs.`
+              : uncalibrated
+                ? `Nothing has been generated with ${estimate.rate.modelId ?? "this model"} in this language yet, so this is fish.audio's list price at the widest this script's characters can be — an upper bound.`
+                : `Calibrated from the last ${estimate.rate.samples} fish.audio ${estimate.rate.samples === 1 ? "take" : "takes"} in this language. The cost of each line is recorded as it runs.`}
+          </p>
+        ) : uncalibrated ? (
           <p className="text-muted-foreground text-xs">
             Nothing has been generated with {estimate.rate.modelId ?? "this model"} yet, so
             this is the list rate — an upper bound. ElevenLabs bills a rate set by your plan,
@@ -108,12 +130,13 @@ export default function RegenerateDialog({ pending, status, onConfirm, onCancel 
 
         {overBudget && (
           <p role="alert" className="text-destructive text-xs">
-            This is more than the plan has left. It will run until the credits are gone and
+            This is more than {dollars ? "the fish.audio balance holds" : "the plan has left"}.
+            It will run until {dollars ? "the balance runs out" : "the credits are gone"} and
             then stop, keeping whatever it finished.
           </p>
         )}
 
-        {subscription?.resetAt && (
+        {!dollars && subscription?.resetAt && (
           <p className="text-muted-foreground text-xs">
             Balance resets {new Date(subscription.resetAt).toLocaleDateString()}.
           </p>

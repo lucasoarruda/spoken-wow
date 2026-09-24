@@ -1,5 +1,5 @@
 /**
- * Turning an ElevenLabs failure into something a batch can act on.
+ * Turning a provider's failure into something a batch can act on.
  *
  * The browser drives a batch one line at a time, so every failure needs an answer to one
  * question: keep going, or stop? Running out of credits means every remaining line will fail
@@ -140,6 +140,42 @@ export function classifyUpstream(httpStatus: number, raw: string, what: string):
   if (httpStatus === 429) return say("rate-limit");
   if (httpStatus === 401 || httpStatus === 403) return say("auth");
   if (httpStatus === 404) return say("voice-missing");
+  if (httpStatus === 422 || httpStatus === 400) return say("bad-request");
+
+  return failure("upstream", `${what} failed (${httpStatus}): ${text}`);
+}
+
+/**
+ * fish.audio's failures are JSON `{ status, message, reason }`. The message is the only clue
+ * to what went wrong, so it is kept rather than replaced with the status line.
+ */
+export function fishMessage(raw: string): string {
+  try {
+    const body = JSON.parse(raw) as { message?: unknown; reason?: unknown };
+    const parts = [body.message, body.reason].filter(
+      (part): part is string => typeof part === "string" && part !== "",
+    );
+    if (parts.length) return parts.join(": ");
+  } catch {
+    // Not JSON - a proxy page. The raw text is all there is.
+  }
+  return raw;
+}
+
+/**
+ * Classify a non-2xx response from fish.audio.
+ *
+ * Its bodies are `{ status, message, reason }` with no slug to key on, so the HTTP status is
+ * the whole of the classification. 402 is fish.audio's empty balance, fatal to a batch for
+ * the reason quota is; 503 is its "high load", which the next attempt may well get past.
+ */
+export function classifyFish(httpStatus: number, raw: string, what: string): Failure {
+  const text = fishMessage(raw).slice(0, 400) || `HTTP ${httpStatus}`;
+  const say = (kind: FailureKind) => failure(kind, `${what}: ${text}`);
+
+  if (httpStatus === 402) return say("quota");
+  if (httpStatus === 429 || httpStatus === 503) return say("rate-limit");
+  if (httpStatus === 401 || httpStatus === 403) return say("auth");
   if (httpStatus === 422 || httpStatus === 400) return say("bad-request");
 
   return failure("upstream", `${what} failed (${httpStatus}): ${text}`);

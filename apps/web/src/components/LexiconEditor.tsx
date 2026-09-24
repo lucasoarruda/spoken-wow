@@ -1,7 +1,7 @@
 "use client";
 
 import { useLang } from "@/components/LangProvider";
-import { withLang } from "@/lib/lang";
+import { withLang, type Lang } from "@/lib/lang";
 import { Check, Pencil, RefreshCw, Search, Trash2, Undo2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { EffectiveLexicon } from "@/lib/generation/dictionary";
+import { fishUse, type FishUse } from "@/lib/generation/fish-lexicon";
 import { PREVIEW_MODES, type PreviewMode } from "@/lib/generation/preview-modes";
 import type { CacheState } from "@/lib/generation/preview";
 import { Toaster, useToast } from "@/components/ui/toast";
@@ -507,6 +508,7 @@ function Editor({
               key={index}
               entry={entry}
               index={index}
+              lang={lang}
               editing={editing === index}
               cached={cache[entry.grapheme] ?? EMPTY_CACHE}
               preview={preview}
@@ -728,6 +730,7 @@ function Tombstone({
 function Row({
   entry,
   index,
+  lang,
   editing,
   cached,
   preview,
@@ -739,6 +742,7 @@ function Row({
 }: {
   entry: LexiconEntry;
   index: number;
+  lang: Lang;
   editing: boolean;
   cached: CacheState;
   preview: ReturnType<typeof usePreview>;
@@ -850,6 +854,7 @@ function Row({
           <span className="text-primary w-52 shrink-0 truncate text-sm">
             {entry.alias ? `“${entry.alias}”` : `/${entry.ipa}/`}
           </span>
+          <FishBadge use={fishUse(entry, lang)} />
           <span className="truncate text-xs">{entry.note}</span>
         </div>
       )}
@@ -983,5 +988,31 @@ function Row({
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * What fish.audio makes of an entry, which is not always what ElevenLabs does: it reads no
+ * IPA outside English, so another language's IPA entries do nothing there until they are
+ * given a respelling. Said per row, because the page is otherwise entirely about ElevenLabs.
+ */
+function FishBadge({ use }: { use: FishUse }) {
+  const text = { phoneme: "fish: phoneme", respelling: "fish: respelling", unused: "fish: not used" }[use];
+  const title = {
+    phoneme: "fish.audio speaks this from the IPA, converted to ARPAbet.",
+    respelling: "fish.audio speaks this respelling as written.",
+    unused:
+      "fish.audio cannot use this entry: it reads no IPA outside English, and this IPA does not convert. Give it a respelling for fish.audio to use.",
+  }[use];
+  return (
+    <span
+      title={title}
+      className={cn(
+        "w-24 shrink-0 text-[11px]",
+        use === "unused" ? "text-amber-500" : "text-muted-foreground",
+      )}
+    >
+      {text}
+    </span>
   );
 }

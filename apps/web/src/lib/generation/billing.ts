@@ -15,6 +15,12 @@
  * direction to be wrong in when the number is there to stop someone spending a month's
  * budget by accident.
  *
+ * fish.audio bills differently and simply: list price in dollars per UTF-8 byte, with no
+ * plan in between. A fish.audio Rate is dollars per character, so an estimate is the same
+ * multiplication whichever provider it is for; the bytes-per-character of the language is
+ * folded into the rate, learned from past fish.audio takes the same way credits are (see
+ * calibration.ts). Credits and dollars are never added together anywhere.
+ *
  * Everything here is pure and free of node imports, because the confirm dialog is a client
  * component and must show the same figure the server would. Reading the calibration out of
  * Postgres lives in calibration.ts.
@@ -31,8 +37,12 @@ export const LIST_RATE = 1;
 export const CALIBRATION_SAMPLE = 50;
 
 export type Rate = {
-  /** Credits per character. */
+  /** Credits per character, or dollars per character when `unit` is "usd". */
   rate: number;
+  /** ElevenLabs credits when absent, which every rate was before fish.audio. */
+  unit?: "credits" | "usd";
+  /** No price is known for this model at all, so nothing can be estimated. */
+  unknown?: boolean;
   /** How many past takes this came from. Zero means the fallback is in use. */
   samples: number;
   modelId: string | null;
@@ -68,7 +78,13 @@ export type Estimate = {
   /** Distinct audio files, which is what actually gets generated. */
   files: number;
   characters: number;
+  /** Whole credits, for an ElevenLabs rate. Zero for a fish.audio one. */
   credits: number;
+  /**
+   * Dollars, for a fish.audio rate. Null for an ElevenLabs one, and for a fish.audio model
+   * with no known price. Never rounded to cents.
+   */
+  usd: number | null;
   rate: Rate;
 };
 
@@ -109,9 +125,13 @@ export function totals(
   counted: { lines: number; files: number; characters: number },
   rate: Rate,
 ): Estimate {
+  if (rate.unit === "usd") {
+    return { ...counted, credits: 0, usd: rate.unknown ? null : counted.characters * rate.rate, rate };
+  }
   return {
     ...counted,
     credits: estimateCredits(counted.characters, rate.rate),
+    usd: null,
     rate,
   };
 }

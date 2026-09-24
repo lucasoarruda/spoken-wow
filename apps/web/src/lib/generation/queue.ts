@@ -21,6 +21,7 @@
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
+import type { Provider } from "./speakers/speaker";
 
 export type JobState = "pending" | "running" | "done" | "failed" | "cancelled";
 
@@ -54,6 +55,8 @@ export type QueueJob = {
   characters: number;
   attempts: number;
   createdBy: string | null;
+  /** Fixed when the job was queued: the provider its estimate was shown for. */
+  provider: Provider;
 };
 
 export type QueueSnapshot = {
@@ -62,7 +65,9 @@ export type QueueSnapshot = {
   counts: Record<JobState, number>;
   /** Summed from what ElevenLabs charged, never from the estimate. */
   credits: number;
-  /** Takes ElevenLabs did not price, counted rather than assumed to be free. */
+  /** Summed from what fish.audio jobs cost, in dollars; never added to `credits`. */
+  costUsd: number;
+  /** Takes neither provider priced, counted rather than assumed to be free. */
   unpriced: number;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
@@ -136,6 +141,7 @@ export async function enqueue(
   jobs: QueueEntry[],
   source: Source,
   lang: Lang = BASE_LANG,
+  provider: Provider = "elevenlabs",
 ): Promise<{ queued: number; skipped: number }> {
   if (jobs.length === 0) return { queued: 0, skipped: 0 };
 
@@ -147,8 +153,8 @@ export async function enqueue(
 
   const { rowCount } = await db().query(
     `insert into "regeneration_job"
-       ("batchId", "source", "lang", "lineId", "file", "npcName", "preview", "characters")
-     select $1, $2, $8, * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
+       ("batchId", "source", "lang", "provider", "lineId", "file", "npcName", "preview", "characters")
+     select $1, $2, $8, $9, * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
      on conflict ("source", "lang", "file") where "state" in ('pending', 'running') do nothing`,
     [
       batchId,
@@ -159,6 +165,7 @@ export async function enqueue(
       jobs.map((job) => job.preview),
       jobs.map((job) => job.characters),
       lang,
+      provider,
     ],
   );
 
@@ -192,7 +199,7 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
          limit 1
       )
       returning j."id"::text, j."batchId", j."source", j."lang", j."lineId", j."file", j."npcName",
-                j."preview", j."characters", j."attempts",
+                j."preview", j."characters", j."attempts", j."provider",
                 (select b."createdBy" from "regeneration_batch" b where b."id" = j."batchId")
                   as "createdBy"`,
     [leaseMs / 1000],
@@ -202,14 +209,14 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
 
 export async function finishJob(
   id: string,
-  result: { version: number; credits: number | null },
+  result: { version: number; credits: number | null; costUsd?: number | null },
 ): Promise<void> {
   await db().query(
     `update "regeneration_job"
-        set "state" = 'done', "version" = $2, "credits" = $3,
+        set "state" = 'done', "version" = $2, "credits" = $3, "costUsd" = $4,
             "finishedAt" = now(), "leaseUntil" = null
       where "id" = $1`,
-    [id, result.version, result.credits],
+    [id, result.version, result.credits, result.costUsd ?? null],
   );
 }
 
@@ -300,6 +307,7 @@ type JobAggregateRow = {
   failed: string;
   cancelled: string;
   credits: string;
+  costUsd: string;
   unpriced: string;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
@@ -364,7 +372,9 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
            count(*) filter (where "state" = 'failed')::text as failed,
            count(*) filter (where "state" = 'cancelled')::text as cancelled,
            coalesce(sum("credits"), 0)::text as credits,
-           count(*) filter (where "state" = 'done' and "credits" is null)::text as unpriced
+           coalesce(sum("costUsd"), 0)::text as "costUsd",
+           count(*) filter (where "state" = 'done' and "credits" is null and "costUsd" is null)::text
+             as unpriced
          from "regeneration_job"
          where ${window}
        ),
@@ -416,6 +426,7 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
       cancelled: Number(row.cancelled),
     },
     credits: Number(row.credits),
+    costUsd: Number(row.costUsd),
     unpriced: Number(row.unpriced),
     running: row.running,
     failures: row.failures,

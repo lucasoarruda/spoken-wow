@@ -1,4 +1,4 @@
-// The stored ElevenLabs key, per user.
+// The stored provider keys, per user: ElevenLabs' and fish.audio's, one of each at most.
 //
 // The plaintext exists in exactly two places: inside a request that is about to store
 // it, and inside a request that is about to spend with it. It is never returned to a
@@ -12,13 +12,22 @@ import "server-only";
 
 import { query } from "./db";
 import { open, seal } from "./secrets";
+import type { Provider } from "./generation/providers";
+
+
+// A table per provider (see migration 0040 for why not one table with a column). Written
+// out rather than interpolated from the argument, so no caller can name a table.
+const TABLE: Record<Provider, string> = {
+  elevenlabs: `"elevenlabs_key"`,
+  fish: `"fish_key"`,
+};
 
 export type ApiKeyStatus = {
   /** The last four characters, for "sk_…••••1a2b". Proves a key is set; authenticates nothing. */
   hint: string;
-  /** When ElevenLabs last confirmed it, which is when it was saved. */
+  /** When the provider last confirmed it, which is when it was saved. */
   verifiedAt: string | null;
-  /** The plan the key answered with, e.g. "creator". */
+  /** The plan the key answered with, e.g. "creator". Always null for fish.audio. */
   tier: string | null;
 };
 
@@ -35,9 +44,12 @@ function hintFor(key: string): string {
   return key.slice(-4);
 }
 
-export async function apiKeyStatus(userId: string): Promise<ApiKeyStatus | null> {
+export async function apiKeyStatus(
+  userId: string,
+  provider: Provider = "elevenlabs",
+): Promise<ApiKeyStatus | null> {
   const rows = await query<{ hint: string; verifiedAt: Date | null; tier: string | null }>(
-    `select "hint", "verifiedAt", "tier" from "elevenlabs_key" where "userId" = $1`,
+    `select "hint", "verifiedAt", "tier" from ${TABLE[provider]} where "userId" = $1`,
     [userId],
   );
   const row = rows[0];
@@ -57,10 +69,13 @@ export async function apiKeyStatus(userId: string): Promise<ApiKeyStatus | null>
  * SPOKEN_SECRET_KEY has changed under a stored credential, and treating it as "no key
  * set" would hide a deployment mistake behind a message about setting up a profile.
  */
-export async function readApiKey(userId: string): Promise<string | null> {
+export async function readApiKey(
+  userId: string,
+  provider: Provider = "elevenlabs",
+): Promise<string | null> {
   const rows = await query<Row>(
     `select "ciphertext", "iv", "tag", "hint", "verifiedAt", "tier"
-       from "elevenlabs_key" where "userId" = $1`,
+       from ${TABLE[provider]} where "userId" = $1`,
     [userId],
   );
   const row = rows[0];
@@ -73,13 +88,14 @@ export async function storeApiKey(
   userId: string,
   key: string,
   tier: string | null,
+  provider: Provider = "elevenlabs",
 ): Promise<ApiKeyStatus> {
   const sealed = seal(key);
 
   // Upsert rather than delete-then-insert: replacing a key is one statement, and a
   // failure halfway through must not leave an editor with no key at all.
   await query(
-    `insert into "elevenlabs_key"
+    `insert into ${TABLE[provider]}
        ("userId", "ciphertext", "iv", "tag", "hint", "verifiedAt", "tier", "updatedAt")
      values ($1, $2, $3, $4, $5, now(), $6, now())
      on conflict ("userId") do update set
@@ -93,11 +109,14 @@ export async function storeApiKey(
     [userId, sealed.ciphertext, sealed.iv, sealed.tag, hintFor(key), tier],
   );
 
-  return (await apiKeyStatus(userId))!;
+  return (await apiKeyStatus(userId, provider))!;
 }
 
-export async function deleteApiKey(userId: string): Promise<void> {
-  await query(`delete from "elevenlabs_key" where "userId" = $1`, [userId]);
+export async function deleteApiKey(
+  userId: string,
+  provider: Provider = "elevenlabs",
+): Promise<void> {
+  await query(`delete from ${TABLE[provider]} where "userId" = $1`, [userId]);
 }
 
 /** Which accounts have a key, for the admin Users table. Presence only. */

@@ -4,13 +4,13 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import GenerationSettings from "@/components/GenerationSettings";
 import VoiceSlotList from "@/components/VoiceSlotList";
 import { readApiKey } from "@/lib/api-key";
 import { auth } from "@/lib/auth";
 import { readSettings } from "@/lib/generation/settings";
 import { canManageVoices } from "@/lib/permissions";
 import { generationStatus } from "@/lib/generation/status";
+import { listReferences } from "@/lib/voices/references";
 import { listSamples, type Sample } from "@/lib/voices/samples";
 import { slots } from "@/lib/voices/slots";
 
@@ -57,6 +57,10 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
 
   const created = existing ? all.filter((slot) => existing.has(slot.name)).length : 0;
 
+  // Not the account's: a fish.audio reference is a row here, the same for every key.
+  const references = Object.fromEntries(await listReferences(lang));
+  const referenced = all.filter((slot) => slot.name in references).length;
+
   // The page's language's settings and accent tags: the voices are everyone's, but how each
   // language generates with them is its own.
   const settings = await readSettings(lang);
@@ -69,7 +73,8 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         three distinct voice sets the game gives every race-gender. The generator resolves
         them by name, so a voice only counts once it is called exactly{" "}
         <code className="text-foreground">race-gender-flavor</code> in the ElevenLabs account.
-        {existing && ` ${created} of ${all.length} exist.`}
+        {existing && ` ${created} of ${all.length} exist.`} fish.audio has a reference for{" "}
+        {referenced} of {all.length}.
       </p>
 
       {error && (
@@ -81,13 +86,13 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         </div>
       )}
 
-      <GenerationSettings initial={settings} models={account.models} />
 
       <VoiceSlotList
         slots={all}
         existing={existing ? [...existing.keys()] : null}
         initialSamples={samples}
         raceTags={settings.config.raceTags}
+        initialReferences={references}
       />
     </main>
   );

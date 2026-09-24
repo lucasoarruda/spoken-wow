@@ -31,6 +31,7 @@ import { BASE_LANG, type Lang } from "@/lib/lang";
 
 import { historyDirOf } from "./adapters";
 import { archiveName, writeAtomic } from "./bytes";
+import type { Provider } from "@/lib/generation/providers";
 
 /** What a take was made with. Anything unknown is null, which means unknown, not unchanged. */
 export type TakeFields = {
@@ -44,6 +45,10 @@ export type TakeFields = {
   settings?: unknown;
   characters?: number | null;
   credits?: number | null;
+  /** Which generator made it. ElevenLabs when omitted, which every caller before fish was. */
+  provider?: Provider;
+  /** fish.audio's cost in dollars; never ElevenLabs credits. See migration 0043. */
+  costUsd?: number | null;
   spokenHash?: string | null;
   dictionaryId?: string | null;
   dictionaryVersion?: string | null;
@@ -130,9 +135,10 @@ async function insertLive(input: {
          ("source", "lang", "file", "lineId", "version", "isCurrent", "origin",
           "voice", "narratorVoice", "voiceId", "modelId", "seed", "outputFormat", "settings",
           "characters", "credits", "durationSec", "bytes", "spokenHash", "dictionaryId",
-          "dictionaryVersion", "leadIn", "leadInSec", "createdBy", "archiveFile")
+          "dictionaryVersion", "leadIn", "leadInSec", "createdBy", "archiveFile",
+          "provider", "costUsd")
        values ($1, $2, $3, $4, $5, true, 'generated', $6, $7, $8, $9, $10, $11, $12::jsonb,
-               $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
+               $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
       [
         source,
         lang,
@@ -159,6 +165,8 @@ async function insertLive(input: {
         fields.leadInSec ?? null,
         fields.createdBy ?? null,
         input.archiveFile,
+        fields.provider ?? "elevenlabs",
+        fields.costUsd ?? null,
       ],
     );
     await client.query("commit");

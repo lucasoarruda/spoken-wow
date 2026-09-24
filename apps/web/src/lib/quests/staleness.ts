@@ -2,7 +2,7 @@
  * Which files hold audio of text that has since changed.
  *
  * Migration 0006 already records the answer without knowing it: `spokenHash` is a sha-256 of
- * the exact string sent to ElevenLabs, written on every take since. Hash what would be sent
+ * the exact string sent to the provider, before the lexicon, written on every take since. Hash what would be sent
  * today and compare. Nothing read it until now.
  *
  * It catches more than an override. The hash moves when the regex rules in
@@ -18,9 +18,12 @@ import { fileIndex } from "../audio";
 import { db } from "../db";
 import { committedPronunciation } from "../generation/files";
 import { spokenHash } from "../generation/spoken-hash";
-import { accentTagged, audioTags } from "../generation/narration";
+import { SHAPE } from "../generation/speakers/shape";
 import { currentConfig } from "../generation/settings";
 import { readOverrides } from "./overrides";
+import type { Provider } from "../generation/providers";
+
+type Row = { file: string; spokenHash: string | null; provider: Provider };
 
 /**
  * Of these files, the ones whose live take was made from different text.
@@ -38,13 +41,13 @@ export async function staleFiles(
   if (files?.length === 0) return new Set();
 
   const { rows } = files
-    ? await db().query<{ file: string; spokenHash: string | null }>(
-        `select "file", "spokenHash" from "take"
+    ? await db().query<Row>(
+        `select "file", "spokenHash", "provider" from "take"
           where "source" = 'quests' and "lang" = $2 and "isCurrent" and "file" = any($1::text[])`,
         [files, lang],
       )
-    : await db().query<{ file: string; spokenHash: string | null }>(
-        `select "file", "spokenHash" from "take"
+    : await db().query<Row>(
+        `select "file", "spokenHash", "provider" from "take"
           where "source" = 'quests' and "lang" = $1 and "isCurrent"`,
         [lang],
       );
@@ -69,7 +72,8 @@ export async function staleFiles(
     // "<hic>", and a dwarf take made with its accent direction against that same direction -
     // otherwise every dwarf line reads as stale forever rather than once.
     const pronounced = committedPronunciation(text, lang);
-    const spoken = accentTagged(audioTags(pronounced), raceTags[line.race]);
+    // By the provider that made the take: what it would be sent now is its question.
+    const spoken = SHAPE[row.provider](pronounced, raceTags[line.race]);
     if (spokenHash(spoken) !== row.spokenHash) {
       stale.add(row.file);
     }

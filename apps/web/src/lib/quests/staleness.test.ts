@@ -32,13 +32,13 @@ async function currentHash(): Promise<string> {
   return spokenHash(applyPronunciation(line.text, fileDefaults().rules));
 }
 
-async function liveTake(hash: string | null) {
+async function liveTake(hash: string | null, provider: "elevenlabs" | "fish" = "elevenlabs") {
   await db().query(
     `insert into "take"
        ("source", "file", "version", "isCurrent", "origin", "lineId", "voice", "bytes",
-        "spokenHash")
-     values ('quests', $1, 9999, true, 'generated', $2, 'human-male-standard', 1, $3)`,
-    [file, LINE, hash],
+        "spokenHash", "provider")
+     values ('quests', $1, 9999, true, 'generated', $2, 'human-male-standard', 1, $3, $4)`,
+    [file, LINE, hash, provider],
   );
 }
 
@@ -113,6 +113,14 @@ describe("staleFiles", () => {
     // same. Calling those stale would mark most of the store on a claim nothing supports.
     await liveTake(null);
     expect(await staleFiles([file])).toEqual(new Set());
+  });
+
+  it("judges a fish.audio take by what fish.audio would be sent", async () => {
+    await liveTake(await currentHash(), "fish");
+    expect(await staleFiles([file])).toEqual(new Set());
+
+    await writeOverride(file, LINE, "Something else entirely.", null);
+    expect(await staleFiles([file])).toEqual(new Set([file]));
   });
 
   it("says nothing about a file with no take at all", async () => {

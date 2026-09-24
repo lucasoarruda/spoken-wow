@@ -1,4 +1,3 @@
-import GenerationSettings from "@/components/GenerationSettings";
 import { viewerOf } from "@/lib/grants/store";
 import { BASE_LANG } from "@/lib/lang";
 import { pageLang } from "@/lib/lang-server";
@@ -11,9 +10,9 @@ import { readApiKey } from "@/lib/api-key";
 import { auth } from "@/lib/auth";
 import { readLexicon } from "@/lib/generation/dictionary";
 import { previewCache, voicePicker } from "@/lib/generation/preview";
-import { readSettings } from "@/lib/generation/settings";
 import { generationStatus } from "@/lib/generation/status";
 import { can } from "@/lib/permissions";
+import { readPreference, speakingConfig } from "@/lib/generation/preference";
 
 export const metadata: Metadata = { title: "Pronunciation · Spoken" };
 
@@ -36,12 +35,14 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   // money, which is true and harmless.
   const apiKey = await readApiKey(session.user.id).catch(() => null);
 
-  const [lexicon, settings, status] = await Promise.all([
+  const [lexicon, preference, status] = await Promise.all([
     readLexicon(lang),
-    readSettings(lang),
+    readPreference(session.user.id),
     generationStatus(apiKey ? { apiKey } : {}, lang),
   ]);
-  const config = settings.config;
+  // This editor's own ElevenLabs settings, which are what a preview is spoken with and what
+  // decides whether a phoneme rule is honoured.
+  const config = await speakingConfig(preference.elevenlabs, lang);
 
   // Resolved here rather than in the browser: knowing whether a preview is cached means
   // knowing which corpus sentence it would use, which is a pass over 17,507 lines. Doing it
@@ -62,11 +63,6 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         line generated afterwards is spoken with it. Only names a plain reader gets wrong belong
         here — a rule for a name it already handles can only make that name worse.
       </p>
-
-      {/* Another language's model and voice settings live here, beside its lexicon: whoever
-          configures a language may set both, while /voices -- where English's are -- is the
-          global admin's, since the voices themselves are shared by every language. */}
-      {!english && <GenerationSettings initial={settings} models={status.models} />}
 
       <LexiconEditor initial={lexicon} modelId={config.modelId} initialCache={cached} />
     </main>

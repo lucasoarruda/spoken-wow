@@ -11,13 +11,23 @@
 import { headers } from "next/headers";
 
 import { readApiKey } from "@/lib/api-key";
+import { PROVIDER_NAME, type Provider } from "@/lib/generation/providers";
+import { readPreference } from "@/lib/generation/preference";
+import { speakerFrom } from "@/lib/generation/speakers/for";
+import type { Speaker } from "@/lib/generation/speakers/speaker";
 import { auth } from "@/lib/auth";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { langParam } from "@/lib/lang-server";
 import { NO_API_KEY } from "@/lib/no-api-key";
 import { currentSession } from "@/lib/session";
 import { viewerOf } from "@/lib/grants/store";
-import { can, canConfigureGeneration, langsWhere, type Capability } from "@/lib/permissions";
+import {
+  can,
+  canConfigureGeneration,
+  langsWhere,
+  spendsCredits,
+  type Capability,
+} from "@/lib/permissions";
 
 export type Session = Awaited<ReturnType<typeof auth.api.getSession>>;
 
@@ -69,6 +79,16 @@ export async function requireConfigure(): Promise<
 // Credentials
 //------------------------------------------------------------------------------
 
+/**
+ * The session of somebody who spends somewhere, or null: the gate on every profile route
+ * that stores a key or a generator choice. Somewhere includes a language grant -- a
+ * translator who may regenerate Portuguese pays with their own key like anybody else.
+ */
+export async function currentSpender() {
+  const session = await currentSession();
+  return session && spendsCredits(await viewerOf(session)) ? session : null;
+}
+
 export type KeyGuard = { key: string; denied: null } | { key: null; denied: Response };
 
 function noKey(message: string): Response {
@@ -76,34 +96,67 @@ function noKey(message: string): Response {
 }
 
 /**
- * The signed-in user's own ElevenLabs key, for the routes that spend.
+ * The signed-in user's own key for a provider, for the routes that spend.
  *
  * Run AFTER a role guard, never instead of one: a key is a credential, not a permission,
  * and a member who pasted one must still be refused.
  *
  * There is no fallback to a server-wide ELEVENLABS_API_KEY, deliberately. With one, "who
  * paid for this line" would have no answer, and granting somebody the collaborator role
- * would quietly grant them the deployer's bill as well.
+ * would quietly grant them the deployer's bill as well. fish.audio has none for the same
+ * reason.
  */
-export async function requireApiKey(userId: string): Promise<KeyGuard> {
+export async function requireApiKey(
+  userId: string,
+  provider: Provider = "elevenlabs",
+): Promise<KeyGuard> {
+  const name = PROVIDER_NAME[provider];
   let key: string | null;
   try {
-    key = await readApiKey(userId);
+    key = await readApiKey(userId, provider);
   } catch {
     // A row that will not open means SPOKEN_SECRET_KEY changed under it. Saving the key
     // again is the fix, so this points at the same page as having none at all -- but it
     // says which of the two happened.
     return {
       key: null,
-      denied: noKey("Your stored ElevenLabs key could not be read. Set it again in your profile."),
+      denied: noKey(`Your stored ${name} key could not be read. Set it again in your profile.`),
     };
   }
 
   if (!key) {
-    return { key: null, denied: noKey("This spends ElevenLabs credits, and you have no key set.") };
+    return {
+      key: null,
+      denied: noKey(
+        provider === "elevenlabs"
+          ? "This spends ElevenLabs credits, and you have no key set."
+          : "This spends from your fish.audio balance, and you have no fish.audio key set.",
+      ),
+    };
   }
 
   return { key, denied: null };
+}
+
+export type SpeakerGuard =
+  | { speaker: Speaker; provider: Provider; key: string; denied: null }
+  | { speaker: null; provider: Provider; key: null; denied: Response };
+
+/**
+ * The signed-in user's Speaker: the provider they chose on /profile, with their own key for
+ * it. The 428 names that provider, so a collaborator who switched to fish.audio without a
+ * key is told which key is missing.
+ */
+export async function requireSpeaker(userId: string): Promise<SpeakerGuard> {
+  const preference = await readPreference(userId);
+  const { key, denied } = await requireApiKey(userId, preference.provider);
+  if (denied) return { speaker: null, provider: preference.provider, key: null, denied };
+  return {
+    speaker: speakerFrom(preference.provider, key, preference),
+    provider: preference.provider,
+    key,
+    denied: null,
+  };
 }
 
 //------------------------------------------------------------------------------

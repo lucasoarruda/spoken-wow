@@ -99,6 +99,20 @@ function rowOf(lang: Lang): { table: string; where: string; params: [Lang] } {
     : { table: `"pronunciation_lexicon_locale"`, where: `"lang" = $1`, params: [lang] };
 }
 
+/**
+ * When a language's lexicon last changed, or null when it has no row: cheap enough to ask
+ * on every line, so a caller can cache what it builds from the entries and rebuild only
+ * when this moves.
+ */
+export async function lexiconStamp(lang: Lang = BASE_LANG): Promise<string | null> {
+  const at = rowOf(lang);
+  const { rows } = await db().query<{ updatedAt: Date }>(
+    `select "updatedAt" from ${at.table} where ${at.where}`,
+    at.params,
+  );
+  return rows[0] ? rows[0].updatedAt.toISOString() : null;
+}
+
 async function readRow(lang: Lang = BASE_LANG): Promise<Row | undefined> {
   const at = rowOf(lang);
   const { rows } = await db().query<Row>(

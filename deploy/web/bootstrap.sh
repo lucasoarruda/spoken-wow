@@ -51,6 +51,7 @@ install -d -o deploy -g deploy -m 755 \
   "$ROOT/shared/audio-history/quests" \
   "$ROOT/shared/audio-history/zones" \
   "$ROOT/shared/voices" \
+  "$ROOT/shared/voice-references" \
   "$ROOT/shared/npc-lines" \
   "$ROOT/shared/audio-previews" \
   "$ROOT/shared/downloads"

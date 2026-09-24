@@ -21,7 +21,7 @@ import { corpus } from "@/lib/quests/catalogue";
 import { isSource } from "@/lib/sections";
 import {
   requireAnyRegenerate,
-  requireApiKey,
+  requireSpeaker,
   requireIn,
 } from "@/lib/generation/authz";
 import { createBatch, enqueue, snapshot } from "@/lib/generation/queue";
@@ -31,6 +31,7 @@ import { filtersFromParams, needsStale } from "@/lib/search-request";
 import { ensureQueueRunning, queueWorker } from "@/lib/generation/boot";
 import { catalogue as bookCatalogue } from "@/lib/books/catalogue";
 import type { Lang } from "@/lib/lang";
+import type { Provider } from "@/lib/generation/speakers/speaker";
 import { catalogue as zoneCatalogue } from "@/lib/zones/catalogue";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,10 @@ export async function POST(request: NextRequest) {
   // Checked at enqueue rather than only in the worker. Every job in the batch is generated
   // with the key of whoever started it, so a batch queued without one is forty thousand rows
   // that can only fail - and the person who pressed the button is no longer here to be told.
-  const { denied: noKey } = await requireApiKey(session.user.id);
+  //
+  // The provider is fixed here too: the estimate the batch was started on was for it, and
+  // switching on /profile mid-batch must not move the jobs already waiting.
+  const { provider, denied: noKey } = await requireSpeaker(session.user.id);
   if (noKey) return noKey;
 
   // Nothing starts the queue on boot - see lib/generation/boot.ts for why - so every route
@@ -67,8 +71,8 @@ export async function POST(request: NextRequest) {
 
   const label = typeof body.label === "string" && body.label ? body.label : "a search";
 
-  if (source === "zones") return queueZones(body.lineIds, label, session.user.id, lang);
-  if (source === "books") return queueBooks(body.lineIds, label, session.user.id, lang);
+  if (source === "zones") return queueZones(body.lineIds, label, session.user.id, lang, provider);
+  if (source === "books") return queueBooks(body.lineIds, label, session.user.id, lang, provider);
 
   if (typeof body.filters !== "string") {
     return NextResponse.json(
@@ -104,6 +108,7 @@ export async function POST(request: NextRequest) {
     })),
     "quests",
     lang,
+    provider,
   );
 
   // The loop is on a two-second idle tick, and waiting that out before the first take would
@@ -127,6 +132,7 @@ async function queueZones(
   label: string,
   userId: string,
   lang: Lang,
+  provider: Provider,
 ): Promise<NextResponse> {
   if (!Array.isArray(lineIds) || lineIds.some((id) => typeof id !== "string")) {
     return NextResponse.json(
@@ -156,7 +162,7 @@ async function queueZones(
   }
 
   const batchId = await createBatch(label, userId, "zones", lang);
-  const { queued, skipped } = await enqueue(batchId, jobs, "zones", lang);
+  const { queued, skipped } = await enqueue(batchId, jobs, "zones", lang, provider);
 
   queueWorker()?.nudge();
 
@@ -177,6 +183,7 @@ async function queueBooks(
   label: string,
   userId: string,
   lang: Lang,
+  provider: Provider,
 ): Promise<NextResponse> {
   if (!Array.isArray(lineIds) || lineIds.some((id) => typeof id !== "string")) {
     return NextResponse.json(
@@ -206,7 +213,7 @@ async function queueBooks(
   }
 
   const batchId = await createBatch(label, userId, "books", lang);
-  const { queued, skipped } = await enqueue(batchId, jobs, "books", lang);
+  const { queued, skipped } = await enqueue(batchId, jobs, "books", lang, provider);
 
   queueWorker()?.nudge();
 

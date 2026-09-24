@@ -25,6 +25,7 @@ import { regenerateNarrated } from "@/lib/generation/narrated";
 import type { RegenerateResult } from "@/lib/generation/regenerate";
 
 import { catalogue, type CatalogueEntry } from "./catalogue";
+import type { Speaker } from "@/lib/generation/speakers/speaker";
 
 async function entryFor(lineId: string, lang: Lang): Promise<CatalogueEntry | undefined> {
   return (await catalogue(lang)).find((candidate) => candidate.id === lineId);
@@ -38,7 +39,7 @@ async function entryFor(lineId: string, lang: Lang): Promise<CatalogueEntry | un
 export async function regenerateZoneLine(
   lineId: string,
   createdBy: string,
-  options: { apiKey: string; lang?: Lang },
+  options: { speaker: Speaker; lang?: Lang },
 ): Promise<RegenerateResult> {
   const entry = await entryFor(lineId, options.lang ?? BASE_LANG);
   if (!entry) {

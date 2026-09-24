@@ -10,6 +10,8 @@
 import { BASE_LANG, withLang, type Lang } from "@/lib/lang";
 import { noApiKeyMessage } from "@/lib/no-api-key";
 import type { Source } from "@/lib/sections";
+import type { Rate } from "./billing";
+import type { Provider } from "./providers";
 
 
 export type FailureKind =
@@ -67,14 +69,18 @@ export type GenerationStatusResponse = {
     voiceSettings: Record<string, number | boolean>;
     seedStrategy: string;
   };
-  settingsSource: "file" | "database";
   /**
-   * Credits per character, calibrated from what this account has actually been charged.
+   * Credits per character, or dollars for fish.audio, calibrated from what this account has
+   * actually been charged.
    *
    * `samples: 0` means nothing has been generated with this model yet and the list rate is
    * standing in - an upper bound, not a measurement.
    */
-  rate: { rate: number; samples: number; modelId: string | null };
+  rate: Rate;
+  /** Which generator the signed-in user spends with. */
+  provider: Provider;
+  /** fish.audio's balance in dollars, for a fish.audio user; null when it could not be read. */
+  wallet?: { credit: number } | null;
 };
 
 export async function fetchGenerationStatus(
@@ -175,6 +181,7 @@ export type QueueSnapshot = {
   active: boolean;
   counts: Record<"pending" | "running" | "done" | "failed" | "cancelled", number>;
   credits: number;
+  costUsd: number;
   unpriced: number;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];

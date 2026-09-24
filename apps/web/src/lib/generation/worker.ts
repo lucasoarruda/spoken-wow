@@ -17,10 +17,14 @@ import { batchStopped, cancelPending, claimNext, failJob, finishJob, retryJob, t
 import { regenerateLine, type RegenerateResult } from "./regenerate";
 import { regenerateBookLine } from "@/lib/books/regenerate";
 import { regenerateZoneLine } from "@/lib/zones/regenerate";
-import { readSettings } from "./settings";
 import { generationStatus } from "./status";
 import type { Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
+import { fishConcurrency, getWallet } from "@/lib/voices/fish";
+import { defaultElevenLabs, readPreference, type Preference } from "./preference";
+import { speakerFrom } from "./speakers/for";
+import type { Provider, Speaker } from "./speakers/speaker";
+import { PROVIDER_NAME } from "./providers";
 
 /**
  * How many times a rate-limited job is retried before it is failed.
@@ -54,13 +58,37 @@ export function backoffFor(attempts: number, random: () => number = Math.random)
  * none, budgetFor's floor of one applies, which is the right answer before the first claim:
  * one job is enough to learn who is next.
  */
-export async function currentBudget(apiKey: string | null = null): Promise<number> {
-  const [status, settings] = await Promise.all([
-    generationStatus(apiKey ? { apiKey } : {}),
-    readSettings(),
-  ]);
-  const plan = budgetFor(status.subscription?.tier ?? null, settings.config.modelId);
+export async function currentBudget(
+  apiKey: string | null,
+  provider: Provider,
+  modelId: string,
+): Promise<number> {
+  if (provider === "fish" && apiKey) return clampToPool(await fishBudget(apiKey), POOL_MAX);
+  const status = await generationStatus(apiKey ? { apiKey } : {});
+  // The model of whoever's job was claimed last: the flash and turbo families have their own
+  // concurrency, and the model is the collaborator's choice now, not the site's.
+  const plan = budgetFor(status.subscription?.tier ?? null, modelId);
   return clampToPool(plan, POOL_MAX);
+}
+
+/** fish.audio's tier, read at most once a minute per key: a pump runs every time a job settles. */
+const FISH_BUDGET_TTL_MS = 60_000;
+const fishBudgets = new Map<string, { at: number; value: Promise<number> }>();
+
+/**
+ * What a fish.audio account may have in flight, less one for the single-line button, as
+ * budgetFor leaves ElevenLabs. A balance that cannot be read is the lowest tier's, since
+ * guessing high is how a batch meets 429s.
+ */
+async function fishBudget(apiKey: string): Promise<number> {
+  const cached = fishBudgets.get(apiKey);
+  if (cached && Date.now() - cached.at < FISH_BUDGET_TTL_MS) return cached.value;
+  const value = getWallet({ apiKey })
+    .then((wallet) => fishConcurrency(wallet.cumulativeTopUp))
+    .catch(() => fishConcurrency(0))
+    .then((limit) => Math.max(1, limit - 1));
+  fishBudgets.set(apiKey, { at: Date.now(), value });
+  return value;
 }
 
 /**
@@ -74,7 +102,7 @@ export async function currentBudget(apiKey: string | null = null): Promise<numbe
 export type Generator = (
   lineId: string,
   userId: string,
-  options: { apiKey: string; lang: Lang },
+  options: { speaker: Speaker; lang: Lang },
 ) => Promise<RegenerateResult>;
 
 export type WorkerOptions = {
@@ -83,9 +111,11 @@ export type WorkerOptions = {
    * generator for it; there is no default that would quietly generate the wrong corpus.
    */
   regenerate?: Partial<Record<Source, Generator>>;
-  budget?: (apiKey: string | null) => Promise<number>;
+  budget?: (apiKey: string | null, provider: Provider, modelId: string) => Promise<number>;
   /** The owner's stored key. Injectable so a test never needs one sealed in a database. */
-  apiKeyFor?: (userId: string) => Promise<string | null>;
+  apiKeyFor?: (userId: string, provider: Provider) => Promise<string | null>;
+  /** The owner's settings for each provider, read as each job runs. */
+  preferenceFor?: (userId: string) => Promise<Pick<Preference, "elevenlabs" | "fish">>;
   backoffMs?: (attempts: number) => number;
   leaseMs?: number;
   /** How long to wait before looking again when the queue was empty. */
@@ -113,6 +143,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
 
   const budget = options.budget ?? currentBudget;
   const apiKeyFor = options.apiKeyFor ?? readApiKey;
+  const preferenceFor = options.preferenceFor ?? readPreference;
   const backoff = options.backoffMs ?? backoffFor;
   const idleMs = options.idleMs ?? 2_000;
 
@@ -123,29 +154,36 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
   /** When a 429 was last seen, which halves the budget for the cool-down. */
   let rateLimitedAt: number | null = null;
   /**
-   * The key the last claimed job was generated with, for sizing the next pump.
+   * The key, provider and model the last claimed job was generated with, for sizing the next
+   * pump.
    *
    * The budget belongs to a plan, and which plan depends on whose key. Reading it per pump
    * from the job most recently claimed is close enough: a queue holding two people's batches
    * is rare, and the cost of guessing the wrong one is a batch that runs at the other's
    * width for a tick.
    */
-  let lastKey: string | null = null;
+  let last: { key: string | null; provider: Provider; model: string } = {
+    key: null,
+    provider: "elevenlabs",
+    model: defaultElevenLabs().modelId,
+  };
 
   async function run(job: QueueJob): Promise<void> {
     // Whose credits this line is spent from. A batch is enqueued by someone who had a key at
     // the time, so reaching here without one means it was cleared or the master key changed
     // underneath it - and every remaining job in the batch would fail identically.
+    //
+    // For the provider the job was queued with, not whichever the owner has chosen since.
     let apiKey: string | null;
     try {
-      apiKey = await apiKeyFor(job.createdBy ?? "");
+      apiKey = await apiKeyFor(job.createdBy ?? "", job.provider);
     } catch {
       apiKey = null;
     }
 
     if (!apiKey) {
       const message =
-        "the account that started this batch has no usable ElevenLabs key; set one in your" +
+        `the account that started this batch has no usable ${PROVIDER_NAME[job.provider]} key; set one in your` +
         " profile and start it again";
       try {
         await failJob(job.id, { kind: "auth", message });
@@ -155,7 +193,22 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       }
       return;
     }
-    lastKey = apiKey;
+    // The owner's own settings, read per job so an edit on /profile applies to later lines.
+    // Caught like the key above: a database that will not answer here is one line's failure,
+    // recorded on the job, never a rejection that nothing awaits.
+    let speaker: Speaker;
+    try {
+      speaker = speakerFrom(job.provider, apiKey, await preferenceFor(job.createdBy ?? ""));
+    } catch (error) {
+      const message = `could not read the settings of the account that started this batch: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      await failJob(job.id, { kind: "upstream", message }).catch((failure: unknown) =>
+        console.error(`regeneration queue: job ${job.id} could not be failed`, failure),
+      );
+      return;
+    }
+    last = { key: apiKey, provider: job.provider, model: speaker.modelId };
 
     const generate = generators[job.source];
     if (!generate) {
@@ -172,7 +225,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     // A batch whose owner's account was deleted still has takes to attribute, and
     // take."createdBy" is nullable for exactly that case.
     const result = await generate(job.lineId, job.createdBy ?? "", {
-      apiKey,
+      speaker,
       lang: job.lang,
     }).catch(
       (error: unknown): RegenerateResult => ({
@@ -193,7 +246,11 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     // the log explains the duplicate charge.
     try {
       if (result.ok) {
-        await finishJob(job.id, { version: result.version, credits: result.credits });
+        await finishJob(job.id, {
+          version: result.version,
+          credits: result.credits,
+          costUsd: result.costUsd,
+        });
         return;
       }
 
@@ -239,7 +296,11 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     try {
       if (!isLeader()) return;
 
-      const allowed = afterRateLimit(await budget(lastKey), rateLimitedAt, Date.now());
+      const allowed = afterRateLimit(
+        await budget(last.key, last.provider, last.model),
+        rateLimitedAt,
+        Date.now(),
+      );
 
       while (!stopped && isLeader() && running.size < allowed) {
         const job = await claimNext(options.leaseMs);

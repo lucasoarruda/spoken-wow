@@ -23,7 +23,8 @@
  *   loadConfig / saveConfig / draftConfig / resolveVoiceId
  *     The narrator's voice, model and settings came from tools/voice/config.json. They come
  *     from the database now, shared with the quests side: the roster on /voices, the model
- *     and voice settings from generation_setting, the dictionary from pronunciation_lexicon.
+ *     and voice settings from the generating collaborator's own generation_preference, the
+ *     dictionary from pronunciation_lexicon.
  *     config.json is down to a fallback credit rate for the reporting CLI.
  *
  *   synthesize / verifyKey / fetchTier / listVoices / apiKey

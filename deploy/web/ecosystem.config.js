@@ -110,6 +110,11 @@ module.exports = {
         // they land somewhere no Makefile target backs up.
         SPOKEN_QUESTS_VOICE_SAMPLES: `${SHARED}/voices`,
 
+        // The window of a clip each slot is spoken from on fish.audio. Cut from the clips
+        // above and cheap to cut again, but a take records the clip's hash, so losing the
+        // file means a slot's next take no longer matches its history.
+        SPOKEN_QUESTS_VOICE_REFERENCES: `${SHARED}/voice-references`,
+
         // Blizzard's NPC barks that /voices seeds a clone's clips from, English's at the top
         // and each other language's under its code (lib/voices/npcLines.ts). Shared rather
         // than in a release because nothing builds them into one: they are fetched on a

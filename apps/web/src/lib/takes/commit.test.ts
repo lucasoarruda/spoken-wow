@@ -105,6 +105,21 @@ describe("the first take of a line", () => {
   });
 });
 
+describe("a take's provider", () => {
+  it("is ElevenLabs unless it says otherwise, with no dollars", async () => {
+    await take("first");
+    const [row] = await listTakes("quests", file);
+    expect(row).toMatchObject({ provider: "elevenlabs", credits: 3, costUsd: null });
+  });
+
+  it("is recorded for fish.audio with its dollars, and no credits", async () => {
+    await take("first", { provider: "fish", credits: null, costUsd: 0.0042 });
+    const [row] = await listTakes("quests", file);
+    expect(row).toMatchObject({ provider: "fish", credits: null });
+    expect(row.costUsd).toBeCloseTo(0.0042);
+  });
+});
+
 describe("re-rolling", () => {
   it("keeps every take in the archive, each under its own name", async () => {
     for (const text of ["one", "two", "three"]) await take(text);
