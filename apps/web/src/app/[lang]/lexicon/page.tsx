@@ -55,7 +55,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
     : {};
 
   return (
-    <main className="mx-auto max-w-5xl px-5 pt-6 pb-36">
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
       <h1 className="text-xl font-semibold">Pronunciation</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
         How ElevenLabs should say the names the corpus uses. Each entry becomes a phoneme rule

@@ -66,7 +66,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const settings = await readSettings(lang);
 
   return (
-    <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
       <h1 className="text-xl font-semibold">Voices</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
         The roster has {all.length} voices: one per race, gender and flavor — the two or

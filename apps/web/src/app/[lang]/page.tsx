@@ -90,7 +90,7 @@ const SECTIONS: {
 
 export default function Page() {
   return (
-    <main className="mx-auto max-w-4xl px-5 pt-10 pb-24">
+    <main className="mx-auto max-w-6xl px-5 pt-10 pb-24">
       <h1 className="text-2xl font-semibold">Spoken</h1>
       <p className="text-muted-foreground mt-2 mb-8 max-w-2xl text-sm">
         Voiced dialogue, lore and text for World of Warcraft Classic. Browse and play every

@@ -63,7 +63,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   }));
 
   return (
-    <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
       <h1 className="text-xl font-semibold">Profile</h1>
 
       <dl className="mt-4 mb-8 grid max-w-md grid-cols-[6rem_1fr] gap-y-1 text-sm">

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Sign in · Spoken" };
 
 export default function Page() {
   return (
-    <main className="mx-auto max-w-4xl px-5 pt-6 pb-36">
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
       <AuthForm mode="login" />
     </main>
   );

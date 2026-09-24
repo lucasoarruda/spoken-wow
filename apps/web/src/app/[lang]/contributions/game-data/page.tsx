@@ -28,7 +28,7 @@ export default async function Page() {
   const pending = await listUnconfirmed("creature");
 
   return (
-    <main className="mx-auto max-w-5xl px-5 pt-6 pb-24">
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-24">
       <h1 className="text-xl font-semibold">Game data</h1>
       <p className="text-muted-foreground mt-1 mb-6 text-sm">
         Resolve NPCs from what a game client knows about them: the appearance its server sends,

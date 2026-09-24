@@ -40,7 +40,7 @@ export default async function ReportPage({
 
   if (!target) {
     return (
-      <main className="mx-auto max-w-3xl px-5 pt-6 pb-24">
+      <main className="mx-auto max-w-6xl px-5 pt-6 pb-24">
         <h1 className="text-xl font-semibold">Report a voice line</h1>
         <p className="text-muted-foreground mt-1 mb-5 text-sm">
           That address is not one this site understands, but you can still tell us about it.
@@ -67,7 +67,7 @@ export default async function ReportPage({
   const version = line ? await liveVersion("quests", audioRelPath(line), lang) : null;
 
   return (
-    <main className="mx-auto max-w-3xl px-5 pt-6 pb-24">
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-24">
       <h1 className="text-xl font-semibold">Report a voice line</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
         You came here from the game. Tell us what sounded wrong and someone will listen to it.

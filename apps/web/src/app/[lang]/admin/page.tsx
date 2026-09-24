@@ -72,7 +72,7 @@ export default async function Page({
     : [{ users: [], total: 0 }, await listGrants(administered), null, null];
 
   return (
-    <main className={`mx-auto px-5 pt-6 pb-36 ${global ? "max-w-5xl" : "max-w-4xl"}`}>
+    <main className="mx-auto max-w-6xl px-5 pt-6 pb-36">
       <h1 className="text-xl font-semibold">Users</h1>
       <p className="text-muted-foreground mt-1 mb-5 text-sm">
         {global ? (
