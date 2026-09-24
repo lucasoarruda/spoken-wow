@@ -3,10 +3,12 @@ import "../globals.css";
 import { Geist } from "next/font/google";
 import Image from "next/image";
 import Script from "next/script";
+import { Suspense } from "react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { GrantsProvider } from "@/components/GrantsProvider";
 import { LangProvider } from "@/components/LangProvider";
 import Link from "@/components/LocaleLink";
+import NavigationProgress from "@/components/NavigationProgress";
 import UserMenu from "@/components/UserMenu";
 import { langTag } from "@/lib/lang";
 import { pageLang } from "@/lib/lang-server";
@@ -46,6 +48,11 @@ export default async function RootLayout({
     // palette is untested. The shadcn tokens make flipping it a one-line change.
     <html lang={langTag(lang)} className={cn("dark font-sans", geist.variable)}>
       <body>
+        {/* Suspense because it reads the search params, which would otherwise hold the
+            whole page to client rendering. */}
+        <Suspense>
+          <NavigationProgress />
+        </Suspense>
         <LangProvider lang={lang}>
           <GrantsProvider>
             <header className="border-b">
