@@ -537,6 +537,41 @@ describe("a fish.audio batch", () => {
   });
 });
 
+describe("a settings read that fails", () => {
+  it("fails that job and keeps the worker running, rather than rejecting unawaited", async () => {
+    const batch = await seed(2);
+    let calls = 0;
+    const worker = startWorker(() => true, {
+      apiKeyFor: async () => "eleven-key",
+      preferenceFor: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("connection terminated");
+        return {
+          elevenlabs: {
+            modelId: "eleven_v3",
+            voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0, use_speaker_boost: true },
+            seedStrategy: "npc",
+          },
+          fish: { model: "s2.1-pro", temperature: 0.7, topP: 0.7, speed: 1 },
+        };
+      },
+      budget: async () => 1,
+      regenerate: { quests: async () => OK },
+    });
+    await until(async () => {
+      const states = await statesOf(batch);
+      return states.failed === 1 && states.done === 1;
+    });
+    await worker.stop();
+
+    const { rows } = await db().query<{ error: string }>(
+      `select "error" from "regeneration_job" where "batchId" = $1 and "state" = 'failed'`,
+      [batch],
+    );
+    expect(rows[0].error).toMatch(/connection terminated/);
+  });
+});
+
 describe("an ElevenLabs batch", () => {
   it("is spoken with the owner's own ElevenLabs settings", async () => {
     const batch = await seed(1);

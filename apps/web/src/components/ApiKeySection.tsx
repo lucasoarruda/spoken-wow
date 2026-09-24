@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,9 @@ export default function ApiKeySection({
   provider?: Provider;
 }) {
   const copy = COPY[provider];
+  // Re-rendered from the server after a save or a removal, because other sections of the page
+  // depend on which keys exist: the generator choice offers fish.audio only once it has one.
+  const router = useRouter();
   const [status, setStatus] = useState(initial);
   const [entry, setEntry] = useState("");
   // Replacing is a separate state from having none, so a set key cannot be overwritten by a
@@ -64,6 +68,7 @@ export default function ApiKeySection({
       setStatus(body.status);
       setEntry("");
       setReplacing(false);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -79,6 +84,7 @@ export default function ApiKeySection({
       if (!response.ok) throw new Error("could not remove that key");
       setStatus(null);
       setReplacing(false);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

@@ -82,6 +82,15 @@ export async function readReference(voice: string, lang: Lang): Promise<Referenc
 const LIST_TTL_MS = 60_000;
 const lists = new Map<Lang, { at: number; value: Promise<Map<string, Reference>> }>();
 
+/**
+ * Drop a language's memoised list, so the next line reads the references afresh. For a
+ * speaker that met a hash the list no longer matches: the edit may have been made in the
+ * other app process, whose own writes clear only its own memo.
+ */
+export function forgetReferences(lang: Lang): void {
+  lists.delete(lang);
+}
+
 export function listReferences(lang: Lang): Promise<Map<string, Reference>> {
   const cached = lists.get(lang);
   if (cached && Date.now() - cached.at < LIST_TTL_MS) return cached.value;
@@ -108,30 +117,46 @@ const clips = new Map<string, { audio: Buffer; text: string }>();
  * record, so a reference re-cut between the two must fail the request rather than send
  * different audio from what the take claims.
  */
-export async function loadReferences(
-  lang: Lang,
-  hashes: string[],
-): Promise<Map<string, { audio: Buffer; text: string }>> {
+export type LoadedReferences = {
+  clips: Map<string, { audio: Buffer; text: string }>;
+  /** Slots whose row is current but whose cut clip is not on disk: a lost directory. */
+  lost: string[];
+};
+
+export async function loadReferences(lang: Lang, hashes: string[]): Promise<LoadedReferences> {
   const { rows } = await db().query<{ voice: string; transcript: string; clipHash: string }>(
     `select "voice", "transcript", "clipHash" from "fish_reference"
       where "lang" = $1 and "clipHash" = any($2::text[])`,
     [lang, hashes],
   );
+  type Outcome = { hash: string; clip: { audio: Buffer; text: string } } | { lost: string } | null;
   const loaded = await Promise.all(
-    rows.map(async (row) => {
+    rows.map(async (row): Promise<Outcome> => {
       const cached = clips.get(row.clipHash);
-      if (cached) return [row.clipHash, cached] as const;
+      if (cached) return { hash: row.clipHash, clip: cached };
+      const audio = await fs
+        .readFile(referencePath(row.voice, lang))
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return null;
+          throw error;
+        });
+      if (!audio) return { lost: row.voice };
       // Checked against the hash before it is kept: the file is written before the row, so
       // a re-cut in progress can leave new audio beside an old row for a moment, and that
       // must fail the line rather than be sent under the old hash.
-      const audio = await fs.readFile(referencePath(row.voice, lang));
       if (clipHash(audio, row.transcript) !== row.clipHash) return null;
       const clip = { audio, text: row.transcript };
       clips.set(row.clipHash, clip);
-      return [row.clipHash, clip] as const;
+      return { hash: row.clipHash, clip };
     }),
   );
-  return new Map(loaded.filter((entry) => entry !== null));
+  const result: LoadedReferences = { clips: new Map(), lost: [] };
+  for (const entry of loaded) {
+    if (!entry) continue;
+    if ("clip" in entry) result.clips.set(entry.hash, entry.clip);
+    else result.lost.push(entry.lost);
+  }
+  return result;
 }
 
 /**

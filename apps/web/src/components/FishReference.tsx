@@ -40,7 +40,11 @@ type Props = {
 export default function FishReference({ voice, samples, initial, onChange }: Props) {
   const lang = useLang();
   const [reference, setReference] = useState(initial);
-  const [sample, setSample] = useState(initial?.sample ?? samples[0]?.file ?? "");
+  const [chosen, setChosen] = useState(initial?.sample ?? "");
+  // Worked out each render, because the clips above can be added or deleted while this panel
+  // is open: a choice that no longer exists falls back to the first clip, rather than
+  // leaving the button disabled or posting a file that is gone.
+  const sample = samples.some((clip) => clip.file === chosen) ? chosen : (samples[0]?.file ?? "");
   const [start, setStart] = useState(String(initial?.startSec ?? 0));
   const [length, setLength] = useState(
     String(initial ? initial.endSec - initial.startSec : DEFAULT_SECONDS),
@@ -129,7 +133,7 @@ export default function FishReference({ voice, samples, initial, onChange }: Pro
             <select
               id={`${voice}-reference-clip`}
               value={sample}
-              onChange={(event) => setSample(event.target.value)}
+              onChange={(event) => setChosen(event.target.value)}
               className="border-input bg-background h-8 max-w-64 rounded-md border px-2 text-xs"
             >
               {samples.map((clip) => (

@@ -167,7 +167,8 @@ describe.skipIf(!hasFfmpeg)("a reference", () => {
 
   it("is loaded by the hash a speaker handed out, and by no other", async () => {
     const current = (await references.readReference(VOICE, LANG))!;
-    const loaded = await references.loadReferences(LANG, [current.clipHash, "stale"]);
+    const { clips: loaded, lost } = await references.loadReferences(LANG, [current.clipHash, "stale"]);
+    expect(lost).toEqual([]);
     expect([...loaded.keys()]).toEqual([current.clipHash]);
     expect(loaded.get(current.clipHash)?.text).toBe("Well met, stranger.");
   });
@@ -203,16 +204,48 @@ describe.skipIf(!hasFfmpeg)("fish.audio as a speaker", () => {
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
-  it("refuses a hash whose reference was re-cut in the meantime", async () => {
+  it("fails one line, not the batch, for a hash re-cut in the meantime, and sends nothing", async () => {
     const fetchImpl = vi.fn();
     const speaker = fishSpeaker({
       apiKey: "k",
       fetchImpl: fetchImpl as unknown as typeof globalThis.fetch,
       settings: SETTINGS,
     });
-    const spoken = await speaker.speak({ turns: [{ text: "x", voiceId: "stale" }], lang: LANG, seed: null, dialogue: false });
-    expect(spoken.ok || spoken.failure.kind).toBe("voice-missing");
+    const spoken = await speaker.speak({
+      turns: [{ text: "x", voiceId: "stale" }],
+      lang: LANG,
+      seed: null,
+      dialogue: false,
+    });
+    expect(spoken.ok || [spoken.failure.kind, spoken.failure.fatal]).toEqual(["upstream", false]);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("stops the batch, naming the slot, when a current reference's clip is gone from disk", async () => {
+    const fetchImpl = vi.fn();
+    const speaker = fishSpeaker({
+      apiKey: "k",
+      fetchImpl: fetchImpl as unknown as typeof globalThis.fetch,
+      settings: SETTINGS,
+    });
+    // A new transcript is a new hash, which no earlier case has read into the cache.
+    const current = (await references.saveTranscript(VOICE, LANG, "Well met, again.", USER))!;
+    const file = references.referencePath(VOICE, LANG);
+    const kept = fs.readFileSync(file);
+    fs.rmSync(file);
+    try {
+      const spoken = await speaker.speak({
+        turns: [{ text: "x", voiceId: current.clipHash }],
+        lang: LANG,
+        seed: null,
+        dialogue: false,
+      });
+      expect(spoken.ok || [spoken.failure.kind, spoken.failure.fatal]).toEqual(["voice-missing", true]);
+      expect(spoken.ok || spoken.failure.message).toContain(`"${VOICE}"`);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      fs.writeFileSync(file, kept);
+    }
   });
 
   it("is gone once deleted, file and all", async () => {

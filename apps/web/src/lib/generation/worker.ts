@@ -194,7 +194,20 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       return;
     }
     // The owner's own settings, read per job so an edit on /profile applies to later lines.
-    const speaker = speakerFrom(job.provider, apiKey, await preferenceFor(job.createdBy ?? ""));
+    // Caught like the key above: a database that will not answer here is one line's failure,
+    // recorded on the job, never a rejection that nothing awaits.
+    let speaker: Speaker;
+    try {
+      speaker = speakerFrom(job.provider, apiKey, await preferenceFor(job.createdBy ?? ""));
+    } catch (error) {
+      const message = `could not read the settings of the account that started this batch: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      await failJob(job.id, { kind: "upstream", message }).catch((failure: unknown) =>
+        console.error(`regeneration queue: job ${job.id} could not be failed`, failure),
+      );
+      return;
+    }
     last = { key: apiKey, provider: job.provider, model: speaker.modelId };
 
     const generate = generators[job.source];

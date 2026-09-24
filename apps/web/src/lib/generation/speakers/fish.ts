@@ -14,7 +14,7 @@ import crypto from "node:crypto";
 
 import type { Lang } from "@/lib/lang";
 import { fishCost, type FishOptions } from "@/lib/voices/fish";
-import { listReferences, loadReferences } from "@/lib/voices/references";
+import { forgetReferences, listReferences, loadReferences } from "@/lib/voices/references";
 
 import { lexiconStamp, readLexicon } from "../dictionary";
 import { failure } from "../errors";
@@ -72,15 +72,31 @@ export function fishSpeaker(options: FishOptions & { settings: FishSettings }): 
       // One speaker per distinct voice, in order of first appearance: the NPC is speaker 0
       // and the narrator 1, whichever of them opens the line.
       const speakers = [...new Set(turns.map((turn) => turn.voiceId))];
-      const clips = await loadReferences(lang, speakers);
-      if (!speakers.every((hash) => clips.has(hash))) {
-        // voices() handed this hash out moments ago, so the reference was re-cut or removed in
-        // between. Refused rather than spoken from whatever is there now, which would record
-        // a voice id the audio was not made from.
+      const { clips, lost } = await loadReferences(lang, speakers);
+      if (lost.length) {
+        // The row is there and its clip is not: a lost directory, not a race. Every line
+        // that uses the slot will fail the same way, so this one stops the batch, and says
+        // which slot to re-cut.
         return {
           ok: false,
           failure: failure(
             "voice-missing",
+            `the fish.audio reference clip for ${lost.map((voice) => `"${voice}"`).join(" and ")} ` +
+              "is missing on disk; cut it again on /voices",
+          ),
+        };
+      }
+      if (!speakers.every((hash) => clips.has(hash))) {
+        // The hash voices() handed out no longer matches: the reference was re-cut or
+        // corrected since, perhaps in the other app process, whose write did not clear this
+        // one's memo. Refused rather than spoken from whatever is there now, which would
+        // record a voice id the audio was not made from -- but as one line's failure, not the
+        // batch's, and with the memo dropped so the next line resolves the new reference.
+        forgetReferences(lang);
+        return {
+          ok: false,
+          failure: failure(
+            "upstream",
             "a fish.audio reference changed while this line was being generated; try again",
           ),
         };
