@@ -12,7 +12,7 @@
 import { corpus } from "@/lib/quests/catalogue";
 import { hasNarration, NARRATOR_VOICE } from "@/lib/generation/narration";
 
-import { VOICE_NAMES } from "./voices";
+import { isVoice, VOICE_NAMES } from "./voices";
 
 export type VoiceSlot = {
   /** e.g. "orc-male-shady" — the ElevenLabs voice name this project resolves by. */
@@ -78,7 +78,11 @@ export async function slots(): Promise<VoiceSlot[]> {
  * Every route that takes a voice name from the URL goes through this before touching the
  * filesystem or ElevenLabs. Membership of a fixed set, not pattern matching: `../` and an
  * absolute path fail for the same reason `orc-mail` does.
+ *
+ * Asked of the roster directly rather than of slots(): the names are the same, and slots()
+ * costs a corpus stamp query per call, which /voices paid once per slot and once per voice
+ * in the ElevenLabs account, in series.
  */
 export async function isVoiceSlot(name: string): Promise<boolean> {
-  return (await slots()).some((slot) => slot.name === name);
+  return isVoice(name);
 }
