@@ -47,6 +47,25 @@ stub.Advance(2)
 local SpokenEnv = _G.SpokenEnv
 SpokenEnv.Addon.db.profile.Contribute.HideButtons = true
 
+-- The Forever client's gamepad navigation hooks CreateFrame and, when the parent sits inside an
+-- open panel, rebuilds that panel's button groups inside the caller. Called from an addon while
+-- the quest log is open, that taints them, and a gamepad close of the map is then blocked from
+-- HideUIPanel. So nothing this addon builds while the log is open may name a parent at creation.
+local parentedInLog = {}
+local createFrame = _G.CreateFrame
+_G.CreateFrame = function(kind, name, parent, ...)
+    -- The stub's own stand-ins for the client's frames are not the addon's to answer for.
+    local frame = debug.traceback():find("/addons/", 1, true) and parent
+    while frame do
+        if frame == _G.QuestScrollFrame or frame == _G.QuestMapFrame then
+            table.insert(parentedInLog, kind)
+            break
+        end
+        frame = frame.GetParent and frame:GetParent()
+    end
+    return createFrame(kind, name, parent, ...)
+end
+
 -- What the client does when it draws the list.
 QuestLogQuests_Update()
 
@@ -159,6 +178,9 @@ Expect("the details button offers Contribute for a quest with no line", detailsB
 Expect("...lit", detailsButton:IsEnabled(), true)
 QuestMapFrame_ShowQuestDetails(748)
 Expect("...and says Play again for a quest with one", detailsButton:GetText(), "Play")
+
+_G.CreateFrame = createFrame
+Expect("no frame was created with a parent inside the open quest log", #parentedInLog, 0)
 
 if failures > 0 then
     print(string.format("\n%d check(s) failed", failures))

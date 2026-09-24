@@ -100,6 +100,21 @@ function Utils:GetQuestLogTitleCheck(index)
     return _G["QuestLogTitle" .. index .. "Check"]
 end
 
+--- A frame created with no parent and only then moved under `parent`.
+---
+--- The WoW Forever client's gamepad navigation hooks CreateFrame: when the new frame's parent
+--- sits inside an open panel, such as the world map and its quest log, it rebuilds that panel's
+--- button groups there and then, inside the caller's execution. Called from an addon, that
+--- taints the groups, and the next gamepad close of the panel is blocked from HideUIPanel,
+--- which shows the "blocked from an action" dialog, whose own buttons are blocked the same way,
+--- over and over until the client hangs. SetParent is not hooked.
+---@return Frame frame
+function Utils:CreateDetachedFrame(frameType, name, parent, template)
+    local frame = CreateFrame(frameType, name, nil, template)
+    frame:SetParent(parent)
+    return frame
+end
+
 --- Returns the provided text enclosed in the provided color tag.
 ---@param text string
 ---@param color string Color tag in "|cAARRGGBB" format

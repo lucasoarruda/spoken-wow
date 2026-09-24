@@ -26,7 +26,8 @@ end
 --- quest details view keeps a single one it rebinds to whichever quest it is showing.
 ---@return QuestPlayButton playButton
 function QuestOverlayUI:MakePlayButton(parent)
-    local playButton = CreateFrame("Button", nil, parent or self:GetPlayButtonParent())
+    -- Detached, because this runs while the quest log is open (Utils:CreateDetachedFrame).
+    local playButton = Utils:CreateDetachedFrame("Button", nil, parent or self:GetPlayButtonParent())
     playButton:SetWidth(20)
     playButton:SetHeight(20)
     playButton:SetHitRectInsets(2, 2, 2, 2)
@@ -62,7 +63,7 @@ function QuestOverlayUI:ContributeButtonFor(questID, title)
     end
     local button = self.questContributeButtons[questID]
     if not button then
-        button = CreateFrame("Button", nil, self:GetPlayButtonParent())
+        button = Utils:CreateDetachedFrame("Button", nil, self:GetPlayButtonParent())
         button:SetWidth(20)
         button:SetHeight(20)
         button:SetHitRectInsets(2, 2, 2, 2)
