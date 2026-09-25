@@ -22,7 +22,7 @@ export function activeFilterCount(filters: LineFilters): number {
   return [
     query,
     query && filters.filter && filters.filter !== "any" ? filters.filter : undefined,
-    filters.missingOnly || undefined,
+    filters.state,
     filters.race,
     filters.gender,
     filters.flavor,
@@ -33,7 +33,6 @@ export function activeFilterCount(filters: LineFilters): number {
     filters.line,
     filters.overridden || undefined,
     filters.ignored || undefined,
-    filters.outdated || undefined,
     filters.dirty || undefined,
     filters.reports,
     filters.generatedBefore,

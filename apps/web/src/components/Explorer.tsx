@@ -18,6 +18,7 @@ import RegenerationPanel from "./RegenerationPanel";
 import SearchBar from "./SearchBar";
 import { Loading, Refreshing } from "@/components/Loading";
 import { Button } from "@/components/ui/button";
+import { audioStateFromParams } from "@/lib/audio-state";
 import { useSession } from "@/lib/auth-client";
 import type { Facets } from "@/lib/facets";
 import { NARRATOR_VOICE } from "@/lib/generation/narration";
@@ -59,7 +60,7 @@ function filterParams(filters: LineFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
   if (filters.filter && filters.filter !== "any") params.set("filter", filters.filter);
-  if (filters.missingOnly) params.set("missing", "1");
+  if (filters.state) params.set("state", filters.state);
   if (filters.race) params.set("race", filters.race);
   if (filters.gender) params.set("gender", filters.gender);
   if (filters.flavor) params.set("flavor", filters.flavor);
@@ -71,7 +72,6 @@ function filterParams(filters: LineFilters): URLSearchParams {
   if (filters.line) params.set("line", filters.line);
   if (filters.overridden) params.set("overridden", "1");
   if (filters.ignored) params.set("ignored", "1");
-  if (filters.outdated) params.set("outdated", "1");
   if (filters.dirty) params.set("dirty", "1");
   if (filters.reports) params.set("fb", filters.reports);
   if (filters.generatedBefore) params.set("before", filters.generatedBefore);
@@ -107,7 +107,7 @@ export default function Explorer({ facets }: { facets: Facets }) {
     () => ({
       q: urlQuery,
       filter: (params.get("filter") as Filter) ?? "any",
-      missingOnly: params.get("missing") === "1",
+      state: audioStateFromParams(params),
       race: params.get("race") ?? undefined,
       gender: params.get("gender") ?? undefined,
       flavor: params.get("flavor") ?? undefined,
@@ -119,7 +119,6 @@ export default function Explorer({ facets }: { facets: Facets }) {
       line: params.get("line") ?? undefined,
       overridden: params.get("overridden") === "1",
       ignored: params.get("ignored") === "1",
-      outdated: params.get("outdated") === "1",
       dirty: params.get("dirty") === "1",
       reports: params.get("fb") === "open" ? "open" : undefined,
       generatedBefore: params.get("before") ?? undefined,
@@ -265,7 +264,9 @@ export default function Explorer({ facets }: { facets: Facets }) {
     (next: Partial<LineFilters>) => {
       updateUrl({
         ...("filter" in next ? { filter: next.filter === "any" ? undefined : next.filter } : {}),
-        ...("missingOnly" in next ? { missing: next.missingOnly ? "1" : undefined } : {}),
+        // The two keys quests used before `state` are dropped whenever it is written, or an
+        // old link's ?missing=1 would outlive the choice that replaced it.
+        ...("state" in next ? { state: next.state, missing: undefined, outdated: undefined } : {}),
         ...("race" in next ? { race: next.race } : {}),
         ...("gender" in next ? { gender: next.gender } : {}),
         ...("flavor" in next ? { flavor: next.flavor } : {}),
@@ -278,7 +279,6 @@ export default function Explorer({ facets }: { facets: Facets }) {
           : {}),
         ...("line" in next ? { line: next.line } : {}),
         ...("overridden" in next ? { overridden: next.overridden ? "1" : undefined } : {}),
-        ...("outdated" in next ? { outdated: next.outdated ? "1" : undefined } : {}),
         ...("dirty" in next ? { dirty: next.dirty ? "1" : undefined } : {}),
         ...("reports" in next ? { fb: next.reports } : {}),
         ...("ignored" in next ? { ignored: next.ignored ? "1" : undefined } : {}),

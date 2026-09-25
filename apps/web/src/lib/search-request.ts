@@ -9,6 +9,7 @@
  * a hand-edited URL, and answering it with the unfiltered corpus is both safe and more
  * useful than a 400.
  */
+import { audioStateFromParams } from "./audio-state";
 import { facets } from "./facets";
 import { NPC_TYPES, SOURCES } from "./line-fields";
 import type { Filter, LineFilters } from "./search";
@@ -29,7 +30,7 @@ export async function filtersFromParams(params: URLSearchParams): Promise<LineFi
   return {
     q: params.get("q") ?? "",
     filter: oneOf(params.get("filter"), FILTERS) ?? "any",
-    missingOnly: params.get("missing") === "1",
+    state: audioStateFromParams(params),
     race: oneOf(params.get("race"), races),
     gender: oneOf(params.get("gender"), genders),
     flavor: oneOf(params.get("flavor"), flavors),
@@ -45,7 +46,6 @@ export async function filtersFromParams(params: URLSearchParams): Promise<LineFi
     // Absent means hidden, like progress text: the useful default view is the corpus minus
     // the lines nobody will ever voice.
     ignored: params.get("ignored") === "1",
-    outdated: params.get("outdated") === "1",
     dirty: params.get("dirty") === "1",
     reports: oneOf(params.get("fb"), ["open"] as const),
     // Kept as the raw day. dayStart is what decides whether it is a date, so there is one
@@ -57,7 +57,7 @@ export async function filtersFromParams(params: URLSearchParams): Promise<LineFi
 
 /** Whether staleness has to be answered for the whole corpus, which is a query and a hash per take. */
 export function needsStale(filters: LineFilters): boolean {
-  return Boolean(filters.outdated);
+  return filters.state === "stale" || filters.state === "current";
 }
 
 /** The same question for pronunciation: one query plus a substring pass per changed word. */
