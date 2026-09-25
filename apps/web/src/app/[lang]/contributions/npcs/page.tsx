@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import ContributionsTabs from "@/components/ContributionsTabs";
 import NpcEditor from "@/components/NpcEditor";
 import { auth } from "@/lib/auth";
-import { npcSummaryFrom } from "@/lib/contributions/triage";
+import { summaryFromResolution } from "@/lib/contributions/speaker";
 import { facets } from "@/lib/facets";
 import { viewerOf } from "@/lib/grants/store";
 import { BASE_LANG } from "@/lib/lang";
@@ -31,12 +31,8 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !can(await viewerOf(session), "regenerate", BASE_LANG)) notFound();
 
-  const resolutions = await listResolutions();
-  const npcs = await Promise.all(
-    resolutions.map((row) =>
-      npcSummaryFrom({ npcKind: row.npcKind, npcId: row.npcId, npcName: row.npcName }, row),
-    ),
-  );
+  const { flavorScopes } = await facets();
+  const npcs = (await listResolutions()).map((row) => summaryFromResolution(row, flavorScopes));
 
   return (
     <main className="mx-auto max-w-6xl px-5 pt-6 pb-24">
@@ -46,7 +42,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
         line that NPC speaks.
       </p>
       <ContributionsTabs lang={lang} active="npcs" showNpcs />
-      <NpcEditor initial={npcs} flavorScopes={(await facets()).flavorScopes} />
+      <NpcEditor initial={npcs} flavorScopes={flavorScopes} />
     </main>
   );
 }

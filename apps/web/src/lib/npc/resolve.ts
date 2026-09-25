@@ -15,6 +15,7 @@
 import { defaultFlavorFor, npcVoiceFromCorpus } from "@/lib/quests/catalogue";
 
 import { raceForModel } from "./models";
+import { INT32_MAX } from "./npc";
 import { getResolution, NPC_KINDS, upsertResolution, type NpcKind, type NpcResolution } from "./store";
 
 // The three integer columns npc_resolution and contribution both ultimately feed from an
@@ -22,8 +23,8 @@ import { getResolution, NPC_KINDS, upsertResolution, type NpcKind, type NpcResol
 // as checkEnvelope is concerned, but Postgres's `integer` tops out at 2147483647, and a value
 // past that 500s every reader of the row (the triage page's Promise.all, the export's
 // unnest($::int[])) rather than merely failing to resolve. Bounding it here, at the one place
-// both consumers get npcId/modelFileId/sex from, means neither has to know this rule exists.
-const INT32_MAX = 2147483647;
+// both consumers get npcId/modelFileId/sex from (digits() below), means neither has to know
+// this rule exists.
 
 export type Observed = {
   npcKind: NpcKind | null;

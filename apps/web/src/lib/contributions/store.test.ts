@@ -171,8 +171,9 @@ describe("setContributionNpc", () => {
   it("names the NPC of an envelope that named none", async () => {
     await createContribution(submission({ meta: {} }));
     const [row] = ours(await listContributions("new"));
-    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" })).toEqual({
-      build: "1.12.1/5875",
+    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" })).toMatchObject({
+      npcId: 240,
+      npcName: "Marshal Dughan",
     });
     const [after] = ours(await listContributions("new"));
     expect(after.meta).toEqual({});

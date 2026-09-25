@@ -10,6 +10,7 @@
  */
 import type { ClientFamily } from "./client";
 import type { ContributionStatus } from "./contributions";
+import type { EnvelopeSource } from "./envelope";
 import type { Provenance } from "../npc/npc";
 
 /**
@@ -98,7 +99,7 @@ export function contributionsHref(current: ContributionFilters, next: FilterChan
  * `undefined` (a row with no npc at all) matches MISSING when it is a quests row, and no other
  * real filter.
  */
-export function matchesSpeaker(provenance: Provenance | undefined, filter: SpeakerFilter, source: string): boolean {
+export function matchesSpeaker(provenance: Provenance | undefined, filter: SpeakerFilter, source: EnvelopeSource): boolean {
   if (filter === "all") return true;
   if (filter === MISSING) return provenance === undefined && source === "quests";
   if (provenance === undefined) return false;

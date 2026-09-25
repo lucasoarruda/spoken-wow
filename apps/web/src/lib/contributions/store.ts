@@ -63,20 +63,20 @@ export function observationMeta(
 }
 
 /**
- * Record which NPC speaks a contribution whose envelope named none. A no-op, returning null, for
- * a row whose envelope already named one: that is the client's own observation and stands.
- * Returns the row's build, which the caller resolves the NPC against.
+ * Record which NPC speaks a quest contribution whose envelope named none. A no-op, returning
+ * null, for a row whose envelope already named one -- the client's own observation stands -- and
+ * for a zones or books row, which never has an NPC to name. Returns the updated row.
  */
 export async function setContributionNpc(
   id: number,
   npc: { npcKind: NpcKind; npcId: number; npcName: string },
-): Promise<{ build: string } | null> {
-  const { rows } = await db().query<{ build: string }>(
+): Promise<Contribution | null> {
+  const { rows } = await db().query<Contribution>(
     `update "contribution"
         set "npcKind" = case when coalesce("meta"->>'kind', '') = '' then $2 else "npcKind" end,
             "npcId" = $3, "npcName" = $4, "updatedAt" = now()
-      where "id" = $1 and coalesce("meta"->>'npc', '') = ''
-      returning "build"`,
+      where "id" = $1 and "source" = 'quests' and coalesce("meta"->>'npc', '') = ''
+      returning ${COLUMNS}`,
     [id, npc.npcKind, npc.npcId, npc.npcName],
   );
   return rows[0] ?? null;

@@ -6,11 +6,12 @@
  * npc_resolution beyond what is rendered crosses into the client.
  */
 import { SearchIcon } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useLang } from "@/components/LangProvider";
-import SpeakerCell, { summaryFromResolution, type FlavorScope, type SpeakerAnswer } from "@/components/SpeakerCell";
+import SpeakerCell, { type SpeakerAnswer } from "@/components/SpeakerCell";
 import { Input } from "@/components/ui/input";
+import { summaryFromResolution, type FlavorScope } from "@/lib/contributions/speaker";
 import type { NpcSummary } from "@/lib/contributions/triage";
 import { localeHref } from "@/lib/lang";
 import type { NpcKind } from "@/lib/npc/npc";
@@ -58,13 +59,16 @@ export default function NpcEditor({
     [flavorScopes],
   );
 
-  const needle = query.trim().toLowerCase();
-  const rows = initial
-    .map((npc) => saved[key(npc.npcKind, npc.npcId)] ?? npc)
-    .filter(
-      (npc) =>
-        !needle || String(npc.npcId).includes(needle) || (npc.npcName ?? "").toLowerCase().includes(needle),
-    );
+  // Not rebuilt when only `busy` or `failed` changes.
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return initial
+      .map((npc) => saved[key(npc.npcKind, npc.npcId)] ?? npc)
+      .filter(
+        (npc) =>
+          !needle || String(npc.npcId).includes(needle) || (npc.npcName ?? "").toLowerCase().includes(needle),
+      );
+  }, [initial, saved, query]);
 
   return (
     <>

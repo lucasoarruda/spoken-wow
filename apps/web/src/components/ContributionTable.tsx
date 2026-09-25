@@ -22,16 +22,18 @@
  */
 import { useLang } from "@/components/LangProvider";
 import { localeHref } from "@/lib/lang";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import FilterChip, { type ChipOption } from "@/components/FilterChip";
-import SpeakerCell, { ProvenanceBadge, summaryFromResolution, type FlavorScope } from "@/components/SpeakerCell";
+import SpeakerCell, { ProvenanceBadge, type SpeakerAnswer } from "@/components/SpeakerCell";
 import { Refreshing } from "@/components/Loading";
 import { usePendingPush } from "@/components/usePendingPush";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ContributionStatus } from "@/lib/contributions/contributions";
 import { CLIENT_FAMILIES, CLIENT_FAMILY_LABELS, type ClientSummary } from "@/lib/contributions/client";
+import { flavorOptionsFor, summaryFromResolution, type FlavorScope } from "@/lib/contributions/speaker";
 import { contributionsHref, MISSING, NEEDS_DECISION, type ClientFilter, type SpeakerFilter } from "@/lib/contributions/query";
 import type { Contribution } from "@/lib/contributions/store";
 // Both are computed server-side (npcSummaryFrom pulls in corpus.ts's flavorsFor) -- `import
@@ -140,6 +142,7 @@ export default function ContributionTable({
   canAnswerNpc: boolean;
 }) {
   const { pending, push } = usePendingPush();
+  const router = useRouter();
   const lang = useLang();
 
   /**
@@ -178,7 +181,7 @@ export default function ContributionTable({
       // row (npc.npcKind === null): the moderator's own select is the only source for it then,
       // since there is no existing row (or envelope) to fall back on the way race/gender/flavor
       // can.
-      answer: Partial<{ npcKind: NpcKind; race: string; gender: string; flavor: string }>,
+      answer: SpeakerAnswer,
     ) => {
       setNpcBusy(contributionId);
       const response = await fetch("/api/contributions/npc", {
@@ -223,7 +226,7 @@ export default function ContributionTable({
       const ok = await recordKind(contributionId, option.npcKind);
       setNpcBusy(null);
       if (!ok) {
-        setRefusals((current) => ({ ...current, [contributionId]: "That didn't go through -- try again." }));
+        setRefusals(withRefusal(contributionId));
         return;
       }
       setNpcOverrides((current) => ({
@@ -236,12 +239,7 @@ export default function ContributionTable({
           flavor: option.flavor,
           provenance: option.provenance,
           confirmed: option.provenance === "corpus" || option.provenance === "moderator",
-          flavorOptions:
-            option.race && option.gender
-              ? flavorScopes
-                  .filter((scope) => scope.race === option.race && scope.gender === option.gender)
-                  .map((scope) => scope.flavor)
-              : [],
+          flavorOptions: flavorOptionsFor(option.race, option.gender, flavorScopes),
           conflict: [],
         },
       }));
@@ -251,12 +249,12 @@ export default function ContributionTable({
 
   /**
    * A quest row whose envelope named no NPC, given one by hand (api/contributions/npc-identity).
-   * Shown under the contribution's own key: until the next render there is only this row that
-   * knows the NPC, and resolveNpc's answer (if the corpus or an earlier row had one) comes back
-   * with it. The error, when there is one, is the route's own words.
+   * Shown under the contribution's own key, with resolveNpc's answer for it. When resolving
+   * failed the answer is still recorded, and a refresh is what resolves it (page.tsx's npcFor).
+   * The error, when there is one, is the route's own words.
    */
   const nameNpc = useCallback(
-    async (contributionId: number, answer: { npcKind: NpcKind; npcId: string; npcName: string }) => {
+    async (contributionId: number, answer: { npcKind: NpcKind; npcId: number; npcName: string }) => {
       setNpcBusy(contributionId);
       const response = await fetch("/api/contributions/npc-identity", {
         method: "POST",
@@ -266,38 +264,21 @@ export default function ContributionTable({
       setNpcBusy(null);
 
       const body = (await response?.json().catch(() => null)) as
-        | { resolution?: NpcResolution | null; error?: string }
+        | { resolution?: NpcResolution | null; error?: unknown }
         | null;
       if (!response?.ok) {
-        setRefusals((current) => ({
-          ...current,
-          [contributionId]: typeof body?.error === "string" ? body.error : "That didn't go through -- try again.",
-        }));
+        setRefusals(withRefusal(contributionId, body?.error));
         return;
       }
-      setRefusals((current) => {
-        if (!(contributionId in current)) return current;
-        const { [contributionId]: _dropped, ...rest } = current;
-        return rest;
-      });
-      const summary: NpcSummary = body?.resolution
-        ? summaryFromResolution(body.resolution, flavorScopes)
-        : {
-            // Resolving failed; the answer itself is recorded and the next render resolves it.
-            npcKind: answer.npcKind,
-            npcId: Number(answer.npcId),
-            npcName: answer.npcName.trim(),
-            race: null,
-            gender: null,
-            flavor: null,
-            provenance: "none",
-            confirmed: false,
-            flavorOptions: [],
-            conflict: [],
-          };
+      setRefusals(withoutRefusal(contributionId));
+      if (!body?.resolution) {
+        router.refresh();
+        return;
+      }
+      const summary = summaryFromResolution(body.resolution, flavorScopes);
       setNpcOverrides((current) => ({ ...current, [contributionKey(contributionId)]: summary }));
     },
-    [flavorScopes],
+    [flavorScopes, router],
   );
 
   const resolve = useCallback(async (id: number, next: ContributionStatus) => {
@@ -313,17 +294,10 @@ export default function ContributionTable({
       // The route already gives a plain-words reason for needs-speaker and one-way (accept.ts);
       // anything else (bad status, unknown row) degrades the same way this always has.
       const body = await response?.json().catch(() => null);
-      setRefusals((current) => ({
-        ...current,
-        [id]: typeof body?.error === "string" ? body.error : "That didn't go through -- try again.",
-      }));
+      setRefusals(withRefusal(id, body?.error));
       return;
     }
-    setRefusals((current) => {
-      if (!(id in current)) return current;
-      const { [id]: _dropped, ...rest } = current;
-      return rest;
-    });
+    setRefusals(withoutRefusal(id));
     setResolved((current) => ({ ...current, [id]: next }));
     // "Add to explorer" is the same POST as Accept, re-sent for a row already accepted -- this
     // is what hides the button once it has worked, without waiting for a reload.
@@ -626,6 +600,23 @@ export default function ContributionTable({
   );
 }
 
+type Refusals = Record<number, string>;
+
+/** A row's refusal, in the route's own words where it gave some. A setRefusals updater. */
+function withRefusal(id: number, error?: unknown): (current: Refusals) => Refusals {
+  const message = typeof error === "string" ? error : "That didn't go through -- try again.";
+  return (current) => ({ ...current, [id]: message });
+}
+
+/** A row's refusal cleared by the next attempt succeeding. A setRefusals updater. */
+function withoutRefusal(id: number): (current: Refusals) => Refusals {
+  return (current) => {
+    if (!(id in current)) return current;
+    const { [id]: _dropped, ...rest } = current;
+    return rest;
+  };
+}
+
 /** Record a kind-less contribution's NPC kind (api/contributions/kind). True when it landed. */
 async function recordKind(contributionId: number, npcKind: NpcKind): Promise<boolean> {
   const response = await fetch("/api/contributions/kind", {
@@ -645,7 +636,7 @@ function MissingNpcForm({
   onSave,
 }: {
   busy: boolean;
-  onSave: (answer: { npcKind: NpcKind; npcId: string; npcName: string }) => void;
+  onSave: (answer: { npcKind: NpcKind; npcId: number; npcName: string }) => void;
 }) {
   const [npcKind, setNpcKind] = useState<NpcKind>("creature");
   const [npcId, setNpcId] = useState("");
@@ -657,7 +648,7 @@ function MissingNpcForm({
       className="flex flex-wrap items-center gap-1"
       onSubmit={(event) => {
         event.preventDefault();
-        if (valid) onSave({ npcKind, npcId: npcId.trim(), npcName });
+        if (valid) onSave({ npcKind, npcId: Number(npcId.trim()), npcName });
       }}
     >
       <select

@@ -11,16 +11,13 @@
  * why this is gated as ../kind is -- whoever may edit the row's language -- and not as ../npc.
  */
 import { requireCapability } from "@/lib/generation/authz";
-import { contributionLocale, setContributionNpc } from "@/lib/contributions/store";
+import { contributionLocale, observationMeta, setContributionNpc } from "@/lib/contributions/store";
 import { BASE_LANG, isLang } from "@/lib/lang";
-import { NPC_KINDS, type NpcKind } from "@/lib/npc/npc";
-import { resolveNpc } from "@/lib/npc/resolve";
+import { INT32_MAX, NPC_KINDS, type NpcKind } from "@/lib/npc/npc";
+import { observedFrom, resolveNpc } from "@/lib/npc/resolve";
 import type { NpcResolution } from "@/lib/npc/store";
 
 export const dynamic = "force-dynamic";
-
-// An integer column (migrations 0030 and 0048), as ../npc bounds it.
-const INT32_MAX = 2147483647;
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -33,9 +30,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "unknown kind" }, { status: 400 });
   }
   const npcKind = body.npcKind as NpcKind;
-  // A string of digits or a number: the form's input sends whichever the browser gives it.
   // `< 0`, not `<= 0` -- id 0 is a real NPC id (see ../npc).
-  const npcId = typeof body.npcId === "string" && /^\d+$/.test(body.npcId.trim()) ? Number(body.npcId) : body.npcId;
+  const npcId = body.npcId;
   if (typeof npcId !== "number" || !Number.isInteger(npcId) || npcId < 0 || npcId > INT32_MAX) {
     return Response.json({ error: "an NPC id is required" }, { status: 400 });
   }
@@ -49,22 +45,19 @@ export async function POST(request: Request) {
 
   const recorded = await setContributionNpc(id, { npcKind, npcId, npcName });
   if (!recorded) {
-    return Response.json({ error: "no such contribution, or its envelope already names its NPC" }, { status: 409 });
+    return Response.json(
+      { error: "no such quest contribution, or its envelope already names its NPC" },
+      { status: 409 },
+    );
   }
 
   // A failure here must not fail the answer, which is already recorded: the triage page resolves
   // any NPC it finds unresolved on its next render, as it does for an envelope's own.
   let resolution: NpcResolution | null = null;
   try {
-    resolution = await resolveNpc({
-      npcKind,
-      npcId,
-      npcName,
-      modelFileId: null,
-      sex: null,
-      creatureType: null,
-      build: recorded.build || null,
-    });
+    // Read back through observationMeta, as every other reader of the row does, so what gets
+    // resolved is exactly what triage, accept and the export will see.
+    resolution = await resolveNpc(observedFrom(observationMeta(recorded)));
   } catch {
     resolution = null;
   }

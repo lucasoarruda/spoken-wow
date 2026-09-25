@@ -11,46 +11,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 // `import type`: triage.ts is server-only (it pulls in corpus.ts), see ContributionTable.
 import type { NpcSummary } from "@/lib/contributions/triage";
+import { flavorOptionsFor, type FlavorScope } from "@/lib/contributions/speaker";
 import { NPC_KINDS, type NpcKind, type Provenance } from "@/lib/npc/npc";
-import type { NpcResolution } from "@/lib/npc/store";
 import { GENDERS, gendersOf, RACES, type Gender } from "@/lib/voices/voices";
-
-/** A race-gender-flavor triple the corpus actually has, for the "nothing known" state's selects. */
-export type FlavorScope = { race: string; gender: string; flavor: string };
 
 /** What a saved answer posts: see SpeakerCell's own docstring for why every key is optional. */
 export type SpeakerAnswer = Partial<{ npcKind: NpcKind; race: string; gender: string; flavor: string }>;
-
-/**
- * A stored resolution, in the shape SpeakerCell renders. flavorOptions comes from flavorScopes,
- * the client-side copy of what npcSummaryFrom asks the corpus for on the server.
- */
-export function summaryFromResolution(resolution: NpcResolution, flavorScopes: FlavorScope[]): NpcSummary {
-  return {
-    npcKind: resolution.npcKind,
-    npcId: resolution.npcId,
-    npcName: resolution.npcName,
-    race: resolution.race,
-    gender: resolution.gender,
-    flavor: resolution.flavor,
-    provenance: resolution.provenance,
-    confirmed: resolution.confirmed,
-    flavorOptions:
-      resolution.race && resolution.gender
-        ? flavorScopes
-            .filter((scope) => scope.race === resolution.race && scope.gender === resolution.gender)
-            .map((scope) => scope.flavor)
-        : [],
-    conflict: [],
-  };
-}
 
 // A speaker's provenance as a pill: a letter or two, so the answer and its Edit fit on one
 // line, with what it means on hover.
 const PROVENANCE_PILLS: Record<Provenance, { short: string; title: string }> = {
   corpus: { short: "C", title: "Corpus: the game's own data for this NPC" },
   client: { short: "G", title: "Guess: from the model the client reported" },
-  moderator: { short: "M", title: "Moderator: set by hand in triage" },
+  moderator: { short: "M", title: "Moderator: set by hand" },
   none: { short: "?", title: "No race: nothing known about this NPC" },
 };
 
@@ -95,15 +68,12 @@ function speakerNote(npc: NpcSummary): string | null {
 }
 
 /**
- * The voice line of the merged NPC/Speaker column (finding 4), in the three states finding 2
- * asks for -- keyed on `confirmed`, not
- * `provenance` alone, for the reason speakerNote already draws that distinction: `confirmed` is
- * the column resolveNpc and the override route agree means "trust this" (migration 0031 only
- * ever sets it for "corpus" or "moderator"), so a moderator's own settled answer gets the same
- * plain, uncontrolled rendering the corpus's does -- there is nothing left to decide either way,
- * and re-opening one would need a distinct "reopen" affordance this table does not yet have.
+ * Who voices an NPC, in three states keyed on `confirmed`, not `provenance` alone, for the
+ * reason speakerNote already draws that distinction: `confirmed` is the column resolveNpc and
+ * the override route agree means "trust this" (migration 0031 only ever sets it for "corpus" or
+ * "moderator"), so a settled answer renders plainly.
  *
- *   - confirmed (corpus or moderator): plain text, no controls.
+ *   - confirmed: plain text; a moderator's own answer adds an Edit that reopens the form.
  *   - unconfirmed, race and gender known ("client"): race-gender as text, a flavor select
  *     narrowed to flavorsFor(race, gender) -- npc.flavorOptions, computed server-side.
  *   - unconfirmed, nothing known ("none"): race and gender selects from the voiced list
@@ -192,11 +162,11 @@ export default function SpeakerCell({
   const known = npc.provenance === "client";
   // The "nothing known" state's own flavor options: flavorScopes is the whole corpus, so this
   // narrows to whatever race and gender were just picked, the same shape flavorOptions already
-  // is for the "client" state -- there is no npc.flavorOptions to fall back on here because
-  // page.tsx has no row-specific race/gender to have asked flavorsFor about.
+  // is for the "client" state -- npc.flavorOptions answers for the race-gender on file, not
+  // the one being picked.
   const flavorOptions = known
     ? npc.flavorOptions
-    : flavorScopes.filter((scope) => scope.race === race && scope.gender === gender).map((scope) => scope.flavor);
+    : flavorOptionsFor(race, gender, flavorScopes);
 
   return (
     <div className="flex flex-col gap-1 py-1">
@@ -277,7 +247,7 @@ export default function SpeakerCell({
           </select>
         ) : null}
         {/* `none` gets no badge: it is the provenance's own way of saying "we tried and learned
-            nothing", which the form sitting right here already says -- see finding 5. `client`
+            nothing", which the form sitting right here already says. `client`
             still earns one, since "a guess came from somewhere" is real information the form
             alone doesn't carry. */}
         {npc.provenance !== "none" ? (
@@ -299,10 +269,8 @@ export default function SpeakerCell({
                 ? { flavor }
                 : { npcKind: kind || undefined, race, gender, flavor },
             );
-            // Collapses back to the plain, settled view either way -- overrideNpc's own request
-            // is fire-and-forget from here (see its "if (!response?.ok) return" silent no-op,
-            // the same failure handling every other action in this table already has), so a
-            // failed save leaves `npc` exactly as it was and this simply re-shows that answer
+            // Collapses back to the plain, settled view either way: the caller owns the request,
+            // and a failed save leaves `npc` exactly as it was, so this re-shows that answer
             // rather than a form now out of sync with it.
             setEditing(false);
           }}

@@ -17,15 +17,15 @@
  * check is satisfied by "moderator" whether or not the row is confirmed.
  */
 import { requireRegenerate } from "@/lib/generation/authz";
+import { INT32_MAX } from "@/lib/npc/npc";
 import { getResolution, NPC_KINDS, upsertResolution, type NpcKind } from "@/lib/npc/store";
 
 export const dynamic = "force-dynamic";
 
-// An integer column (migration 0030), same as the intake path's npcId -- see resolve.ts's
-// digits() for why an upper bound matters here too: a moderator's own POST is authenticated,
-// but nothing stops a mistyped or pasted id from being just as oversized, and the same
-// out-of-range insert would fail the same way.
-const INT32_MAX = 2147483647;
+// npcId is bounded by INT32_MAX, same as the intake path's -- see resolve.ts's digits() for why
+// an upper bound matters here too: a moderator's own POST is authenticated, but nothing stops a
+// mistyped or pasted id from being just as oversized, and the same out-of-range insert would
+// fail the same way.
 
 export async function POST(request: Request) {
   const { session, denied } = await requireRegenerate();

@@ -20,7 +20,8 @@ vi.mock("@/lib/generation/authz", () => ({
 }));
 
 // The corpus scan is resolve.ts's own business and tested there; this only needs to see it asked.
-vi.mock("@/lib/npc/resolve", () => ({
+vi.mock("@/lib/npc/resolve", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/npc/resolve")>()),
   resolveNpc: async (observed: unknown) => {
     resolved.push(observed);
     return null;
@@ -42,11 +43,11 @@ afterAll(async () => {
   await closeDb();
 });
 
-async function contribution(meta: Record<string, string>): Promise<number> {
+async function contribution(meta: Record<string, string>, source = "quests"): Promise<number> {
   const { rows } = await db().query<{ id: number }>(
     `insert into "contribution" ("source", "key", "locale", "build", "meta", "raw", "dedup", "text", "ip")
-     values ('quests', 'q:1:accept', 'ptBR', '1.15.7/1', $2, 'raw', $3, 'Words.', $1) returning "id"`,
-    [ip, JSON.stringify(meta), `${ip}-${Math.random()}`],
+     values ($4, 'q:1:accept', 'ptBR', '1.15.7/1', $2, 'raw', $3, 'Words.', $1) returning "id"`,
+    [ip, JSON.stringify(meta), `${ip}-${Math.random()}`, source],
   );
   return rows[0].id;
 }
@@ -63,7 +64,7 @@ describe("POST /api/contributions/npc-identity", () => {
   it("records the NPC and resolves it", async () => {
     const id = await contribution({});
     editable.add("ptBR");
-    const response = await POST(post({ id, npcKind: "creature", npcId: "240", npcName: " Marshal Dughan " }));
+    const response = await POST(post({ id, npcKind: "creature", npcId: 240, npcName: " Marshal Dughan " }));
     expect(response.status).toBe(200);
     const { rows } = await db().query(`select "npcKind", "npcId", "npcName" from "contribution" where "id" = $1`, [id]);
     expect(rows[0]).toEqual({ npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" });
@@ -73,7 +74,7 @@ describe("POST /api/contributions/npc-identity", () => {
   it("requires both the id and the name", async () => {
     const id = await contribution({});
     editable.add("ptBR");
-    expect((await POST(post({ id, npcKind: "creature", npcId: "", npcName: "X" }))).status).toBe(400);
+    expect((await POST(post({ id, npcKind: "creature", npcId: "240", npcName: "X" }))).status).toBe(400);
     expect((await POST(post({ id, npcKind: "creature", npcId: 240, npcName: "  " }))).status).toBe(400);
     expect((await POST(post({ id, npcKind: "creature", npcId: -1, npcName: "X" }))).status).toBe(400);
   });
@@ -83,6 +84,12 @@ describe("POST /api/contributions/npc-identity", () => {
     editable.add("ptBR");
     expect((await POST(post({ id, npcKind: "creature", npcId: 240, npcName: "Y" }))).status).toBe(409);
     expect(resolved).toEqual([]);
+  });
+
+  it("leaves a row that is not a quest's alone", async () => {
+    const id = await contribution({}, "zones");
+    editable.add("ptBR");
+    expect((await POST(post({ id, npcKind: "creature", npcId: 240, npcName: "Y" }))).status).toBe(409);
   });
 
   it("refuses somebody who edits another language only", async () => {
