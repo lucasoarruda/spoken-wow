@@ -4,6 +4,13 @@
 //
 //   node scripts/audio/sounds.mjs <quests|zones|books>          (LOCAL_DB names the database)
 //   node scripts/audio/sounds.mjs --list <quests|zones|books>   the archive files it would copy
+//   node scripts/audio/sounds.mjs --lang=esMX zones               another language's pack
+//
+// A language other than English is zones only, the one section that ships a pack per language
+// (addons/SpokenZonesAudio_<lang>, pipelines/zones/tools/lib/locales.mjs sourceFolder). Its
+// takes are archived under <archive>/<lang>/, beside English's rather than among them
+// (historyDirOf in apps/web/src/lib/takes/adapters.ts), so the two cannot overwrite each other
+// in the archive, in a pull or in the folder built here.
 //
 // THE ARCHIVE IS THE ONLY AUDIO THERE IS. Every take is one file there, written once by the
 // site and never changed; which take is live is a flag on its row. So the folder a pack is
@@ -29,6 +36,8 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+const BASE_LANG = "enUS";
+
 const SECTIONS = {
   quests: {
     archive: process.env.SPOKEN_QUESTS_AUDIO_HISTORY ?? join(ROOT, "pipelines/quests/audio-history"),
@@ -50,11 +59,22 @@ const SECTIONS = {
 const args = process.argv.slice(2);
 const list = args.includes("--list");
 const section = args.find((arg) => !arg.startsWith("--"));
-const paths = SECTIONS[section];
-if (!paths) {
-  console.error("usage: sounds.mjs [--list] <quests|zones|books>");
+const lang = args.find((arg) => arg.startsWith("--lang="))?.slice("--lang=".length) || BASE_LANG;
+const english = SECTIONS[section];
+if (!english || !/^[a-z]{2}[A-Z]{2}$/.test(lang)) {
+  console.error("usage: sounds.mjs [--list] [--lang=<code>] <quests|zones|books>");
   process.exit(1);
 }
+if (lang !== BASE_LANG && section !== "zones") {
+  console.error(`${section} has no ${lang} pack to build: only zones ships one per language`);
+  process.exit(1);
+}
+// The archive root stays the section's: a language's takes are a directory inside it, and
+// --list prints paths relative to the root, which is what pull-live.sh hands to rsync.
+const paths = lang === BASE_LANG
+  ? english
+  : { archive: english.archive, out: join(ROOT, `addons/SpokenZonesAudio_${lang}/Sounds`) };
+const prefix = lang === BASE_LANG ? "" : lang;
 const database = process.env.LOCAL_DB;
 if (!database) {
   console.error("LOCAL_DB is not set");
@@ -65,10 +85,10 @@ if (!database) {
 // other two do not; the archive directory is the file without it either way.
 const listing = execFileSync(
   "psql",
-  [database, "-tA", "-F", "\t", "-v", `source=${section}`, "-f", "-"],
+  [database, "-tA", "-F", "\t", "-v", `source=${section}`, "-v", `lang=${lang}`, "-f", "-"],
   {
     input: `select "file", coalesce("archiveFile", '') from "take"
-             where "source" = :'source' and "lang" = 'enUS' and "isCurrent"
+             where "source" = :'source' and "lang" = :'lang' and "isCurrent"
              order by "file"`,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -83,7 +103,7 @@ const live = listing
   .map((row) => {
     const [file, name] = row.split("\t");
     const stem = file.replace(/\.mp3$/, "");
-    return { file, stem, archived: name ? join(stem, name) : "" };
+    return { file, stem, archived: name ? join(prefix, stem, name) : "" };
   });
 
 if (list) {
@@ -137,6 +157,6 @@ if (gone.length) {
 if (missing.length) {
   console.error(`  ${missing.length} live takes are not in this machine's archive, e.g.:`);
   for (const path of missing.slice(0, 5)) console.error(`    ${path}`);
-  console.error(`  Fetch them with:  make ${section}-pull-live`);
+  console.error(`  Fetch them with:  make ${section}-pull-live${lang === BASE_LANG ? "" : ` LOCALE=${lang}`}`);
   process.exit(1);
 }

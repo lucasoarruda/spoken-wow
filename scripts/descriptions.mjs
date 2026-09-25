@@ -145,7 +145,9 @@ function parseFrontmatter(text, file) {
   return { meta, body: text.slice(end + 5).trim() + "\n" };
 }
 
-const REQUIRED = ["curseforge", "wago", "slug", "name", "summary", "categories", "license"];
+// `wago` is not among them: a language's sound pack is on CurseForge alone, since Wago refuses
+// a file its size and the page's `release:` already sends a Wago reader to GitHub instead.
+const REQUIRED = ["curseforge", "slug", "name", "summary", "categories", "license"];
 
 // CurseForge's summary field. Enforced here rather than discovered in the form,
 // where the failure is a truncated sentence nobody re-reads.
@@ -190,7 +192,7 @@ async function loadGroups() {
       // Wago's ids are eight alphanumeric characters and case matters -- QN53yXKB is not
       // qn53yxkb. Checked here because the upload endpoint is /projects/<id>/version: a
       // mistyped id is a 404 in the middle of a release, or worse, somebody else's project.
-      if (!/^[A-Za-z0-9]{8}$/.test(meta.wago)) {
+      if (meta.wago !== undefined && !/^[A-Za-z0-9]{8}$/.test(meta.wago)) {
         throw new Error(
           `${name}/${file}: 'wago' should be the 8-character Wago project id, from the ` +
             `project's page in https://addons.wago.io/developers`,
@@ -317,6 +319,8 @@ async function main() {
     const urls = wagoUrls(all.flatMap((g) => g.pages));
     for (const page of pages) {
       await writeFile(join(OUT_DIR, `${page.meta.slug}.md`), forStore(page.body, "curseforge"));
+      // No Wago project, nothing to paste there.
+      if (page.meta.wago === undefined) continue;
       await writeFile(join(WAGO_OUT_DIR, `${page.meta.slug}.md`), forWago(page.body, urls));
     }
     console.log(
@@ -335,7 +339,8 @@ async function main() {
     for (const group of groups) {
       for (const page of group.pages) {
         console.log(
-          `     ${page.meta.slug} (CurseForge ${page.meta.curseforge}, Wago ${page.meta.wago}): ` +
+          `     ${page.meta.slug} (CurseForge ${page.meta.curseforge}, ` +
+            `${page.meta.wago ? `Wago ${page.meta.wago}` : "not on Wago"}): ` +
             `summary ${page.meta.summary.length}/${SUMMARY_LIMIT} chars`,
         );
       }

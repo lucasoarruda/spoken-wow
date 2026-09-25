@@ -42,6 +42,7 @@ which is why there is one file per project here and not two.
 | `quests/audio-gossip.md` | Spoken Quests Audio: Gossip | 1660202 | XKqA45Ky | `spoken-quests-audio-gossip` |
 | `zones/spoken-zones.md` | Spoken Zones (was ZoneLore) | 1636521 | mNw7b5No | `spoken-zones` |
 | `zones/spoken-zones-audio.md` | Spoken Zones Audio | 1636532 | b6mvD9KP | `spoken-zones-audio` |
+| `zones/spoken-zones-audio-esmx.md` | Spoken Zones Audio: Spanish (AL) | 1711067 | — | `spoken-zones-audio-esmx` |
 | `books/spoken-books.md` | Spoken Books | 1701514 | qGYZnRNg | `spoken-books` |
 | `books/spoken-books-audio.md` | Spoken Books Audio | 1701520 | qGZOrvNd | `spoken-books-audio` |
 
@@ -104,6 +105,9 @@ the same wall the complete quests pack meets on CurseForge. Every pack is 280-45
 `scripts/*/release.sh` uploads the addons to both stores and the packs to CurseForge alone.
 The Wago ids for the pack projects are listed above anyway: the projects exist, and the day
 that endpoint takes a larger file they are what it uploads to.
+A language's pack -- Spoken Zones Audio: Spanish (AL) is the first -- has no Wago project at all:
+its page leaves `wago:` out, `scripts/descriptions.mjs` writes no Wago copy of it, and
+`scripts/zones/release.sh` skips the Wago upload for it.
 
 **So the packs have a third channel**, `scripts/audio-github-release.sh` (`make audio-release`),
 one GitHub release per pack under `<pack>/vX.Y.Z` — the ceiling there is 2 GB a file. It runs

@@ -45,6 +45,7 @@ target_zip() { case "$1" in
   quests-audio-shared)   echo "SpokenQuestsAudioShared";;
   quests-audio-gossip)   echo "SpokenQuestsAudioGossip";;
   zones-audio)           echo "SpokenZonesAudio";;
+  zones-audio-esMX)      echo "SpokenZonesAudio_esMX";;
   books-audio)           echo "SpokenBooksAudio";;
 esac; }
 target_toc() { local zip; zip="$(target_zip "$1")"; case "$1" in
@@ -53,16 +54,18 @@ target_toc() { local zip; zip="$(target_zip "$1")"; case "$1" in
 esac; }
 target_changelog() { case "$1" in
   quests-audio-*) echo "$REPO/docs/quests/CHANGELOG.md";;
-  zones-audio)    echo "$REPO/docs/zones/CHANGELOG.md";;
+  zones-audio*)   echo "$REPO/docs/zones/CHANGELOG.md";;
   books-audio)    echo "$REPO/docs/books/CHANGELOG.md";;
 esac; }
 # Which heading in that file is this pack's. The kind is half the key in two of the three:
 # the quests player and its packs have collided on a version number before, and zones numbers
 # its addon and its pack independently, so `## 2.0.1 — audio` is the pack's and anything else
-# at that number is the addon's. Books has one changelog per version and no such split.
+# at that number is the addon's. Books has one changelog per version and no such split. A
+# language's zones pack is `— audio esMX`, which English's pattern has to step over.
 target_changelog_kind() { case "$1" in
   quests-audio-*) echo "pack";;
-  zones-audio)    echo "audio";;
+  zones-audio)    echo "audio(?! [a-z]{2}[A-Z]{2})";;
+  zones-audio-esMX) echo "audio esMX";;
   books-audio)    echo "";;
 esac; }
 # What the pack is called in the release title and in the store pages it is linked from.
@@ -72,13 +75,14 @@ target_title() { case "$1" in
   quests-audio-shared)   echo "Spoken Quests Audio: Shared Quests";;
   quests-audio-gossip)   echo "Spoken Quests Audio: Gossip";;
   zones-audio)           echo "Spoken Zones Audio";;
+  zones-audio-esMX)      echo "Spoken Zones Audio: Spanish (AL)";;
   books-audio)           echo "Spoken Books Audio";;
 esac; }
 # The addon each pack is inert without, by store slug, for the release notes. A pack installed
 # alone is several hundred megabytes of silence.
 target_needs() { case "$1" in
   quests-audio-*) echo "spoken-quests";;
-  zones-audio)    echo "spoken-zones";;
+  zones-audio*)   echo "spoken-zones";;
   books-audio)    echo "spoken-books";;
 esac; }
 
@@ -90,7 +94,7 @@ targets=()
 for arg in "$@"; do
   case "$arg" in
     --dry-run|-n) dry_run=1;;
-    quests-audio-alliance|quests-audio-horde|quests-audio-shared|quests-audio-gossip|zones-audio|books-audio)
+    quests-audio-alliance|quests-audio-horde|quests-audio-shared|quests-audio-gossip|zones-audio|books-audio|zones-audio-esMX)
       targets+=("$arg");;
     *) echo "error: unknown argument '$arg' (expected: $ALL_TARGETS, --dry-run)" >&2; exit 1;;
   esac

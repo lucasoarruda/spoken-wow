@@ -18,31 +18,40 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { BASE_LOCALE, packFolder } from "../lib/locales.mjs";
+import { BASE_LOCALE, CODES, sourceFolder } from "../lib/locales.mjs";
 import { ROOT } from "../lib/loredata.mjs";
 import * as db from "./db.mjs";
 
 const execFileAsync = promisify(execFile);
 
-// The lore is English and nothing here takes a language. The "lang" column stays on
-// the shared "take" table -- quests and books write it too, and a column is never
-// dropped here -- so every row this module reads names the one value there is.
-export const LANG = BASE_LOCALE;
+// The language whose takes these tools read, and whose pack they build: English unless
+// SPOKEN_ZONES_LANG names another (make passes it as LOCALE=esMX). One per process, because
+// everything downstream -- the manifest, Sounds/, the lookup beside it -- is one language's,
+// and a run that mixed two would build a pack whose table names another language's files.
+export const LANG = process.env.SPOKEN_ZONES_LANG || BASE_LOCALE;
+if (!CODES.includes(LANG)) {
+  throw new Error(`SPOKEN_ZONES_LANG=${LANG} is not a language (expected one of ${CODES.join(", ")})`);
+}
 
 // Two of these can be overridden by an environment variable, and on the droplet both are:
 // they point outside the release directory, so a deploy cannot move them and prune.sh
 // cannot delete them. Unset, which is every local run, they are the repo paths.
 
+//
+// Another language's manifest sits beside English's as manifest-<lang>.json: the same export
+// of the same table, for the rows in that language.
 export function manifestPath() {
-  return process.env.SPOKEN_ZONES_MANIFEST
+  const english = process.env.SPOKEN_ZONES_MANIFEST
     || join(ROOT, "pipelines/zones/tools/voice/manifest.json");
+  return LANG === BASE_LOCALE ? english : english.replace(/\.json$/, `-${LANG}.json`);
 }
 
-// The pack's Sounds/, inside its high tier: assembled from the live takes and the archive
-// by scripts/audio/sounds.mjs before a build, and read by build-lookup, validate-audio and
+// The pack's Sounds/, in the language's source folder (addons/SpokenZonesAudio, or
+// addons/SpokenZonesAudio_esMX): assembled from the live takes and the archive by
+// scripts/audio/sounds.mjs before a build, and read by build-lookup, validate-audio and
 // package-audio.sh. Not kept anywhere -- the archive is the only audio there is.
 export function soundsDir() {
-  return join(ROOT, "addons", packFolder(BASE_LOCALE, "high"), "Sounds");
+  return join(ROOT, "addons", sourceFolder(LANG), "Sounds");
 }
 
 // Every take, one directory per file, each written once by the site and never changed.

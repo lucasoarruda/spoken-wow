@@ -2,6 +2,7 @@
 # Fetch the archived takes a section's pack is built from, and no others.
 #
 #   scripts/audio/pull-live.sh <quests|zones|books>
+#   scripts/audio/pull-live.sh zones esMX      another language's pack, zones only
 #
 # The list is the local database's live takes, written by `sounds.mjs --list` -- the same
 # query that later copies them into the pack -- so run the section's sync first: a pull
@@ -22,7 +23,11 @@
 #   RSYNC                       an rsync 3.x; macOS's openrsync lacks --info
 set -euo pipefail
 
-section=${1:?usage: pull-live.sh <quests|zones|books>}
+section=${1:?usage: pull-live.sh <quests|zones|books> [lang]}
+# A language's takes live under <lang>/ in the same archive, and the list sounds.mjs prints
+# already carries that prefix, so the rsync below is the same for every language and lands
+# them beside English's rather than over them.
+lang=${2:-enUS}
 : "${DROPLET:?no droplet configured: export SPOKEN_DROPLET=deploy@<host>}"
 : "${RSYNC:?no rsync 3.x found. macOS ships openrsync, which lacks --info: brew install rsync}"
 REMOTE_ROOT=${REMOTE_ROOT:-/srv/spoken}
@@ -35,8 +40,8 @@ archive=${!override:-$root/pipelines/$section/audio-history}
 
 list=$(mktemp)
 trap 'rm -f "$list"' EXIT
-node "$root/scripts/audio/sounds.mjs" --list "$section" >"$list"
-echo "==> $(wc -l <"$list" | tr -d ' ') live $section takes"
+node "$root/scripts/audio/sounds.mjs" --list --lang="$lang" "$section" >"$list"
+echo "==> $(wc -l <"$list" | tr -d ' ') live $section $lang takes"
 
 mkdir -p "$archive"
 # shellcheck disable=SC2086 -- SSH carries its own flags
@@ -49,4 +54,6 @@ mkdir -p "$archive"
   fi
   exit "$status"
 }
-echo "==> pulled into ${archive#"$root"/}. Build the pack's audio with:  make $section-sounds"
+suffix=""
+[ "$lang" = enUS ] || suffix=" LOCALE=$lang"
+echo "==> pulled into ${archive#"$root"/}. Build the pack's audio with:  make $section-sounds$suffix"

@@ -4,6 +4,11 @@
 #   ./scripts/package-audio.sh                 # the pack
 #   ./scripts/package-audio.sh standard        # just the 64kbps one
 #   ./scripts/package-audio.sh high            # just the 128kbps one
+#   LOCALE=esMX ./scripts/package-audio.sh     # another language's pack
+#
+# A language other than English is built from addons/SpokenZonesAudio_<lang> into a folder of
+# the same name, at the standard tier only (tiersFor and packFolder in
+# pipelines/zones/tools/lib/locales.mjs), and its .toc says which language it narrates.
 #
 # Two tiers exist because this is a ~790MB download at the source bitrate, which
 # is a lot to ask for narration that is mostly listened to once per zone. The
@@ -38,9 +43,22 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # supplies the empty default when there is none.
 export DATABASE_URL="${DATABASE_URL-}"
 
-# The masters are the high tier the project already publishes. Kept in step with
-# packFolder() in tools/lib/locales.mjs.
-SRC="$REPO/addons/SpokenZonesAudio"
+# The language being packaged. Everything below that names a folder, a title or a cache follows
+# from it, so an esMX run cannot write into English's folder or its zip.
+LOCALE="${LOCALE:-enUS}"
+if [[ ! "$LOCALE" =~ ^[a-z]{2}[A-Z]{2}$ ]]; then
+  echo "error: LOCALE=$LOCALE is not a language code (e.g. esMX)" >&2
+  exit 1
+fi
+english() { [[ "$LOCALE" == "enUS" ]]; }
+
+# The masters. English's are the high tier the project already publishes; another language's
+# folder carries its code. Kept in step with sourceFolder() in tools/lib/locales.mjs.
+if english; then
+  SRC="$REPO/addons/SpokenZonesAudio"
+else
+  SRC="$REPO/addons/SpokenZonesAudio_$LOCALE"
+fi
 TOC="$SRC/$(basename "$SRC").toc"
 SOUNDS="$SRC/Sounds"
 DIST="$REPO/dist"
@@ -78,6 +96,7 @@ JOBS="${JOBS:-$( (command -v nproc >/dev/null 2>&1 && nproc) || sysctl -n hw.ncp
 # recipe automatically starts a fresh cache instead of serving entries cut with
 # the old one. "copy" means no transcode.
 tier_folder() {
+  if ! english; then echo "SpokenZonesAudio_$LOCALE"; return; fi
   case "$1" in standard) echo "ZoneLoreAudio64";; high) echo "SpokenZonesAudio";; esac
 }
 tier_bitrate()  { case "$1" in standard) echo "64";; high) echo "128";; esac; }
@@ -85,7 +104,9 @@ tier_encoding() { case "$1" in standard) echo "vbr-v6";; high) echo "copy";; esa
 # The high tier was renamed from ZoneLoreAudio with the projects: a pack reads its own folder
 # name out of the loader, so nothing breaks, and the re-download it costs is one the release
 # doing the rename costs anyway. ZoneLoreAudio64 keeps its name because it is retired.
+# Another language's title is its source .toc's, which names the language.
 tier_title() {
+  if ! english; then sed -n 's/^## Title:[[:space:]]*//p' "$TOC" | head -1 | tr -d '\r'; return; fi
   case "$1" in standard) echo "Spoken Zones Audio 64";; high) echo "Spoken Zones Audio";; esac
 }
 
@@ -93,7 +114,8 @@ tier_title() {
 # projects, two folder names and a question at install time that the answer "take the
 # bigger one" always won. ZoneLoreAudio64 stays published so existing installs keep
 # working and is never uploaded to again. `standard` is still reachable by naming it.
-tiers=("high")
+# Another language ships the one VBR tier (tiersFor in tools/lib/locales.mjs).
+if english; then tiers=("high"); else tiers=("standard"); fi
 
 if [[ $# -gt 0 ]]; then
   for arg in "$@"; do
@@ -126,7 +148,11 @@ fi
 count="$(find "$SOUNDS" -name '*.mp3' 2>/dev/null | wc -l | tr -d ' ')"
 if [[ "$count" -eq 0 ]]; then
   echo "error: no mp3 files in $SOUNDS" >&2
-  echo "       Generate some first, on the site, then:  make zones-pull-history zones-sounds" >&2
+  if english; then
+    echo "       Generate some first, on the site, then:  make zones-pull-live zones-sounds" >&2
+  else
+    echo "       Generate some first, on the site, then:  make zones-pull-live zones-sounds LOCALE=$LOCALE" >&2
+  fi
   exit 1
 fi
 
@@ -134,7 +160,7 @@ fi
 # silence in-game rather than erroring, so check it here rather than discovering
 # it after upload.
 echo "checking the lookup table against the files..."
-node "$REPO/pipelines/zones/tools/voice/validate-audio.mjs"
+SPOKEN_ZONES_LANG="$LOCALE" node "$REPO/pipelines/zones/tools/voice/validate-audio.mjs"
 
 # Each tier ships the README for its own CurseForge page, so the description a
 # player read before downloading is the file they end up with.
@@ -147,7 +173,13 @@ node "$REPO/scripts/descriptions.mjs" --write >/dev/null
 #
 # The retired 64 kbps page is gone, so every tier without a page of its own falls back to the
 # one shipping description rather than to a page nobody maintains.
+#
+# A language's pack has a page of its own, publishers/zones/spoken-zones-audio-<lang>.md, and
+# ships that; until one exists it falls back the same way.
 tier_readme() {
+  local own
+  own="$REPO/dist/descriptions/spoken-zones-audio-$(printf '%s' "$LOCALE" | tr '[:upper:]' '[:lower:]').md"
+  if ! english && [[ -f "$own" ]]; then echo "$own"; return; fi
   echo "$REPO/dist/descriptions/spoken-zones-audio.md"
 }
 
@@ -202,7 +234,7 @@ for tier in "${tiers[@]}"; do
     -e "s|^## Title:.*|## Title: $title|" \
     -e "s|^## X-SpokenZones-Quality:.*|## X-SpokenZones-Quality: $tier|" \
     -e "s|^## X-SpokenZones-Bitrate:.*|## X-SpokenZones-Bitrate: $bitrate|" \
-    -e "s|^## X-SpokenZones-Language:.*|## X-SpokenZones-Language: enUS|" \
+    -e "s|^## X-SpokenZones-Language:.*|## X-SpokenZones-Language: $LOCALE|" \
     "$staging/$folder/$folder.toc"
   rm -f "$staging/$folder/$folder.toc.bak"
 
@@ -211,7 +243,9 @@ for tier in "${tiers[@]}"; do
     echo "copying $count masters..."
     rsync -a --exclude '.DS_Store' --exclude '*.part' "$SOUNDS/" "$staging/$folder/Sounds/"
   else
-    cache="$CACHE_ROOT/$encoding"
+    # Per language as well as per recipe: the prune below drops every entry this run did not
+    # use, and one language's build must not empty the cache another's is kept in.
+    if english; then cache="$CACHE_ROOT/$encoding"; else cache="$CACHE_ROOT/$LOCALE-$encoding"; fi
     mkdir -p "$cache"
 
     # Three passes rather than one loop, because only the middle one is expensive

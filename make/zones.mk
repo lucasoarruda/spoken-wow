@@ -65,10 +65,12 @@ clean: ## Remove build output
 # "Generating voicelines".
 #-------------------------------------------------------------------------------
 
-# The pipeline takes no language: the lore is English and the tools say so themselves.
-# The addon keeps its locale data -- alias tables and interface strings, both keyed by
-# CLIENT locale -- and `make zones-aliases` and `make zones-languages` still maintain it.
-VOICE_LANG =
+# Which language's takes and pack the voice targets act on: English, or LOCALE=esMX for
+# another language's pack (addons/SpokenZonesAudio_esMX). pipelines/zones/tools/voice/store.mjs
+# reads it; sounds, pull-live and package-audio take the same LOCALE, so one variable on the
+# command line moves the whole chain and a run cannot build one language's lookup over
+# another's clips.
+VOICE_LANG = SPOKEN_ZONES_LANG=$(or $(LOCALE),enUS)
 
 # The manifest comes from Postgres when DATABASE_URL is set and from the committed files
 # otherwise, and the repo-root .env sets it -- so a laptop whose Postgres is not running gets
@@ -228,7 +230,7 @@ pull-history: require-droplet ## Fetch the droplet's archived takes (non-destruc
 # `make zones-sync` first. pull-history is the whole archive, for listening to old takes.
 pull-live: require-droplet ## Fetch only the live takes the local database names (after sync)
 	$(preflight)
-	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh zones
+	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh zones $(or $(LOCALE),enUS)
 
 history-status: require-droplet ## Compare archived take count and size on both sides
 	@echo "local:   $$(find pipelines/zones/audio-history -name '*.mp3' 2>/dev/null | wc -l | tr -d ' ') takes, $$(du -sh pipelines/zones/audio-history 2>/dev/null | cut -f1 || echo 0)"
@@ -237,8 +239,8 @@ history-status: require-droplet ## Compare archived take count and size on both 
 
 # The pack's Sounds/ is not kept: it is assembled from the live takes and the archive, and
 # made again before every build. See scripts/audio/sounds.mjs.
-sounds: ## Assemble addons/SpokenZonesAudio/Sounds from the live takes and the archive
-	@$(DB_ENV) node scripts/audio/sounds.mjs zones
+sounds: ## Assemble addons/SpokenZonesAudio/Sounds (LOCALE=esMX: that language's pack) from the live takes
+	@$(DB_ENV) node scripts/audio/sounds.mjs --lang=$(or $(LOCALE),enUS) zones
 
 #-------------------------------------------------------------------------------
 # Moving the database between machines
@@ -261,8 +263,8 @@ check-synced: ## Compare the local zones data with the droplet's, and prompt if 
 
 # From the database, against production's data: the lookup table is rebuilt here rather than
 # on the droplet after every generation, which is what the site used to do.
-package-audio: check-synced sounds lookup validate-audio ## Build the sound-pack zip
-	@./scripts/zones/package-audio.sh
+package-audio: check-synced sounds lookup validate-audio ## Build the sound-pack zip (LOCALE=esMX for that language's)
+	@LOCALE="$(or $(LOCALE),enUS)" ./scripts/zones/package-audio.sh
 
 release-dry: ## Show what `make release` would upload to CurseForge and Wago
 	@./scripts/zones/release.sh --dry-run

@@ -81,6 +81,7 @@ superpowers/
 # No trailing slash: a test client is pointed at this pack by symlinking its audio in,
 # and a trailing slash matches only a real directory, leaving the link to be committed.
 /addons/SpokenZonesAudio/Sounds
+/addons/SpokenZonesAudio_*/Sounds
 
 # The books narration, in the pack folder the client loads. Same rule and same reason as
 # the zones pack above, including the missing trailing slash: a test client is pointed at

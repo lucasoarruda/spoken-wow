@@ -5,6 +5,7 @@
 #   ./scripts/zones/release.sh                  # both projects, both stores
 #   ./scripts/zones/release.sh zones            # just the addon
 #   ./scripts/zones/release.sh audio            # just the sound pack
+#   ./scripts/zones/release.sh audio-esMX       # a language's sound pack; never uploaded by default
 #   ./scripts/zones/release.sh --store=wago     # one store only; --store=curseforge for the other
 #
 # TWO STORES, ONE RELEASE. The same zip goes to both by default: a file that exists on one
@@ -60,30 +61,36 @@ RELEASE_TYPE="${RELEASE_TYPE:-release}"
 # it fails on the empty project id below -- which is the failure to want, because
 # the alternative is uploading a German pack over the English project.
 target_curseforge() { case "$1" in
-  zones)    echo "1636521";;
-  audio)    echo "1636532";;
+  zones)      echo "1636521";;
+  audio)      echo "1636532";;
+  audio-esMX) echo "1711067";;
 esac; }
 # The Wago project id for the same project: eight alphanumeric characters, from the project's
 # entry in https://addons.wago.io/developers, and also in the page frontmatter under
 # publishers/zones/ where scripts/descriptions.mjs checks it.
+#
+# A language's pack has none: Wago refuses a file this size anyway (see full-release in
+# make/zones.mk), and its players get the pack from the GitHub release. Empty here means the
+# Wago upload is skipped for it rather than sent to another project.
 target_wago() { case "$1" in
   zones)    echo "mNw7b5No";;
   audio)    echo "b6mvD9KP";;
 esac; }
+# A language's pack is built into a folder named for its code (packFolder in
+# pipelines/zones/tools/lib/locales.mjs), and its version is that folder's .toc's.
 target_addon() { case "$1" in
   zones)    echo "SpokenZones";;
   audio)    echo "SpokenZonesAudio";;
+  audio-*)  echo "SpokenZonesAudio_${1#audio-}";;
 esac; }
-target_zip() { case "$1" in
-  zones)    echo "SpokenZones";;
-  audio)    echo "SpokenZonesAudio";;
-esac; }
+target_zip() { target_addon "$1"; }
 # The project's slug, which is neither the folder nor the zip name: the folders keep the names
 # they were published under and the slugs were changed with the rename. Used for the link
 # printed after an upload, so a wrong one here is a dead link and nothing worse.
 target_slug() { case "$1" in
-  zones)    echo "spoken-zones";;
-  audio)    echo "spoken-zones-audio";;
+  zones)      echo "spoken-zones";;
+  audio)      echo "spoken-zones-audio";;
+  audio-esMX) echo "spoken-zones-audio-esmx";;
 esac; }
 # Which clients each file is offered to. Every zip built from 0.3.1 onwards carries
 # a .toc for both clients, so both are filed against both. Files uploaded
@@ -97,12 +104,12 @@ esac; }
 # name only - see the ONE REGISTRY note in tools/voice/build-lookup.mjs.
 target_dependencies() { case "$1" in
   zones)    echo "spoken-player";;
-  audio)    echo "spoken-zones";;
+  audio*)   echo "spoken-zones";;
 esac; }
 
 target_game_versions() { case "$1" in
   zones)    echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
-  audio)    echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
+  audio*)   echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
 esac; }
 
 dry_run=""
@@ -114,8 +121,8 @@ for arg in "$@"; do
     --store=curseforge) stores="curseforge";;
     --store=wago)       stores="wago";;
     --dry-run|-n) dry_run=1;;
-    zones|audio) targets+=("$arg");;
-    *) echo "error: unknown argument '$arg' (expected: zones, audio, --store=..., --dry-run)" >&2; exit 1;;
+    zones|audio|audio-esMX) targets+=("$arg");;
+    *) echo "error: unknown argument '$arg' (expected: zones, audio, audio-esMX, --store=..., --dry-run)" >&2; exit 1;;
   esac
 done
 
@@ -194,16 +201,22 @@ fi
 # THE KIND IS HALF THE KEY. The addon and the pack read their own TOCs and have numbered
 # themselves independently since 2.0.0, so the same number belongs to both of them at
 # different times -- 2.0.1 is the addon's placeholder-folder fix and, separately, the pack's
-# new icon. A heading of `## <version> — audio` is the pack's and anything else at that
-# number is the addon's, which is what keeps one's notes off the other's upload.
+# new icon. A heading of `## <version> — audio` is the pack's, `## <version> — audio esMX` is
+# that language's pack's, and anything else at that number is the addon's, which is what keeps
+# one's notes off the other's upload.
 changelog_for() {
   node -e '
     const { readFileSync } = require("fs");
     const [path, version, target] = process.argv.slice(1);
     const text = readFileSync(path, "utf8");
     const lines = text.split("\n");
-    const matches = (l) => l.startsWith(`## ${version}`) &&
-      /—\s*audio\b/.test(l) === (target === "audio");
+    // "" for the addon, "audio" for the English pack, "audio esMX" for that language pack.
+    const kindOf = (l) => {
+      const m = l.match(/—\s*audio\b(?:\s+([a-z]{2}[A-Z]{2})\b)?/);
+      return m ? (m[1] ? `audio ${m[1]}` : "audio") : "";
+    };
+    const wanted = target === "zones" ? "" : target.replace("-", " ");
+    const matches = (l) => l.startsWith(`## ${version}`) && kindOf(l) === wanted;
     const start = lines.findIndex(matches);
     if (start === -1) {
       console.error(`no "## ${version}" section for ${target} in CHANGELOG.md`);
@@ -329,7 +342,9 @@ for target in "${targets[@]}"; do
   # The Wago upload, after the CurseForge one and not conditional on it: the two stores refuse
   # files for different reasons, and a file one store will not take is still a file the other
   # should have.
-  if store_has wago; then
+  if store_has wago && [[ -z "$(target_wago "$target")" ]]; then
+    echo "  wago:      no Wago project for $target -- skipped (its players use the GitHub release)"
+  elif store_has wago; then
     if [[ -n "$dry_run" ]]; then
       echo "  wago:      project $(target_wago "$target") -- dry run, not uploading"
     else
