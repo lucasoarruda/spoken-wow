@@ -194,7 +194,9 @@ done
 # audio-all are each one project for every language -- so --lang refuses anything but the
 # four packs, the same way books' and zones' release.sh do.
 if ! english; then
-  for t in "${targets[@]}"; do
+  # ${targets[@]+...} rather than a bare expansion: macOS's bash 3.2 raises "unbound variable"
+  # under set -u when "${targets[@]}" is empty, which it is for `--lang=xx` alone.
+  for t in ${targets[@]+"${targets[@]}"}; do
     [[ "$t" == audio-* ]] || { echo "error: --lang=$LANG_CODE releases sound packs; '$t' has one project for every language" >&2; exit 1; }
   done
   (( ${#targets[@]} > 0 )) || targets=(audio-alliance audio-horde audio-shared audio-gossip)
