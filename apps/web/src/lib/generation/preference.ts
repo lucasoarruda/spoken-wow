@@ -7,7 +7,7 @@
  * What stays an admin's, per language, is the race accent tags, because they change the text
  * that is sent and staleness hashes that text.
  *
- * No row is ElevenLabs with the built-in settings, which is what everybody had before this.
+ * No row is fish.audio on its free model, with the built-in settings for both providers.
  */
 import "server-only";
 
@@ -37,7 +37,7 @@ export function defaultElevenLabs(): ElevenLabsSettings {
 
 export function defaultPreference(): Preference {
   return {
-    provider: "elevenlabs",
+    provider: "fish",
     elevenlabs: defaultElevenLabs(),
     fish: { model: DEFAULT_FISH_MODEL, ...FISH_DEFAULTS },
   };
