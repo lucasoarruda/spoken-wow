@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUDIO_STATE_OPTIONS } from "@/lib/audio-state";
 import type { ZoneFacet } from "@/lib/zones/catalogue";
 import {
   activeFilterCount,
@@ -23,11 +24,6 @@ import {
  * one app that filter differently read as two apps.
  */
 
-/** Values that label themselves. */
-function plainOptions(values: readonly string[]): ChipOption[] {
-  return values.map((value) => ({ value, label: value }));
-}
-
 /** Where the free-text query is matched. "any" is the idle state, so it is not an option. */
 const FIELD_OPTIONS: ChipOption[] = FIELDS.filter((field) => field !== "any").map((field) => ({
   value: field,
@@ -35,6 +31,7 @@ const FIELD_OPTIONS: ChipOption[] = FIELDS.filter((field) => field !== "any").ma
 }));
 
 const KIND_OPTIONS: ChipOption[] = KINDS.map((kind) => ({ value: kind, label: `${kind}s only` }));
+
 
 type Props = {
   zones: ZoneFacet[];
@@ -114,9 +111,9 @@ export function SearchBar({
           onChange={(kind) => onChange({ kind: kind as LineFilters["kind"] })}
         />
         <FilterChip
-          label="state"
+          label="audio"
           value={filters.state}
-          options={plainOptions(STATES)}
+          options={AUDIO_STATE_OPTIONS}
           onChange={(state) => onChange({ state: state as LineFilters["state"] })}
         />
         {/* Read as one range: "generated after X" and "generated before Y". */}

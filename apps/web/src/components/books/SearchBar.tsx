@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUDIO_STATE_OPTIONS } from "@/lib/audio-state";
 import type { BookFacet } from "@/lib/books/catalogue";
 import {
   activeFilterCount,
@@ -33,7 +34,6 @@ const KIND_OPTIONS: ChipOption[] = OWNER_KINDS.map((kind) => ({
   label: kind === "object" ? "in the world" : "carried items",
 }));
 
-const STATE_OPTIONS: ChipOption[] = STATES.map((state) => ({ value: state, label: state }));
 
 type Props = {
   books: BookFacet[];
@@ -104,7 +104,7 @@ export function SearchBar({
       <FilterChip
         label="audio"
         value={filters.state}
-        options={STATE_OPTIONS}
+        options={AUDIO_STATE_OPTIONS}
         onChange={(value) => onChange({ state: value as PageFilters["state"] })}
       />
 

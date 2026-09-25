@@ -18,6 +18,7 @@ import { hasNarration, restoresOnlyNarration } from "./generation/narration";
 import type { NpcType, Source } from "./line-fields";
 import type { LineIgnore } from "./quests/ignores";
 import type { LineOverride } from "./quests/override";
+import type { AudioState } from "./audio-state";
 import { isVoiceable } from "./text-gate";
 
 /** Which field the free-text query is matched against. */
@@ -30,7 +31,11 @@ export type Filter = "any" | "npc" | "quest" | "text";
 export type LineFilters = {
   q?: string;
   filter?: Filter;
-  missingOnly?: boolean;
+  /**
+   * Where the line's audio stands (lib/audio-state.ts). `stale` and `current` both need the
+   * staleness set in the context; without it they match nothing.
+   */
+  state?: AudioState;
   race?: string;
   gender?: string;
   flavor?: string;
@@ -69,12 +74,10 @@ export type LineFilters = {
    * how you go and read it.
    */
   ignored?: boolean;
-  /** Lines whose audio was made from text that has since changed. */
-  outdated?: boolean;
   /**
    * Lines whose audio was made before a pronunciation it speaks was changed.
    *
-   * Not a narrower `outdated`, and not implied by it: a lexicon edit moves no text, so the
+   * Not a narrower `state: "stale"`, and not implied by it: a lexicon edit moves no text, so the
    * two select disjoint problems with the same audio and either can be true alone.
    */
   dirty?: boolean;
@@ -344,7 +347,7 @@ export function matchingLines(
   {
     q = "",
     filter = "any",
-    missingOnly = false,
+    state,
     race,
     gender,
     flavor,
@@ -355,7 +358,6 @@ export function matchingLines(
     narration = false,
     line: lineId,
     overridden,
-    outdated = false,
     dirty = false,
     ignored = false,
     reports,
@@ -383,7 +385,7 @@ export function matchingLines(
       : lines.filter((line) => !ignores.has(line.lineId));
   }
   if (query) lines = lines.filter((line) => matches(line, query, filter));
-  if (missingOnly) lines = lines.filter((line) => isGap(line, store, overrides));
+  if (state === "missing") lines = lines.filter((line) => isGap(line, store, overrides));
   if (race) lines = lines.filter((line) => line.race === race);
   if (gender) lines = lines.filter((line) => line.gender === gender);
   if (flavor) lines = lines.filter((line) => line.flavor === flavor);
@@ -408,7 +410,14 @@ export function matchingLines(
   if (lineId) lines = lines.filter((line) => line.lineId === lineId);
   // Absent `stale` means nobody asked for it, so nothing matches rather than everything: the
   // honest answer to "which audio is out of date?" without the data is none, not all.
-  if (outdated) lines = lines.filter((line) => stale?.has(audioRelPath(line)) ?? false);
+  if (state === "stale") lines = lines.filter((line) => stale?.has(audioRelPath(line)) ?? false);
+  // Current needs the same set, for the same reason: without it nothing is known current.
+  if (state === "current") {
+    lines = lines.filter((line) => {
+      const file = audioRelPath(line);
+      return store.has(file) && stale !== undefined && !stale.has(file);
+    });
+  }
   // Absent `dirty` means nobody asked, so nothing matches rather than everything - the
   // argument the line above makes, for the same reason.
   if (dirty) lines = lines.filter((line) => dirtyOf?.has(audioRelPath(line)) ?? false);
