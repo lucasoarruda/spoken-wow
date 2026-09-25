@@ -171,3 +171,32 @@ def test_the_length_table_measures_ogg(tmp_path):
     build_module(CORPUS, store, str(tmp_path / "dist"), "Mod")
 
     assert '["5-accept"] = 0.3' in _sound_length_table(tmp_path)
+
+
+def _toc(tmp_path):
+    with open(tmp_path / "dist" / "Mod" / "Mod.toc", encoding="utf-8") as f:
+        return f.read()
+
+
+def test_a_language_pack_says_which_language_it_speaks(tmp_path):
+    # DataModules.lua reads this key; without it the pack counts as English and plays under
+    # English text only.
+    build_module(CORPUS, _store(tmp_path, "quests/5-accept.ogg"), str(tmp_path / "dist"), "Mod",
+                 language="esMX")
+    assert "## X-SpokenQuests-Language: esMX\n" in _toc(tmp_path)
+
+
+def test_a_language_pack_says_its_tables_are_english(tmp_path):
+    # The text-keyed tables are built from the English corpus whatever the pack speaks, and the
+    # addon takes a module's tables to be in its own language unless LookupLocale says otherwise.
+    build_module(CORPUS, _store(tmp_path, "quests/5-accept.ogg"), str(tmp_path / "dist"), "Mod",
+                 language="esMX")
+    assert 'Mod.LookupLocale = "enUS"\n' in _module_lua(tmp_path)
+
+
+def test_an_english_pack_is_unchanged(tmp_path):
+    # Every pack already shipped has neither line, and adding them would change the bytes of
+    # every English pack for nothing.
+    build_module(CORPUS, _store(tmp_path, "quests/5-accept.ogg"), str(tmp_path / "dist"), "Mod")
+    assert "X-SpokenQuests-Language" not in _toc(tmp_path)
+    assert "LookupLocale" not in _module_lua(tmp_path)

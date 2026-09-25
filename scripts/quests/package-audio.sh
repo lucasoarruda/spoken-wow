@@ -89,6 +89,16 @@ TITLE_FAMILY="${TITLE_FAMILY:-}"
 # kbps above which an mp3 is worth re-encoding as an mp3. See tools/plan_transcode.py.
 THRESHOLD="${THRESHOLD:-80}"
 
+# The language being packaged. English builds exactly as it always has; another language
+# builds each of its registered packs (scripts/lib/packs.mjs) from its assembled store in
+# build/quests/<lang>/audio, named, titled and versioned by its page.
+LANGUAGE="${LANGUAGE:-enUS}"
+if [ "$LANGUAGE" != enUS ]; then
+  STORE="$REPO/build/quests/$LANGUAGE/audio"
+  PACKS="$(node "$REPO/scripts/lib/packs.mjs" list quests "$LANGUAGE" | tr '\n' ' ')"
+fi
+pack_field() { node "$REPO/scripts/lib/packs.mjs" get quests "$LANGUAGE" "$1" "$2"; }
+
 # Transcoded clips, kept between runs. A sibling of dist/ and of the store, for the
 # reason web/src/lib/paths.ts gives about audio-history: anything living under
 # audio/ would be walked as if it were a voiceline.
@@ -156,7 +166,7 @@ if [ "$ENCODE" = copy ]; then
   echo "copying $count masters (ENCODE=copy)..."
   cut -f4 "$plan" | while IFS= read -r rel; do cp "$STORE/$rel" "$staging/$rel"; done
 else
-  cache="$CACHE_ROOT/$ENCODE"
+  if [ "$LANGUAGE" = enUS ]; then cache="$CACHE_ROOT/$ENCODE"; else cache="$CACHE_ROOT/$LANGUAGE-$ENCODE"; fi
   mkdir -p "$cache"
 
   # Deduplicated: two identical masters share a key, and two workers must not write one
@@ -276,10 +286,22 @@ for pack in $PACKS; do
     fi
   fi
 
+  version="$VERSION"
+  language_args=()
+  if [ "$LANGUAGE" != enUS ]; then
+    module="$(pack_field "$pack" folder)"
+    title="$(pack_field "$pack" name)"
+    version="$(pack_field "$pack" version)"
+    language_args=(--language "$LANGUAGE")
+  fi
+
   echo
   echo "building $module ($pack)"
+  # ${language_args[@]+...} rather than a bare expansion: macOS's bash 3.2 raises "unbound
+  # variable" under set -u when a plain "${arr[@]}" is empty, which it is on every English build.
   (cd "$QUESTS" && "$PYTHON" cli-main.py build --store "$staging" --dist "$DIST" \
-    --module "$module" --version "$VERSION" --pack "$pack" ${title:+--module-title "$title"})
+    --module "$module" --version "$version" --pack "$pack" ${title:+--module-title "$title"} \
+    "${language_args[@]+"${language_args[@]}"}")
 
   echo "  module size: $(du -sh "$DIST/$module" | cut -f1)  (store: $(du -sh "$STORE" | cut -f1))"
 
@@ -290,7 +312,7 @@ for pack in $PACKS; do
   #
   # LABEL is what keeps the encode profiles apart, since both build the same folder names -
   # they are alternatives and a player installs one, so only the zip carries it.
-  zip_path="$(cd "$DIST" && pwd)/$module$LABEL-$VERSION.zip"
+  zip_path="$(cd "$DIST" && pwd)/$module$LABEL-$version.zip"
   rm -f "$zip_path"
   echo "  zipping $(basename "$zip_path")..."
   (cd "$DIST" && zip -r -q -X "$zip_path" "$module" -x '*.DS_Store' '*.part')

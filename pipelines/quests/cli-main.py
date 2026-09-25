@@ -69,6 +69,9 @@ bld.add_argument("--pack", default="all", choices=PACKS,
 bld.add_argument("--factions", default=DEFAULT_FACTIONS_PATH)
 bld.add_argument("--module-title", default=None,
                  help="TOC title; defaults to one naming the pack")
+bld.add_argument("--language", default=None,
+                 help="The language the pack speaks, e.g. esMX. Omitted means English, and "
+                      "leaves the TOC as every English pack has it.")
 
 ins = subparsers.add_parser(
     "install", help="Copy the built module into a WoW AddOns folder.")
@@ -130,7 +133,8 @@ elif args.mode == "build":
     report = build_module(corpus, args.store, args.dist,
                           args.module, args.version, progress=True,
                           ignored=load_ignored(args.ignored), include=include,
-                          title=args.module_title or pack_title(args.pack))
+                          title=args.module_title or pack_title(args.pack),
+                          language=args.language)
     print(f"\nbuilt {report['moduleDir']}")
     print(f"  audio files {report['audioFiles']} ({report['audioFormat']}, pack: {args.pack})")
     for name, rows in sorted(report["tableRows"].items()):

@@ -58,7 +58,7 @@ endef
         pull-history pull-live history-status sounds package package-audio \
         package-audio-complete package-meta push-complete icon \
         downloads-status \
-        factions release release-audio release-wago release-curse \
+        factions release release-audio release-audio-dry release-wago release-curse \
         release-dry import-corpus import-locale fill-locales export-corpus export-ignores \
         sync check-synced full-release
 
@@ -117,7 +117,7 @@ pull-history: require-droplet ## Fetch the droplet's archived takes (non-destruc
 # `make quests-sync` first. pull-history is the whole archive, for listening to old takes.
 pull-live: require-droplet ## Fetch only the live takes the local database names (after sync)
 	$(preflight)
-	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh quests
+	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh quests $(or $(LOCALE),enUS)
 
 history-status: require-droplet ## Compare take count and size on both sides
 	@echo "local:  $$(find pipelines/quests/audio-history -name '*.mp3' 2>/dev/null | wc -l | tr -d ' ') takes, $$(du -sh pipelines/quests/audio-history 2>/dev/null | cut -f1 || echo 0)"
@@ -126,7 +126,7 @@ history-status: require-droplet ## Compare take count and size on both sides
 # The folder a pack is built from, pipelines/quests/audio/: not kept, but assembled from the
 # live takes and the archive before every build. See scripts/audio/sounds.mjs.
 sounds: ## Assemble pipelines/quests/audio from the live takes and the archive
-	@$(DB_ENV) node scripts/audio/sounds.mjs quests
+	@$(DB_ENV) node scripts/audio/sounds.mjs --lang=$(or $(LOCALE),enUS) quests
 
 # --- packaging ------------------------------------------------------------------------
 #
@@ -175,7 +175,7 @@ package: ## Zip the player addon into dist/: one Blizzard zip, one per legacy cl
 
 package-audio: check-synced export-corpus export-ignores sounds ## Transcode, build and zip the five sound packs into dist/ (VERSION=1.4.0)
 	@VERSION=$(VERSION) ENCODE=$(if $(ENCODE),$(ENCODE),ogg-q0-44k) MODULE=SpokenQuestsAudio \
-	  JOBS=$(JOBS) ./scripts/quests/package-audio.sh
+	  LANGUAGE="$(or $(LOCALE),enUS)" JOBS=$(JOBS) ./scripts/quests/package-audio.sh
 
 # Every line in one folder rather than split five ways, ~1.3 GB. Not a CurseForge release - it
 # is over the upload ceiling and always will be - so it is built for people who would rather
@@ -243,25 +243,51 @@ release: ## Upload the built zips to CurseForge and Wago (needs both tokens)
 	@./scripts/quests/release.sh
 
 # The packs alone, for when the audio was rebuilt and the player was not. The meta addon comes
-# last, since CurseForge resolves its dependencies at upload time.
+# last, since CurseForge resolves its dependencies at upload time. A language has no meta addon
+# -- audio-all is the "install everything" addon for the four English projects, and a language's
+# four packs are dependency-free, so LOCALE releases only them.
+PACKS_AUDIO := audio-alliance audio-horde audio-shared audio-gossip
 
-release-audio: ## Upload the four packs and their meta addon
+ifneq ($(filter-out enUS,$(LOCALE)),)
+release-audio-dry: ## Show what uploading the sound packs would send (LOCALE=xx for a language's)
+	@./scripts/quests/release.sh --dry-run --lang=$(LOCALE) $(PACKS_AUDIO)
+
+release-audio: ## Upload the four packs and their meta addon (LOCALE=xx for a language's)
+	@./scripts/quests/release.sh --lang=$(LOCALE) $(PACKS_AUDIO)
+else
+release-audio-dry:
+	@./scripts/quests/release.sh --dry-run audio-alliance audio-horde audio-shared audio-gossip audio-all
+
+release-audio:
 	@./scripts/quests/release.sh audio-alliance audio-horde audio-shared audio-gossip audio-all
+endif
 
 # The whole pack release, from production's data to the stores, with one question before
 # anything is uploaded. Each step is its own target and still runs alone; this is their order.
 #
-# VERSION is required, not defaulted: package-audio.sh would otherwise stamp its own default,
-# and a release under a number already on CurseForge is a duplicate file there. It needs a
-# `## <VERSION>` pack section in docs/quests/CHANGELOG.md, which both uploads quote.
+# VERSION is required for English, not defaulted: package-audio.sh would otherwise stamp its own
+# default, and a release under a number already on CurseForge is a duplicate file there. It needs
+# a `## <VERSION>` pack section in docs/quests/CHANGELOG.md, which both uploads quote. A
+# language's version comes from its page under publishers/quests/ instead, so LOCALE needs none.
 #
 # The packs go to CurseForge only -- Wago answers 413 to a file this size (scripts/lib/wago.sh)
-# -- and to GitHub, which is where a Wago player gets them. The meta addon is kilobytes and
-# goes to both stores. The complete pack for the site is not built here: it is another
-# 1.3 GB, and `make quests-package-audio-complete push-complete` is the step if it is wanted.
-PACKS_AUDIO := audio-alliance audio-horde audio-shared audio-gossip
-
-full-release: require-droplet ## Sync, pull live takes, build and upload the packs (VERSION=2.1.0)
+# -- and to GitHub, which is where a Wago player gets them. English's meta addon is kilobytes and
+# goes to both stores; a language has none. The complete pack for the site is not built here: it
+# is another 1.3 GB, and `make quests-package-audio-complete push-complete` is the step if it is
+# wanted.
+ifneq ($(filter-out enUS,$(LOCALE)),)
+full-release: require-droplet ## Sync, pull live takes, build and upload the packs (VERSION=2.1.0; LOCALE=xx for a language's)
+	@$(MAKE) --no-print-directory -f make/quests.mk sync
+	@$(MAKE) --no-print-directory -f make/quests.mk pull-live LOCALE=$(LOCALE)
+	@$(MAKE) --no-print-directory -f make/quests.mk package-audio LOCALE=$(LOCALE)
+	@./scripts/quests/release.sh --dry-run --store=curseforge --lang=$(LOCALE) $(PACKS_AUDIO)
+	@./scripts/audio-github-release.sh --dry-run quests $(LOCALE)
+	@printf 'Upload quests packs to CurseForge and GitHub? [y/N] '; \
+	  read -r answer; [ "$$answer" = y ] || { echo aborted; exit 1; }
+	@./scripts/quests/release.sh --store=curseforge --lang=$(LOCALE) $(PACKS_AUDIO)
+	@./scripts/audio-github-release.sh quests $(LOCALE)
+else
+full-release: require-droplet
 	@[ -n "$(VERSION)" ] || { echo "VERSION is required:  make quests-full-release VERSION=2.1.0"; exit 1; }
 	@$(MAKE) --no-print-directory -f make/quests.mk sync
 	@$(MAKE) --no-print-directory -f make/quests.mk pull-live
@@ -275,6 +301,7 @@ full-release: require-droplet ## Sync, pull live takes, build and upload the pac
 	@./scripts/quests/release.sh --store=curseforge $(PACKS_AUDIO)
 	@./scripts/quests/release.sh audio-all
 	@./scripts/audio-github-release.sh $(addprefix quests-,$(PACKS_AUDIO))
+endif
 
 # --- the ignore list ------------------------------------------------------------------
 #
