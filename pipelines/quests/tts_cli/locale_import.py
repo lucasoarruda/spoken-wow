@@ -14,7 +14,7 @@ alone; this never creates a line id.
 
 THE TRANSLATION IS CLEANED THE WAY THE ENGLISH IS, WITH TWO EXCEPTIONS:
 
-  * $G male:female; is resolved by the ENGLISH row's player gender, because that is what
+  * $G male:female; (ptBR's $U) is resolved by the ENGLISH row's player gender, because that is what
     splits the line id into :m and :f. A translation with a $G where the English has none
     takes the male form; one without where the English has one is the same text twice.
   * $N, $C and $R are left as they are. The English cleaner writes "adventurer" and
@@ -38,7 +38,8 @@ from psycopg2.extras import execute_values
 from tts_cli.corpus import _skip_reason
 from tts_cli.naming import line_id_for_row
 
-_GENDER = re.compile(r"\$[Gg]\s*([^:;]+?)\s*:\s*([^:;]+?)\s*;")
+# ptBR writes the player's gender as $U where every other language writes $G.
+_GENDER = re.compile(r"\$[GgUu]\s*([^:;]+?)\s*:\s*([^:;]+?)\s*;")
 _DIRECTION = re.compile(r"<.*?>\s")
 
 
