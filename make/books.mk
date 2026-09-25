@@ -17,7 +17,8 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help db extract import export lookup deploy deploy-copy status remove \
-        import-locale pull-history pull-live sounds sync check-synced package package-audio release-dry release release-wago release-curse icon test \
+        import-locale pull-history pull-live sounds sync check-synced package package-audio release-dry release release-wago release-curse \
+        release-audio-dry release-audio icon test \
         full-release
 
 PIPELINE := pipelines/books
@@ -45,8 +46,8 @@ import-locale: ## locales_page_text -> book_line + entity_name (LOCALE=deDE; nee
 export: ## book_line -> addons/SpokenBooks/Data/Books.lua (needs DATABASE_URL)
 	@node $(PIPELINE)/tools/export.mjs
 
-lookup: ## take -> addons/SpokenBooksAudio/Data/Sounds.lua (needs DATABASE_URL)
-	@node $(PIPELINE)/tools/build-lookup.mjs
+lookup: ## take -> the pack's Data/Sounds.lua (LOCALE=xx: into build/books/xx; needs DATABASE_URL)
+	@node $(PIPELINE)/tools/build-lookup.mjs --lang=$(or $(LOCALE),enUS)
 
 #-------------------------------------------------------------------------------
 # The narration
@@ -89,12 +90,12 @@ pull-history: require-droplet ## Fetch the droplet's archived takes (non-destruc
 # Only the takes the pack is built from: the live ones, as the local database has them, so run
 # `make books-sync` first. pull-history is the whole archive, for listening to old takes.
 pull-live: require-droplet ## Fetch only the live takes the local database names (after sync)
-	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh books
+	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh books $(or $(LOCALE),enUS)
 
 # The pack folder the client loads and the release zips: not kept, but assembled from the
 # live takes and the archive before every build. See scripts/audio/sounds.mjs.
-sounds: ## Assemble addons/SpokenBooksAudio/Sounds from the live takes and the archive
-	@$(DB_ENV) node scripts/audio/sounds.mjs books
+sounds: ## Assemble the pack's Sounds/ (LOCALE=xx: into build/books/xx) from the live takes
+	@$(DB_ENV) node scripts/audio/sounds.mjs --lang=$(or $(LOCALE),enUS) books
 
 package: ## Zip the addon into dist/ (for a release)
 	@./scripts/books/package.sh
@@ -112,7 +113,11 @@ package: ## Zip the addon into dist/ (for a release)
 # where the client will never look.
 # From the database, against production's data: the lookup table is rebuilt here rather than
 # on the droplet after every generation, which is what the site used to do.
-package-audio: check-synced sounds lookup ## Zip the sound pack into dist/ (for another machine, or a release)
+ifneq ($(filter-out enUS,$(LOCALE)),)
+package-audio: check-synced sounds lookup ## Zip the sound pack into dist/ (LOCALE=xx for a language's)
+	@LOCALE="$(LOCALE)" ./scripts/books/package-audio.sh
+else
+package-audio: check-synced sounds lookup
 	@mkdir -p dist
 	@version=$$(sed -n 's/^## Version: //p' addons/SpokenBooksAudio/SpokenBooksAudio.toc); \
 	 zip_path="$$PWD/dist/SpokenBooksAudio-$$version.zip"; \
@@ -124,6 +129,7 @@ package-audio: check-synced sounds lookup ## Zip the sound pack into dist/ (for 
 	   "$$(unzip -Z1 "$$zip_path" | grep -c '\.mp3$$')" \
 	   "$$(du -h "$$zip_path" | cut -f1)"; \
 	 shasum -a 256 "$$zip_path"
+endif
 
 # The in-game addon list reads a TGA or BLP, never the PNG or SVG in
 # pipelines/books/assets/, so the icon is converted and committed -- an addon must build
@@ -174,6 +180,14 @@ release-wago: ## Upload the built zips to Wago only (needs WAGO_TOKEN)
 
 release-curse: ## Upload the built zips to CurseForge only (needs CURSEFORGE_TOKEN)
 	@./scripts/books/release.sh --store=curseforge
+
+# One language's sound pack, to CurseForge (and Wago where its page has an id). English's is
+# `release` as always; LOCALE picks another language's page under publishers/books/.
+release-audio-dry: ## Show what uploading the sound pack would send (LOCALE=xx for a language)
+	@./scripts/books/release.sh --dry-run --lang=$(or $(LOCALE),enUS) audio
+
+release-audio: ## Upload the sound pack (LOCALE=xx for a language's)
+	@./scripts/books/release.sh --lang=$(or $(LOCALE),enUS) audio
 
 # The whole pack release, from production's data to the stores, with one question before
 # anything is uploaded. Each step is its own target and still runs alone; this is their order.

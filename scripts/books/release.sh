@@ -5,6 +5,7 @@
 #   ./scripts/books/release.sh             # both projects, both stores
 #   ./scripts/books/release.sh books       # just the addon
 #   ./scripts/books/release.sh audio       # just the sound pack
+#   ./scripts/books/release.sh --lang=esMX audio # that language's sound pack instead
 #   ./scripts/books/release.sh --store=wago        # Wago only
 #   ./scripts/books/release.sh --store=curseforge  # CurseForge only
 #   NO_DEPENDENCIES=1 ./scripts/books/release.sh audio   # upload without declaring the addon
@@ -25,6 +26,12 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DIST="$REPO/dist"
+
+# The language whose sound pack `audio` means. English unless --lang says otherwise; the
+# addon itself has one language-independent project, so --lang is refused alongside `books`.
+LANG_CODE=enUS
+pack_field() { node "$REPO/scripts/lib/packs.mjs" get books "$LANG_CODE" - "$1"; }
+english() { [[ "$LANG_CODE" == enUS ]]; }
 
 # The Wago half, which is the same for every project and so lives in one file.
 # shellcheck source=../lib/wago.sh
@@ -48,51 +55,29 @@ GAME_VERSION_FOREVER="${GAME_VERSION_FOREVER:-1.60.1}"
 RELEASE_TYPE="${RELEASE_TYPE:-release}"
 
 # project key -> CurseForge project id, addon folder the version is read from, and the zip
-# basename the package scripts produce.
-#
-# An unknown target falls through to an empty id and is refused below rather than
-# defaulting: an id left in this function is an id something eventually uploads to, and
-# uploading a books pack over another project is not recoverable from this side.
-target_curseforge() { case "$1" in
-  books)  echo "1701514";;
-  audio)  echo "1701520";;
-esac; }
+# basename the package scripts produce. `audio`'s come from LANG_CODE's page under
+# publishers/books/ -- the registry a language's pack is created in by hand on CurseForge
+# before it can be released, so an unregistered language fails on the empty project id
+# below rather than uploading over the English project.
+target_curseforge() { case "$1" in books) echo "1701514";; audio) pack_field curseforge;; esac; }
 # The Wago project id for the same project: eight alphanumeric characters, from the project's
 # entry in https://addons.wago.io/developers. They are also in each page's frontmatter under
 # publishers/, which is where scripts/descriptions.mjs checks them -- kept here as well so
 # that this script needs no YAML parser to know where to upload.
-target_wago() { case "$1" in
-  books)  echo "qGYZnRNg";;
-  audio)  echo "qGZOrvNd";;
-esac; }
-target_addon() { case "$1" in
-  books)  echo "SpokenBooks";;
-  audio)  echo "SpokenBooksAudio";;
-esac; }
-target_zip() { case "$1" in
-  books)  echo "SpokenBooks";;
-  audio)  echo "SpokenBooksAudio";;
-esac; }
+target_wago()       { case "$1" in books) echo "qGYZnRNg";; audio) pack_field wago;; esac; }
+target_addon()      { case "$1" in books) echo "SpokenBooks";; audio) pack_field folder;; esac; }
+target_zip()        { target_addon "$1"; }
 # The project's slug. Used for the link printed after an upload, so a wrong one here is a
 # dead link and nothing worse -- unlike the slugs in target_dependencies(), which
 # CurseForge resolves at upload time.
-target_slug() { case "$1" in
-  books)  echo "spoken-books";;
-  audio)  echo "spoken-books-audio";;
-esac; }
+target_slug()       { case "$1" in books) echo "spoken-books";; audio) pack_field slug;; esac; }
 # Required dependencies by CurseForge slug. The addon needs the player it speaks through,
 # and the pack needs the addon: it is data, inert without something to read it, and a
 # manager that installs it alone leaves a player several hundred megabytes heavier and no
 # louder. It also makes the pair upgrade together, which is what lets the pack register
 # itself under one name only.
-target_dependencies() { case "$1" in
-  books)  echo "spoken-player";;
-  audio)  echo "spoken-books";;
-esac; }
-target_game_versions() { case "$1" in
-  books)  echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
-  audio)  echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
-esac; }
+target_dependencies() { case "$1" in books) echo "spoken-player";; audio) echo "spoken-books";; esac; }
+target_game_versions() { echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER"; }
 
 dry_run=""
 stores="curseforge wago"
@@ -103,10 +88,18 @@ for arg in "$@"; do
     --store=curseforge) stores="curseforge";;
     --store=wago)       stores="wago";;
     --dry-run|-n) dry_run=1;;
+    --lang=*) LANG_CODE="${arg#--lang=}";;
     books|audio) targets+=("$arg");;
-    *) echo "error: unknown argument '$arg' (expected: books, audio, --store=..., --dry-run)" >&2; exit 1;;
+    *) echo "error: unknown argument '$arg' (expected: books, audio, --lang=..., --store=..., --dry-run)" >&2; exit 1;;
   esac
 done
+
+if ! english; then
+  for t in "${targets[@]}"; do
+    [[ "$t" == audio ]] || { echo "error: --lang=$LANG_CODE releases a sound pack; '$t' has one project for every language" >&2; exit 1; }
+  done
+  (( ${#targets[@]} > 0 )) || targets=("audio")
+fi
 
 # Asked once, answered everywhere below: `case " $stores " in *" wago "*)` reads worse than
 # this does at each of the four places that need it.
@@ -188,7 +181,10 @@ changelog_for() {
     const { readFileSync } = require("fs");
     const [path, version] = process.argv.slice(1);
     const lines = readFileSync(path, "utf8").split("\n");
-    const start = lines.findIndex((l) => l.startsWith(`## ${version}`));
+    // Restated from isLanguageHeading in scripts/lib/packs.mjs, because this is a node -e
+    // string and cannot import it -- keep the two in step.
+    const language = /^## \S+ — [a-z]+(?:-[a-z]+)+-[a-z]{2}[A-Z]{2}(?:\s|$)/;
+    const start = lines.findIndex((l) => l.startsWith(`## ${version}`) && !language.test(l));
     if (start === -1) {
       console.error(`no "## ${version}" section in ${path}`);
       process.exit(1);
@@ -215,8 +211,12 @@ for target in "${targets[@]}"; do
     exit 1
   fi
 
-  toc="$REPO/addons/$addon/$addon.toc"
-  version="$(sed -n 's/^## Version:[[:space:]]*//p' "$toc" | head -1 | tr -d '\r')"
+  if [[ "$target" == audio ]] && ! english; then
+    version="$(pack_field version)"
+  else
+    toc="$REPO/addons/$addon/$addon.toc"
+    version="$(sed -n 's/^## Version:[[:space:]]*//p' "$toc" | head -1 | tr -d '\r')"
+  fi
   zip_path="$DIST/$zip_name-$version.zip"
 
   echo
@@ -227,7 +227,11 @@ for target in "${targets[@]}"; do
     exit 1
   fi
 
-  changelog="$(changelog_for "$version")"
+  if [[ "$target" == audio ]] && ! english; then
+    changelog="$(node "$REPO/scripts/lib/packs.mjs" changelog "$REPO/docs/books/CHANGELOG.md" "$version" "$(pack_field release)")"
+  else
+    changelog="$(changelog_for "$version")"
+  fi
   size="$(du -h "$zip_path" | cut -f1)"
 
   echo "  file:      $zip_path ($size)"
@@ -308,13 +312,15 @@ for target in "${targets[@]}"; do
     file_id="$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).id ?? "?"))' "$response")"
     echo "  uploaded -- file id $file_id"
     echo "  https://www.curseforge.com/wow/addons/$(target_slug "$target")/files/$file_id"
+    fi
   fi
-fi
 
   # The Wago upload. Deliberately after the CurseForge one and not conditional on it: the two
   # stores reject files for different reasons -- CurseForge has a body-size ceiling the packs
   # have already met -- and a file one store refuses is still a file the other should have.
-  if store_has wago; then
+  if store_has wago && [[ -z "$(target_wago "$target")" ]]; then
+    echo "  wago:      no Wago project for $target -- skipped (its players use the GitHub release)"
+  elif store_has wago; then
     if [[ -n "$dry_run" ]]; then
       echo "  wago:      project $(target_wago "$target") -- dry run, not uploading"
     else
