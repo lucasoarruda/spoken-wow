@@ -1541,32 +1541,36 @@ audience this is for. `RELEASE_TYPE=beta` overrides it.
 
 ### A language's sound pack
 
-Another language's narration ships as a pack of its own: `SpokenZonesAudio_esMX`, built from
-`addons/SpokenZonesAudio_esMX/` (its `.toc`, icon and README; `Sounds/` and `Data/Sounds.lua`
-are made at build time), at the one VBR tier, into a CurseForge project of its own. Its `.toc`
-says `X-SpokenZones-Language: esMX`, so Spoken Zones plays it only under Spanish (AL) text,
-and it installs beside the English pack. Its takes are archived under
-`audio-history/zones/esMX/`, so pulling or building it never touches English's files.
+A page under `publishers/zones/` is what makes a language's pack exist at all —
+`publishers/zones/spoken-zones-audio-esmx.md` for `esMX`. Its frontmatter (`curseforge:`,
+`version:`, `slug:`, `name:`) is the CurseForge project, the version and the folder name
+(`SpokenZonesAudio_esMX`) that every build and release script reads through
+`scripts/lib/packs.mjs`, rather than a case a second language would add to. Add a language by
+adding its page; nothing else names it.
 
-`LOCALE=esMX` on the voice targets moves the whole chain to that language — the take rows
-read, `manifest-esMX.json`, the `Sounds/` assembled and the lookup written beside it:
+`LOCALE=esMX` moves the whole chain to that language, and every step's build output lands
+under `build/zones/esMX/` (never in English's `addons/SpokenZonesAudio/`, which stays
+English's alone):
 
 ```sh
-make zones-sync                               # every language's takes, as production has them
-make zones-pull-live LOCALE=esMX              # only esMX's live takes
-make zones-package-audio LOCALE=esMX          # dist/SpokenZonesAudio_esMX-<v>.zip
-./scripts/zones/release.sh --dry-run --store=curseforge audio-esMX
-./scripts/zones/release.sh --store=curseforge audio-esMX
-./scripts/audio-github-release.sh zones-audio-esMX
+make zones-pull-live LOCALE=esMX      # this language's live takes, from the database
+make zones-sounds LOCALE=esMX         # build/zones/esMX/Sounds, assembled from the archive
+make zones-lookup LOCALE=esMX         # build/zones/esMX/Data/Sounds.lua
+make zones-package-audio LOCALE=esMX  # dist/SpokenZonesAudio_esMX-<v>.zip
+make zones-release-audio LOCALE=esMX  # uploads it, from ./scripts/zones/release.sh --lang=esMX
 ```
 
-The pack numbers itself from 1.0.0 in its own `.toc`, and its changelog sections are headed
-`## <version> — audio esMX`. It has no Wago project — Wago refuses a file this size — so its
-page, `publishers/zones/spoken-zones-audio-esmx.md`, has no `wago:`, and the GitHub release is
-where a Wago player finds it. After the first upload, commit the generated
-`Data/Sounds.lua` and `manifest-esMX.json`, and add the language to `AUDIO_PUBLISHED` in
-`tools/locale/build-languages.mjs`. A second language is the same folder, page and
-`release.sh`/`audio-github-release.sh` entries under its own code.
+A language ships at the one `high`-tier quality every English pack ships at — its clips arrive
+already at the bitrate they ship, so there is nothing to transcode. Its `.toc` says
+`X-SpokenZones-Language: esMX`, so Spoken Zones plays it only under Spanish (AL) text, and it
+installs beside the English pack rather than over it.
+
+The pack numbers itself from 1.0.0 in its own page, and its changelog sections are headed by
+its release tag: `## <version> — zones-audio-esMX`. It has no Wago project — Wago refuses a
+file this size — so its page has no `wago:`, and `./scripts/audio-github-release.sh zones esMX`
+is where a Wago player finds it. Nothing under `build/` or `dist/` is committed, so after a
+release there is nothing left to commit — a second language is a page, a release and nothing
+else.
 
 ### Descriptions live in `publishers/`, and are pasted by hand
 
