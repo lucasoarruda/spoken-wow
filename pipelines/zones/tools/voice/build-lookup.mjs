@@ -12,18 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadEnvFile } from "../lib/env.mjs";
-import { sourceFolder } from "../lib/locales.mjs";
-import { ROOT } from "../lib/loredata.mjs";
-import { close as closeStore, LANG, loadManifest, soundsDir } from "./store.mjs";
-
-// Beside the masters, whichever language those are. The lookup describes the
-// files next to it, so the two cannot be built for different languages.
-//
-// The directory in this repository, not the folder the pack ships under: those are two
-// names now, and this writes a file into the tree. See sourceFolder in lib/locales.mjs.
-function packDir(lang) {
-  return join(ROOT, "addons", sourceFolder(lang));
-}
+import { close as closeStore, loadManifest, packDir, soundsDir } from "./store.mjs";
 
 function luaString(text) {
   return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -45,7 +34,7 @@ function luaPath(file) {
  * resolves every clip through this table, so a new take that is not in it is
  * unreachable and the old duration would reset the Play button at the wrong moment.
  */
-export async function buildLookup(lang = LANG) {
+export async function buildLookup() {
   const manifest = await loadManifest();
 
   const zones = new Map();      // mapID -> row
@@ -145,7 +134,7 @@ export async function buildLookup(lang = LANG) {
     "",
   );
 
-  const outPath = join(packDir(lang), "Data/Sounds.lua");
+  const outPath = join(packDir(), "Data/Sounds.lua");
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, lines.join("\n"));
 

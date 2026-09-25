@@ -6,9 +6,9 @@
 #   ./scripts/package-audio.sh high            # just the 128kbps one
 #   LOCALE=esMX ./scripts/package-audio.sh     # another language's pack
 #
-# A language other than English is built from addons/SpokenZonesAudio_<lang> into a folder of
-# the same name, at the standard tier only (tiersFor and packFolder in
-# pipelines/zones/tools/lib/locales.mjs), and its .toc says which language it narrates.
+# A language other than English is built from build/zones/<lang> -- staged there by
+# `make zones-sounds LOCALE=..` and `make zones-lookup LOCALE=..` -- into a folder named and
+# versioned by its store page (scripts/lib/packs.mjs), at the one VBR tier every language ships.
 #
 # Two tiers exist because this is a ~790MB download at the source bitrate, which
 # is a lot to ask for narration that is mostly listened to once per zone. The
@@ -52,16 +52,27 @@ if [[ ! "$LOCALE" =~ ^[a-z]{2}[A-Z]{2}$ ]]; then
 fi
 english() { [[ "$LOCALE" == "enUS" ]]; }
 
-# The masters. English's are the high tier the project already publishes; another language's
-# folder carries its code. Kept in step with sourceFolder() in tools/lib/locales.mjs.
-if english; then
-  SRC="$REPO/addons/SpokenZonesAudio"
-else
-  SRC="$REPO/addons/SpokenZonesAudio_$LOCALE"
-fi
-TOC="$SRC/$(basename "$SRC").toc"
-SOUNDS="$SRC/Sounds"
+# The source is always English's folder: the .toc, README and everything but the audio and
+# the lookup come from it regardless of language.
+SRC="$REPO/addons/SpokenZonesAudio"
+TOC="$SRC/SpokenZonesAudio.toc"
 DIST="$REPO/dist"
+
+if english; then
+  SOUNDS="$SRC/Sounds"
+  LOOKUP="$SRC/Data/Sounds.lua"
+else
+  # Staged by `make zones-sounds LOCALE=..` and `make zones-lookup LOCALE=..`: build output,
+  # never committed. What this language's pack is called comes from its page.
+  WORK="$REPO/build/zones/$LOCALE"
+  SOUNDS="$WORK/Sounds"
+  LOOKUP="$WORK/Data/Sounds.lua"
+  pack_field() { node "$REPO/scripts/lib/packs.mjs" get zones "$LOCALE" - "$1"; }
+  PACK_FOLDER="$(pack_field folder)"
+  PACK_TITLE="$(pack_field name)"
+  PACK_VERSION="$(pack_field version)"
+  PACK_SLUG="$(pack_field slug)"
+fi
 
 # Transcoded clips, kept between runs. A sibling of dist/ rather than a child,
 # because `make clean` removes dist/ and re-encoding the corpus is five minutes.
@@ -96,7 +107,7 @@ JOBS="${JOBS:-$( (command -v nproc >/dev/null 2>&1 && nproc) || sysctl -n hw.ncp
 # recipe automatically starts a fresh cache instead of serving entries cut with
 # the old one. "copy" means no transcode.
 tier_folder() {
-  if ! english; then echo "SpokenZonesAudio_$LOCALE"; return; fi
+  if ! english; then echo "$PACK_FOLDER"; return; fi
   case "$1" in standard) echo "ZoneLoreAudio64";; high) echo "SpokenZonesAudio";; esac
 }
 tier_bitrate()  { case "$1" in standard) echo "64";; high) echo "128";; esac; }
@@ -104,9 +115,9 @@ tier_encoding() { case "$1" in standard) echo "vbr-v6";; high) echo "copy";; esa
 # The high tier was renamed from ZoneLoreAudio with the projects: a pack reads its own folder
 # name out of the loader, so nothing breaks, and the re-download it costs is one the release
 # doing the rename costs anyway. ZoneLoreAudio64 keeps its name because it is retired.
-# Another language's title is its source .toc's, which names the language.
+# Another language's title is its page's.
 tier_title() {
-  if ! english; then sed -n 's/^## Title:[[:space:]]*//p' "$TOC" | head -1 | tr -d '\r'; return; fi
+  if ! english; then echo "$PACK_TITLE"; return; fi
   case "$1" in standard) echo "Spoken Zones Audio 64";; high) echo "Spoken Zones Audio";; esac
 }
 
@@ -114,8 +125,9 @@ tier_title() {
 # projects, two folder names and a question at install time that the answer "take the
 # bigger one" always won. ZoneLoreAudio64 stays published so existing installs keep
 # working and is never uploaded to again. `standard` is still reachable by naming it.
-# Another language ships the one VBR tier (tiersFor in tools/lib/locales.mjs).
-if english; then tiers=("high"); else tiers=("standard"); fi
+# A language's tier is `high`, encoding `copy`: its clips arrive already at the bitrate
+# they ship at, so there is nothing to transcode.
+tiers=("high")
 
 if [[ $# -gt 0 ]]; then
   for arg in "$@"; do
@@ -132,7 +144,11 @@ if [[ ! -f "$TOC" ]]; then
   exit 1
 fi
 
-version="$(sed -n 's/^## Version:[[:space:]]*//p' "$TOC" | head -1 | tr -d '\r')"
+if english; then
+  version="$(sed -n 's/^## Version:[[:space:]]*//p' "$TOC" | head -1 | tr -d '\r')"
+else
+  version="$PACK_VERSION"
+fi
 if [[ -z "$version" ]]; then
   echo "error: no '## Version:' line in $TOC" >&2
   exit 1
@@ -145,13 +161,13 @@ if ! grep -q '^## X-SpokenZones-Language:' "$TOC"; then
   exit 1
 fi
 
-count="$(find "$SOUNDS" -name '*.mp3' 2>/dev/null | wc -l | tr -d ' ')"
+count="$(find "$SOUNDS" -name '*.mp3' 2>/dev/null | wc -l | tr -d ' ' || true)"
 if [[ "$count" -eq 0 ]]; then
   echo "error: no mp3 files in $SOUNDS" >&2
   if english; then
     echo "       Generate some first, on the site, then:  make zones-pull-live zones-sounds" >&2
   else
-    echo "       Generate some first, on the site, then:  make zones-pull-live zones-sounds LOCALE=$LOCALE" >&2
+    echo "       Generate some first, on the site, then:  make zones-pull-live zones-sounds zones-lookup LOCALE=$LOCALE" >&2
   fi
   exit 1
 fi
@@ -177,9 +193,7 @@ node "$REPO/scripts/descriptions.mjs" --write >/dev/null
 # A language's pack has a page of its own, publishers/zones/spoken-zones-audio-<lang>.md, and
 # ships that; until one exists it falls back the same way.
 tier_readme() {
-  local own
-  own="$REPO/dist/descriptions/spoken-zones-audio-$(printf '%s' "$LOCALE" | tr '[:upper:]' '[:lower:]').md"
-  if ! english && [[ -f "$own" ]]; then echo "$own"; return; fi
+  if ! english; then echo "$REPO/dist/descriptions/$PACK_SLUG.md"; return; fi
   echo "$REPO/dist/descriptions/spoken-zones-audio.md"
 }
 
@@ -208,10 +222,12 @@ for tier in "${tiers[@]}"; do
   trap 'rm -rf "$staging"' EXIT
   mkdir -p "$staging/$folder"
 
-  # Everything except the audio is copied; the audio is either re-encoded or
-  # copied into place, so the tree the client sees is identical apart from the
-  # bitrate and the three .toc lines rewritten below.
-  rsync -a --exclude 'Sounds/' --exclude '.DS_Store' "$SRC/" "$staging/$folder/"
+  # Everything except the audio and the lookup is copied from English's source; the audio is
+  # either re-encoded or copied into place and the lookup is this language's, so the tree the
+  # client sees is identical apart from those and the .toc lines rewritten below.
+  rsync -a --exclude 'Sounds/' --exclude 'Data/Sounds.lua' --exclude '.DS_Store' "$SRC/" "$staging/$folder/"
+  mkdir -p "$staging/$folder/Data"
+  cp "$LOOKUP" "$staging/$folder/Data/Sounds.lua"
   # The .toc must be named after its folder. The source tier already is, and mv
   # onto itself is an error rather than a no-op.
   if [[ "$folder" != "$(basename "$SRC")" ]]; then
@@ -232,6 +248,7 @@ for tier in "${tiers[@]}"; do
   sed -i.bak \
     -e "s|^## IconTexture:.*|## IconTexture: Interface\\\\AddOns\\\\$folder\\\\Textures\\\\AddonIcon.tga|" \
     -e "s|^## Title:.*|## Title: $title|" \
+    -e "s|^## Version:.*|## Version: $version|" \
     -e "s|^## X-SpokenZones-Quality:.*|## X-SpokenZones-Quality: $tier|" \
     -e "s|^## X-SpokenZones-Bitrate:.*|## X-SpokenZones-Bitrate: $bitrate|" \
     -e "s|^## X-SpokenZones-Language:.*|## X-SpokenZones-Language: $LOCALE|" \
@@ -243,9 +260,7 @@ for tier in "${tiers[@]}"; do
     echo "copying $count masters..."
     rsync -a --exclude '.DS_Store' --exclude '*.part' "$SOUNDS/" "$staging/$folder/Sounds/"
   else
-    # Per language as well as per recipe: the prune below drops every entry this run did not
-    # use, and one language's build must not empty the cache another's is kept in.
-    if english; then cache="$CACHE_ROOT/$encoding"; else cache="$CACHE_ROOT/$LOCALE-$encoding"; fi
+    cache="$CACHE_ROOT/$encoding"
     mkdir -p "$cache"
 
     # Three passes rather than one loop, because only the middle one is expensive

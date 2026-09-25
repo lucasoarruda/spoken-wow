@@ -13,14 +13,12 @@ import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 
 import { loadEnvFile } from "../lib/env.mjs";
-import { ROOT, readLines } from "../lib/loredata.mjs";
+import { readLines } from "../lib/loredata.mjs";
 import { assignFiles, lineId } from "./naming.mjs";
 import { hasBrackets, loadPronunciation, toSpokenText } from "./normalise.mjs";
-import { sourceFolder } from "../lib/locales.mjs";
-import { LANG, loadManifest, soundsDir } from "./store.mjs";
+import { LANG, loadManifest, packDir, soundsDir } from "./store.mjs";
 
-// The tree's directory, not the published folder name. See sourceFolder in lib/locales.mjs.
-const LOOKUP_PATH = join(ROOT, "addons", sourceFolder(LANG), "Data/Sounds.lua");
+const LOOKUP_PATH = join(packDir(), "Data/Sounds.lua");
 
 const problems = [];
 const notes = [];

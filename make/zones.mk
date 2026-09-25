@@ -239,7 +239,7 @@ history-status: require-droplet ## Compare archived take count and size on both 
 
 # The pack's Sounds/ is not kept: it is assembled from the live takes and the archive, and
 # made again before every build. See scripts/audio/sounds.mjs.
-sounds: ## Assemble addons/SpokenZonesAudio/Sounds (LOCALE=esMX: that language's pack) from the live takes
+sounds: ## Assemble the pack's Sounds/ (LOCALE=xx: into build/zones/xx) from the live takes
 	@$(DB_ENV) node scripts/audio/sounds.mjs --lang=$(or $(LOCALE),enUS) zones
 
 #-------------------------------------------------------------------------------
