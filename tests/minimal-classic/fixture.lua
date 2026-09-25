@@ -1,6 +1,19 @@
 -- Offline WoW UI/timer fixture. Queue, actions, portraits and both player UIs
 -- under test are the repository's real Lua, not reimplementations.
 getn = table.getn
+-- The client's format takes positional arguments (%1$s), which the translated strings use;
+-- stock Lua's does not. Reordered as tests/lua/wow_client_stub.lua does, then formatted plainly.
+local plainFormat = string.format
+string.format = function(fmt, ...)
+    if type(fmt) ~= 'string' or not fmt:find('%%%d+%$') then return plainFormat(fmt, ...) end
+    local args, ordered, n = { ... }, {}, 0
+    local plain = fmt:gsub('%%(%d+)%$', function(index)
+        n = n + 1
+        ordered[n] = args[tonumber(index)]
+        return '%'
+    end)
+    return plainFormat(plain, unpack(ordered, 1, n))
+end
 format = string.format
 local methods = {}
 local clock, timers, serial = 0, {}, 0
