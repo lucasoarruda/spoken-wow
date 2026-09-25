@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Facets } from "@/lib/facets";
+import { AUDIO_STATE_OPTIONS } from "@/lib/audio-state";
 import { NPC_TYPES, SOURCES } from "@/lib/line-fields";
 import { activeFilterCount } from "@/lib/active-filters";
 import type { Filter, LineFilters } from "@/lib/search";
@@ -131,6 +132,12 @@ const SearchBar = forwardRef<HTMLInputElement, Props>(function SearchBar(
           options={plainOptions(NPC_TYPES)}
           onChange={(npcType) => onFilters({ npcType: npcType as LineFilters["npcType"] })}
         />
+        <FilterChip
+          label="audio"
+          value={filters.state}
+          options={AUDIO_STATE_OPTIONS}
+          onChange={(state) => onFilters({ state: state as LineFilters["state"] })}
+        />
         {/* Read as one range: "generated after X" and "generated before Y". A file the app
             has never written has no date, and counts as generated long ago - so it sits in
             every "before" and no "after". */}
@@ -147,16 +154,6 @@ const SearchBar = forwardRef<HTMLInputElement, Props>(function SearchBar(
 
         <div className="flex items-center gap-2 whitespace-nowrap">
           <Checkbox
-            id="missing-only"
-            checked={filters.missingOnly ?? false}
-            onCheckedChange={(value) => onFilters({ missingOnly: value === true })}
-          />
-          <Label htmlFor="missing-only" className="text-muted-foreground text-sm">
-            missing audio only
-          </Label>
-        </div>
-        <div className="flex items-center gap-2 whitespace-nowrap">
-          <Checkbox
             id="overridden-only"
             checked={filters.overridden ?? false}
             onCheckedChange={(value) => onFilters({ overridden: value === true })}
@@ -165,17 +162,7 @@ const SearchBar = forwardRef<HTMLInputElement, Props>(function SearchBar(
             rewritten only
           </Label>
         </div>
-        <div className="flex items-center gap-2 whitespace-nowrap">
-          <Checkbox
-            id="outdated-only"
-            checked={filters.outdated ?? false}
-            onCheckedChange={(value) => onFilters({ outdated: value === true })}
-          />
-          <Label htmlFor="outdated-only" className="text-muted-foreground text-sm">
-            audio outdated
-          </Label>
-        </div>
-        {/* Its own box beside "audio outdated", not a narrowing of it: a lexicon edit moves
+        {/* Its own box beside the "audio" chip, not a narrowing of it: a lexicon edit moves
             no text, so the two select different faults in the same file. */}
         <div className="flex items-center gap-2 whitespace-nowrap">
           <Checkbox

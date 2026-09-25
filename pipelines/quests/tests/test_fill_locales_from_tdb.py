@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-from fill_locales_from_tdb import read_tables, same  # noqa: E402
+from fill_locales_from_tdb import read_tables, same, untranslated  # noqa: E402
 
 
 def test_the_dump_reader_keeps_named_columns_and_unescapes(tmp_path):
@@ -47,3 +47,15 @@ def test_a_changed_word_is_a_changed_line():
     assert same("a good mage") != same("a good $C")
     assert same("the behest of Tara") != same("the behest of Thenysil")
     assert same(None) == same("") == ""
+
+
+def test_english_filed_under_another_language_is_not_a_translation():
+    english = "Executor Zygand tells me you've been out killing Scarlet Crusaders, $n."
+    assert untranslated(english, english)
+    assert untranslated("Executor Zigano tells me you've been out killing Scarlet Crusaders.", english)
+    assert not untranslated("O Executor Zygand me disse que você tem matado Cruzados Escarlates, $n.", english)
+
+
+def test_a_short_line_sharing_a_name_is_still_a_translation():
+    assert not untranslated("Olá, $n.", "Hello, $n.")
+    assert not untranslated("Salve, $c!", "Hail, $c!")

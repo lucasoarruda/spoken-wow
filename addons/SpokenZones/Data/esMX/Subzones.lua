@@ -1051,7 +1051,7 @@ local subzones = {
 		["pyrewood village"] = {
 			name = "Aldea Piroleña",
 			short = "La Aldea Piroleña se encuentra en el límite del Bosque de Argénteos, un grupo apiñado de humanos que sobrevivieron a la primera llegada de la Plaga durante la Tercera Guerra.",
-			full = "La Aldea Piroleña se encuentra en el límite del Bosque de Argénteos, un grupo apiñado de humanos que sobrevivieron a la primera llegada de la Plaga durante la Tercera Guerra. Al norte se alza un castillo que antes pertenecía al barón Silverlaine, custodiado por el paladín comandante Springvale y la Mano de Plata. Silverlaine y sus hombres fueron masacrados por los huargen del archimago Arugal, que se apoderó del castillo y lo rebautizó como Castillo de Colmillo Oscuro. Desde allí, Arugal volvió su locura contra la propia Piroleña y maldijo a su gente para que cada noche se convierta en huargen Furia Lunar babeantes, que despedazan a cualquiera que se cruce en su camino, solo para despertar de nuevo como humanos al amanecer.\n\nA pesar de ello, la aldea sigue abriendo sus puertas a los viajeros durante el día, y su gente sigue atada a la maldición que Arugal les impuso, sin que se vea un final.",
+			full = "La Aldea Piroleña se encuentra en el límite del Bosque de Argénteos, un grupo apiñado de humanos que sobrevivieron a la primera llegada de la Plaga durante la Tercera Guerra. Al norte se alza un castillo que antes pertenecía al barón Filargenta, custodiado por el paladín comandante Springvale y la Mano de Plata. Filargenta y sus hombres fueron masacrados por los huargen del archimago Arugal, que se apoderó del castillo y lo rebautizó como Castillo de Colmillo Oscuro. Desde allí, Arugal volvió su locura contra la propia Piroleña y maldijo a su gente para que cada noche se convierta en huargen Furia Lunar babeantes, que despedazan a cualquiera que se cruce en su camino, solo para despertar de nuevo como humanos al amanecer.\n\nA pesar de ello, la aldea sigue abriendo sus puertas a los viajeros durante el día, y su gente sigue atada a la maldición que Arugal les impuso, sin que se vea un final.",
 			source = "https://warcraft.wiki.gg/wiki/Pyrewood_Village",
 		},
 		["sepulcher"] = {
@@ -1062,8 +1062,8 @@ local subzones = {
 		},
 		["shadowfang keep"] = {
 			name = "Castillo de Colmillo Oscuro",
-			short = "El Castillo de Colmillo Oscuro se alza sobre un alto risco que domina la Aldea Piroleña. Perteneció en otro tiempo al barón Silverlaine, un señor de Gilneas, hasta que la Plaga cayó sobre Lordaeron y el archimago real Arugal buscó la manera de detenerla.",
-			full = "El Castillo de Colmillo Oscuro se alza sobre un alto risco que domina la Aldea Piroleña. Perteneció en otro tiempo al barón Silverlaine, un señor de Gilneas, hasta que la Plaga cayó sobre Lordaeron y el archimago real Arugal buscó la manera de detenerla. Basándose en las investigaciones del mago Ur, y con la bendición del rey Genn Cringris pero en contra del consejo del Kirin Tor, Arugal invocó a los huargen. Estos hicieron retroceder la marea de no-muertos, y luego se volvieron contra la propia Gilneas, destrozando la Muralla de Cringris antes de correr libres por Argénteos. Cayeron sobre el castillo y mataron al barón Silverlaine y a toda su casa.\n\nArugal, destrozado por lo que había desatado, no huyó de ello. Llamó a los huargen sus hijos, se apoderó del castillo y lo rebautizó como Colmillo Oscuro. En comunión con un amo al que servía en el Culto del Lobo, extendió la maldición por el bosque, hasta que la propia Aldea Piroleña quedó transformada: su gente era humana de día y bestias de noche, gobernada por un consejo que solo respondía ante él.",
+			short = "El Castillo de Colmillo Oscuro se alza sobre un alto risco que domina la Aldea Piroleña. Perteneció en otro tiempo al barón Filargenta, un señor de Gilneas, hasta que la Plaga cayó sobre Lordaeron y el archimago real Arugal buscó la manera de detenerla.",
+			full = "El Castillo de Colmillo Oscuro se alza sobre un alto risco que domina la Aldea Piroleña. Perteneció en otro tiempo al barón Filargenta, un señor de Gilneas, hasta que la Plaga cayó sobre Lordaeron y el archimago real Arugal buscó la manera de detenerla. Basándose en las investigaciones del mago Ur, y con la bendición del rey Genn Cringris pero en contra del consejo del Kirin Tor, Arugal invocó a los huargen. Estos hicieron retroceder la marea de no-muertos, y luego se volvieron contra la propia Gilneas, destrozando la Muralla de Cringris antes de correr libres por Argénteos. Cayeron sobre el castillo y mataron al barón Filargenta y a toda su casa.\n\nArugal, destrozado por lo que había desatado, no huyó de ello. Llamó a los huargen sus hijos, se apoderó del castillo y lo rebautizó como Colmillo Oscuro. En comunión con un amo al que servía en el Culto del Lobo, extendió la maldición por el bosque, hasta que la propia Aldea Piroleña quedó transformada: su gente era humana de día y bestias de noche, gobernada por un consejo que solo respondía ante él.",
 			source = "https://warcraft.wiki.gg/wiki/Shadowfang_Keep",
 		},
 		["shining strand"] = {
@@ -1218,8 +1218,8 @@ local subzones = {
 		},
 		["corins crossing"] = {
 			name = "Cruce de Corin",
-			short = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y la Mano de Tyr, entre la Cicatriz Infecta y el Lago Mereldar.",
-			full = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y la Mano de Tyr, entre la Cicatriz Infecta y el Lago Mereldar. En otro tiempo fue un pueblo corriente de cruce de caminos, con un ayuntamiento y una herrería.\n\nAhora la Plaga llena por completo sus calles, y entre los muertos se mueven cosas que no pueden verse en absoluto: los sirvientes invisibles, que ven a través del sigilo como si no existiera. No hay ningún camino discreto para atravesar el Cruce de Corin.",
+			short = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y la Mano de Tyr, entre la Cicatriz Purulenta y el Lago Mereldar.",
+			full = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y la Mano de Tyr, entre la Cicatriz Purulenta y el Lago Mereldar. En otro tiempo fue un pueblo corriente de cruce de caminos, con un ayuntamiento y una herrería.\n\nAhora la Plaga llena por completo sus calles, y entre los muertos se mueven cosas que no pueden verse en absoluto: los sirvientes invisibles, que ven a través del sigilo como si no existiera. No hay ningún camino discreto para atravesar el Cruce de Corin.",
 			source = "https://warcraft.wiki.gg/wiki/Corin's_Crossing",
 		},
 		["crown guard tower"] = {
@@ -1357,7 +1357,7 @@ local subzones = {
 		["tyrs hand"] = {
 			name = "Mano de Tyr",
 			short = "La Mano de Tyr es una ciudad humana fortificada, uno de los últimos reductos de los vivos contra la Plaga en la región.",
-			full = "La Mano de Tyr es una ciudad humana fortificada, uno de los últimos reductos de los vivos contra la Plaga en la región. Sus alrededores están en mucho mejor estado que el resto de las Tierras de la Peste, aunque los árboles y la vegetación siguen pudriéndose.\n\nLa ciudad es uno de los lugares sagrados más antiguos y venerados de la Iglesia de la Luz, construida casi por completo a base de iglesias y coronada por la Basílica Escarlata y la abadía fortificada.\n\nCuando llegó la Plaga y Eastweald se convirtió en las Tierras de la Peste, la Mano de Tyr no cayó. Bajo el mando de lord Valdemar resistió asaltos diarios, protegida primero por los Caballeros de la Mano de Plata y después por la Cruzada Escarlata, y enviaba suministros y refuerzos a otros dominios Escarlata, mientras recibía informes diarios desde Stratholme traídos por mensajeros que tenían que abrirse paso a través de caminos plagados de peste.",
+			full = "La Mano de Tyr es una ciudad humana fortificada, uno de los últimos reductos de los vivos contra la Plaga en la región. Sus alrededores están en mucho mejor estado que el resto de las Tierras de la Peste, aunque los árboles y la vegetación siguen pudriéndose.\n\nLa ciudad es uno de los lugares sagrados más antiguos y venerados de la Iglesia de la Luz, construida casi por completo a base de iglesias y coronada por la Basílica Escarlata y la abadía fortificada.\n\nCuando llegó la Plaga y los Bosques del Este se convirtieron en las Tierras de la Peste, la Mano de Tyr no cayó. Bajo el mando de lord Valdemar resistió asaltos diarios, protegida primero por los Caballeros de la Mano de Plata y después por la Cruzada Escarlata, y enviaba suministros y refuerzos a otros dominios Escarlata, mientras recibía informes diarios desde Stratholme traídos por mensajeros que tenían que abrirse paso a través de caminos plagados de peste.",
 			source = "https://warcraft.wiki.gg/wiki/Tyr's_Hand",
 		},
 		["undercroft"] = {
@@ -1419,8 +1419,8 @@ local subzones = {
 		},
 		["dun garok"] = {
 			name = "Dun Garok",
-			short = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ironhill.",
-			full = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ironhill. Su guarnición protege a los humanos de Trabalomas y vigila la Mina Azur, una presencia que los Renegados no soportan, pues han ofrecido oro a quien logre colarse en la fortaleza y pasar a sus enanos por la espada.",
+			short = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ferrocolina.",
+			full = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ferrocolina. Su guarnición protege a los humanos de Trabalomas y vigila la Mina Azur, una presencia que los Renegados no soportan, pues han ofrecido oro a quien logre colarse en la fortaleza y pasar a sus enanos por la espada.",
 			source = "https://warcraft.wiki.gg/wiki/Dun_Garok",
 		},
 		["durnholde keep"] = {
@@ -1545,8 +1545,8 @@ local subzones = {
 		},
 		["western strand"] = {
 			name = "Playa del Oeste",
-			short = "La Playa del Oeste se encuentra en la costa suroeste de las Laderas de Trabalomas. Los múrlocs Torn Fin han levantado pequeños campamentos a lo largo de su orilla, y Andy Murgole patrulla estas aguas, vigilando la costa donde habitan.",
-			full = "La Playa del Oeste se encuentra en la costa suroeste de las Laderas de Trabalomas. Los múrlocs Torn Fin han levantado pequeños campamentos a lo largo de su orilla, y Andy Murgole patrulla estas aguas, vigilando la costa donde habitan.",
+			short = "La Playa del Oeste se encuentra en la costa suroeste de las Laderas de Trabalomas. Los múrlocs Rompeanca han levantado pequeños campamentos a lo largo de su orilla, y Andy Murgole patrulla estas aguas, vigilando la costa donde habitan.",
+			full = "La Playa del Oeste se encuentra en la costa suroeste de las Laderas de Trabalomas. Los múrlocs Rompeanca han levantado pequeños campamentos a lo largo de su orilla, y Andy Murgole patrulla estas aguas, vigilando la costa donde habitan.",
 			source = "https://warcraft.wiki.gg/wiki/Western_Strand",
 		},
 	},
@@ -1566,8 +1566,8 @@ local subzones = {
 		},
 		["altar of zul"] = {
 			name = "El Altar de Zul",
-			short = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga la Guardiana monta guardia en lo alto de las piedras, custodia del poder que el altar aún pueda conservar.",
-			full = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga la Guardiana monta guardia en lo alto de las piedras, custodia del poder que el altar aún pueda conservar.",
+			short = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga la Vigilante monta guardia en lo alto de las piedras, custodia del poder que el altar aún pueda conservar.",
+			full = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga la Vigilante monta guardia en lo alto de las piedras, custodia del poder que el altar aún pueda conservar.",
 			source = "https://warcraft.wiki.gg/wiki/Altar_of_Zul",
 		},
 		["bogens ledge"] = {
@@ -2400,8 +2400,8 @@ local subzones = {
 		},
 		["redridge canyons"] = {
 			name = "Cañones de Crestagrana",
-			short = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Yowler, que dirige a los gnolls que dominan este terreno.",
-			full = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Yowler, que dirige a los gnolls que dominan este terreno.",
+			short = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Ululante, que dirige a los gnolls que dominan este terreno.",
+			full = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Ululante, que dirige a los gnolls que dominan este terreno.",
 			source = "https://warcraft.wiki.gg/wiki/Redridge_Canyons",
 		},
 		["renders camp"] = {
@@ -3387,8 +3387,8 @@ local subzones = {
 		},
 		["satyrnaar"] = {
 			name = "Satyrnaar",
-			short = "Satyrnaar se alza destrozada entre los árboles del noreste de Vallefresno, con sus edificios en ruinas desde hace mucho, aunque ahora hay tiendas agrupadas entre los restos donde los sátiros Bleakheart han establecido su hogar.",
-			full = "Satyrnaar se alza destrozada entre los árboles del noreste de Vallefresno, con sus edificios en ruinas desde hace mucho, aunque ahora hay tiendas agrupadas entre los restos donde los sátiros Bleakheart han establecido su hogar. De las tres fortalezas de sátiros del bosque, solo Satyrnaar sigue en gran parte intacta, y su posición junto al camino que va del Puesto del Hachazo hacia Azshara la ha convertido a la vez en la más accesible y la más disputada de las tres.\n\nLos Bleakheart tienen aquí algo más que un refugio. Dentro de Satyrnaar descansa una de las gemas de alma del Culto de la Facción Oscura, prenda del pacto que une a los sátiros con los oscuros propósitos de ese culto.",
+			short = "Satyrnaar se alza destrozada entre los árboles del noreste de Vallefresno, con sus edificios en ruinas desde hace mucho, aunque ahora hay tiendas agrupadas entre los restos donde los sátiros Almaumbría han establecido su hogar.",
+			full = "Satyrnaar se alza destrozada entre los árboles del noreste de Vallefresno, con sus edificios en ruinas desde hace mucho, aunque ahora hay tiendas agrupadas entre los restos donde los sátiros Almaumbría han establecido su hogar. De las tres fortalezas de sátiros del bosque, solo Satyrnaar sigue en gran parte intacta, y su posición junto al camino que va del Puesto del Hachazo hacia Azshara la ha convertido a la vez en la más accesible y la más disputada de las tres.\n\nLos Almaumbría tienen aquí algo más que un refugio. Dentro de Satyrnaar descansa una de las gemas de alma del Culto de la Facción Oscura, prenda del pacto que une a los sátiros con los oscuros propósitos de ese culto.",
 			source = "https://warcraft.wiki.gg/wiki/Satyrnaar",
 		},
 		["shady nook"] = {
@@ -4056,8 +4056,8 @@ local subzones = {
 		},
 		["dreadmurk shore"] = {
 			name = "Playa Tenebruma",
-			short = "La costa entre la Isla Theramore y el Fuerte del Norte está llena de múrlocs de la tribu Mirefin, que reclaman la costa y sus islas dispersas como propias.",
-			full = "La costa entre la Isla Theramore y el Fuerte del Norte está llena de múrlocs de la tribu Mirefin, que reclaman la costa y sus islas dispersas como propias. Tortugas marinas y otras criaturas comparten las aguas que los rodean.",
+			short = "La costa entre la Isla Theramore y el Fuerte del Norte está llena de múrlocs de la tribu Ancalodo, que reclaman la costa y sus islas dispersas como propias.",
+			full = "La costa entre la Isla Theramore y el Fuerte del Norte está llena de múrlocs de la tribu Ancalodo, que reclaman la costa y sus islas dispersas como propias. Tortugas marinas y otras criaturas comparten las aguas que los rodean.",
 			source = "https://warcraft.wiki.gg/wiki/Dreadmurk_Shore",
 		},
 		["dustwallow bay"] = {
@@ -4140,8 +4140,8 @@ local subzones = {
 		},
 		["witch hill"] = {
 			name = "Colina de las Brujas",
-			short = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de \"Ojolodo\" Jarl. Los múrlocs Mirefin tienen sus campamentos cerca, en el fango.",
-			full = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de \"Ojolodo\" Jarl. Los múrlocs Mirefin tienen sus campamentos cerca, en el fango.",
+			short = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de \"Ojolodo\" Jarl. Los múrlocs Ancalodo tienen sus campamentos cerca, en el fango.",
+			full = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de \"Ojolodo\" Jarl. Los múrlocs Ancalodo tienen sus campamentos cerca, en el fango.",
 			source = "https://warcraft.wiki.gg/wiki/Witch_Hill",
 		},
 		["wyrmbog"] = {

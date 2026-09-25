@@ -27,16 +27,18 @@ describe("counting what is in force", () => {
   });
 
   it("counts the booleans only when they are true", () => {
-    expect(activeFilterCount({ missingOnly: false, overridden: false })).toBe(0);
-    expect(activeFilterCount({ missingOnly: true, overridden: true })).toBe(2);
+    expect(activeFilterCount({ overridden: false })).toBe(0);
+    expect(activeFilterCount({ ignored: false, overridden: true })).toBe(1);
+    expect(activeFilterCount({ state: "missing", overridden: true })).toBe(2);
     // Ignored counts: it changes which corpus the results came from, so a "clear all" that
     // left it in force would restore a different search than it claims to.
     expect(activeFilterCount({ ignored: true })).toBe(1);
   });
 
-  it("counts audio outdated, which narrows", () => {
-    expect(activeFilterCount({ outdated: true })).toBe(1);
-    expect(activeFilterCount({ outdated: false })).toBe(0);
+  it("counts the audio state, whichever it is", () => {
+    expect(activeFilterCount({ state: "stale" })).toBe(1);
+    expect(activeFilterCount({ state: "current" })).toBe(1);
+    expect(activeFilterCount({ state: undefined })).toBe(0);
   });
 
   it("counts narration, which narrows", () => {

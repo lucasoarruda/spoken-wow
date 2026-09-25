@@ -9,6 +9,8 @@
 
 local ADDON_NAME, SpokenBooks = ...
 
+local L = SpokenBooks.L
+
 -- The pack table shape this version knows how to read. A pack declaring anything else is
 -- ignored with a warning: refusing to read it is recoverable, guessing at an unknown layout
 -- plays silence and reports nothing.
@@ -101,7 +103,7 @@ function SpokenBooks:ClipFor(pageId)
 						-- Only where there is more than one page: "page 1 of 1" is noise on a
 						-- letter, which is most of this corpus.
 						label = (book and #book.pages > 1)
-							and format("Page %d of %d", place.number, #book.pages)
+							and format(L.OPT_PAGE_COUNT_FMT, place.number, #book.pages)
 							or nil,
 						bullet = "book",
 						portrait = { kind = "texture", texture = BOOK_TEXTURE },
@@ -120,9 +122,9 @@ end
 --- nothing they can do, and telling them apart is the point of saying anything at all.
 function SpokenBooks:DescribeMissingAudio()
 	if #self:GetAudioPacks() == 0 then
-		return "No Spoken Books sound pack is installed."
+		return L.OPT_NO_PACK_INSTALLED
 	end
-	return "The installed sound pack has no narration for this page yet."
+	return L.OPT_NO_PACK_AUDIO
 end
 
 function SpokenBooks:HasAudio(pageId)

@@ -91,7 +91,7 @@ local subzones = {
 		["orgrimmar"] = {
 			name = "Orgrimmar",
 			short = "Orgrimmar s'éleva dans les années qui suivirent le mont Hyjal, lorsque le chef de guerre Thrall mena son peuple jusqu'à une côte désolée de Kalimdor.",
-			full = "Orgrimmar s'éleva dans les années qui suivirent le mont Hyjal, lorsque le chef de guerre Thrall mena son peuple jusqu'à une côte désolée de Kalimdor. Il nomma la contrée Durotar en l'honneur de son père, et la cité qu'il y éleva, il la nomma Orgrimmar, en l'honneur d'Orgrim Doomhammer, l'ami et mentor qui l'avait façonné. Elle fut bâtie rapidement, mais non sans soin : murailles robustes, portes massives, hautes tours, et les montagnes dans son dos taillées pour faire partie de la forteresse elle-même, de sorte que la terre montait la garde sur la cité.\n\nLa Horde qui la bâtit n'était plus la Horde qui avait jadis embrasé le monde. La malédiction démoniaque brisée, le peuple de Thrall se détourna de la conquête pour se tourner vers la survie, et Orgrimmar fut élevée autant par d'autres que par les orcs : gobelins, taurens et trolls Darkspear travaillèrent à leurs côtés, et le Mok'Nathal Rexxar prêta main-forte à l'ouvrage. Centaures, harpies, lézards-tonnerre, kobolds et hurans mirent tous à l'épreuve la jeune cité durant ses premières années, mais elle tint bon et devint la demeure non seulement des orcs, mais aussi des trolls, des taurens et, avec le temps, des Réprouvés nouvellement accueillis au sein de la Horde.\n\nLe vent lui-même n'est pas un ami ici : les vents tranchants balaient les vallées avec assez de force pour arracher les toits des bâtiments construits sans soin.",
+			full = "Orgrimmar s'éleva dans les années qui suivirent le mont Hyjal, lorsque le chef de guerre Thrall mena son peuple jusqu'à une côte désolée de Kalimdor. Il nomma la contrée Durotar en l'honneur de son père, et la cité qu'il y éleva, il la nomma Orgrimmar, en l'honneur d'Orgrim Marteau du Destin, l'ami et mentor qui l'avait façonné. Elle fut bâtie rapidement, mais non sans soin : murailles robustes, portes massives, hautes tours, et les montagnes dans son dos taillées pour faire partie de la forteresse elle-même, de sorte que la terre montait la garde sur la cité.\n\nLa Horde qui la bâtit n'était plus la Horde qui avait jadis embrasé le monde. La malédiction démoniaque brisée, le peuple de Thrall se détourna de la conquête pour se tourner vers la survie, et Orgrimmar fut élevée autant par d'autres que par les orcs : gobelins, taurens et trolls Darkspear travaillèrent à leurs côtés, et le Mok'Nathal Rexxar prêta main-forte à l'ouvrage. Centaures, harpies, lézards-tonnerre, kobolds et hurans mirent tous à l'épreuve la jeune cité durant ses premières années, mais elle tint bon et devint la demeure non seulement des orcs, mais aussi des trolls, des taurens et, avec le temps, des Réprouvés nouvellement accueillis au sein de la Horde.\n\nLe vent lui-même n'est pas un ami ici : les vents tranchants balaient les vallées avec assez de force pour arracher les toits des bâtiments construits sans soin.",
 			source = "https://warcraft.wiki.gg/wiki/Orgrimmar",
 		},
 		["razor hill"] = {
@@ -589,7 +589,7 @@ local subzones = {
 		["hammerfall"] = {
 			name = "Trépas-d'Orgrim",
 			short = "Le sol de Trépas-d'Orgrim se souvient de ce qu'il fut jadis. Après la deuxième guerre, l'Alliance de Lordaeron y construisit l'un de ses plus grands camps d'internement, parquant les orcs capturés derrière ses murs.",
-			full = "Le sol de Trépas-d'Orgrim se souvient de ce qu'il fut jadis. Après la deuxième guerre, l'Alliance de Lordaeron y construisit l'un de ses plus grands camps d'internement, parquant les orcs capturés derrière ses murs. Il ne resta pas une prison. Le chef de guerre Thrall et Orgrim Doomhammer menèrent la Horde contre le camp pour libérer leur peuple, et dans le chaos de cette libération, alors que Thrall couvrait la retraite, un chevalier lancé à la charge planta une lance dans le dos d'Orgrim avec une telle force qu'elle perça son armure de part en part. Doomhammer mourut là, sur la terre qu'il était venu libérer.\n\nAprès la troisième guerre, la Horde revint dans les ruines et y établit une base avancée, qu'elle nomma en l'honneur du chef de guerre tombé en la prenant. Elle devint plus qu'un avant-poste : un refuge pour ceux qui pensaient n'avoir plus leur place dans le monde, avec ses huttes des esprits, ses écuries, sa forge et sa grande salle dressées là où s'élevaient jadis les murs du camp d'internement.",
+			full = "Le sol de Trépas-d'Orgrim se souvient de ce qu'il fut jadis. Après la deuxième guerre, l'Alliance de Lordaeron y construisit l'un de ses plus grands camps d'internement, parquant les orcs capturés derrière ses murs. Il ne resta pas une prison. Le chef de guerre Thrall et Orgrim Marteau du Destin menèrent la Horde contre le camp pour libérer leur peuple, et dans le chaos de cette libération, alors que Thrall couvrait la retraite, un chevalier lancé à la charge planta une lance dans le dos d'Orgrim avec une telle force qu'elle perça son armure de part en part. Doomhammer mourut là, sur la terre qu'il était venu libérer.\n\nAprès la troisième guerre, la Horde revint dans les ruines et y établit une base avancée, qu'elle nomma en l'honneur du chef de guerre tombé en la prenant. Elle devint plus qu'un avant-poste : un refuge pour ceux qui pensaient n'avoir plus leur place dans le monde, avec ses huttes des esprits, ses écuries, sa forge et sa grande salle dressées là où s'élevaient jadis les murs du camp d'internement.",
 			source = "https://warcraft.wiki.gg/wiki/Hammerfall",
 		},
 		["northfold manor"] = {
@@ -1051,7 +1051,7 @@ local subzones = {
 		["pyrewood village"] = {
 			name = "Bois-du-Bûcher",
 			short = "Bois-du-Bûcher se trouve à la lisière de la forêt des Pins argentés, un groupe d'humains qui survécurent à la première venue du Fléau pendant la troisième guerre.",
-			full = "Bois-du-Bûcher se trouve à la lisière de la forêt des Pins argentés, un groupe d'humains qui survécurent à la première venue du Fléau pendant la troisième guerre. Au nord se dresse un donjon jadis tenu par le baron Silverlaine, gardé par le paladin commandant Springvale et la Main d'argent. Silverlaine et ses hommes furent massacrés par les worgens de l'archimage Arugal, qui s'empara du donjon et le rebaptisa donjon d'Ombrecroc. De là, Arugal tourna sa folie contre Bois-du-Bûcher même, maudissant ses habitants de sorte que chaque nuit ils deviennent des worgens Ragelune écumants, qui déchirent quiconque croise leur chemin, pour se réveiller humains à l'aube.\n\nMalgré cela, le village ouvre encore ses portes aux voyageurs le jour, ses habitants liés à la malédiction qu'Arugal leur a infligée, sans qu'on en voie la fin.",
+			full = "Bois-du-Bûcher se trouve à la lisière de la forêt des Pins argentés, un groupe d'humains qui survécurent à la première venue du Fléau pendant la troisième guerre. Au nord se dresse un donjon jadis tenu par le baron d'Argelaine, gardé par le paladin commandant Springvale et la Main d'argent. d'Argelaine et ses hommes furent massacrés par les worgens de l'archimage Arugal, qui s'empara du donjon et le rebaptisa donjon d'Ombrecroc. De là, Arugal tourna sa folie contre Bois-du-Bûcher même, maudissant ses habitants de sorte que chaque nuit ils deviennent des worgens Ragelune écumants, qui déchirent quiconque croise leur chemin, pour se réveiller humains à l'aube.\n\nMalgré cela, le village ouvre encore ses portes aux voyageurs le jour, ses habitants liés à la malédiction qu'Arugal leur a infligée, sans qu'on en voie la fin.",
 			source = "https://warcraft.wiki.gg/wiki/Pyrewood_Village",
 		},
 		["sepulcher"] = {
@@ -1062,8 +1062,8 @@ local subzones = {
 		},
 		["shadowfang keep"] = {
 			name = "Donjon d'Ombrecroc",
-			short = "Le donjon d'Ombrecroc se dresse sur un haut promontoire au-dessus de Bois-du-Bûcher. Il appartenait jadis au baron Silverlaine, un seigneur de Gilnéas, jusqu'à ce que le Fléau s'abatte sur Lordaeron et que l'archimage royal Arugal cherche un moyen de l'arrêter.",
-			full = "Le donjon d'Ombrecroc se dresse sur un haut promontoire au-dessus de Bois-du-Bûcher. Il appartenait jadis au baron Silverlaine, un seigneur de Gilnéas, jusqu'à ce que le Fléau s'abatte sur Lordaeron et que l'archimage royal Arugal cherche un moyen de l'arrêter. S'appuyant sur les recherches du mage Ur, avec la bénédiction du roi Genn Greymane mais contre l'avis du Kirin Tor, Arugal invoqua les worgens. Ils repoussèrent la marée des morts-vivants, puis se retournèrent contre Gilnéas elle-même, ravageant le mur de Greymane avant de se répandre librement dans les Pins argentés. Ils fondirent sur le donjon et tuèrent le baron Silverlaine et sa maisonnée.\n\nArugal, brisé par ce qu'il avait déchaîné, ne s'enfuit pas. Il appela les worgens ses enfants, s'empara du donjon et le rebaptisa Ombrecroc. Communiant avec un maître qu'il servait au sein du culte du Loup, il répandit la malédiction à travers la forêt, jusqu'à ce que Bois-du-Bûcher lui-même soit transformé, ses habitants humains le jour et bêtes la nuit, gouvernés par un conseil qui ne répondait qu'à lui.",
+			short = "Le donjon d'Ombrecroc se dresse sur un haut promontoire au-dessus de Bois-du-Bûcher. Il appartenait jadis au baron d'Argelaine, un seigneur de Gilnéas, jusqu'à ce que le Fléau s'abatte sur Lordaeron et que l'archimage royal Arugal cherche un moyen de l'arrêter.",
+			full = "Le donjon d'Ombrecroc se dresse sur un haut promontoire au-dessus de Bois-du-Bûcher. Il appartenait jadis au baron d'Argelaine, un seigneur de Gilnéas, jusqu'à ce que le Fléau s'abatte sur Lordaeron et que l'archimage royal Arugal cherche un moyen de l'arrêter. S'appuyant sur les recherches du mage Ur, avec la bénédiction du roi Genn Greymane mais contre l'avis du Kirin Tor, Arugal invoqua les worgens. Ils repoussèrent la marée des morts-vivants, puis se retournèrent contre Gilnéas elle-même, ravageant le mur de Greymane avant de se répandre librement dans les Pins argentés. Ils fondirent sur le donjon et tuèrent le baron d'Argelaine et sa maisonnée.\n\nArugal, brisé par ce qu'il avait déchaîné, ne s'enfuit pas. Il appela les worgens ses enfants, s'empara du donjon et le rebaptisa Ombrecroc. Communiant avec un maître qu'il servait au sein du culte du Loup, il répandit la malédiction à travers la forêt, jusqu'à ce que Bois-du-Bûcher lui-même soit transformé, ses habitants humains le jour et bêtes la nuit, gouvernés par un conseil qui ne répondait qu'à lui.",
 			source = "https://warcraft.wiki.gg/wiki/Shadowfang_Keep",
 		},
 		["shining strand"] = {
@@ -1218,8 +1218,8 @@ local subzones = {
 		},
 		["corins crossing"] = {
 			name = "La Croisée de Corin",
-			short = "La Croisée de Corin se trouve là où se rejoignent les routes d'Andorhal, de Darrowshire, de Stratholme et de la Main de Tyr, entre la Balafre d'Infectis et le lac Mereldar.",
-			full = "La Croisée de Corin se trouve là où se rejoignent les routes d'Andorhal, de Darrowshire, de Stratholme et de la Main de Tyr, entre la Balafre d'Infectis et le lac Mereldar. Jadis simple bourg de carrefour, elle possédait un hôtel de ville et une forge.\n\nDésormais, le Fléau emplit entièrement ses rues, et parmi les morts se déplacent des choses que l'on ne peut voir du tout : des serviteurs invisibles, qui percent le camouflage comme s'il n'existait pas. Aucun chemin discret ne traverse la Croisée de Corin.",
+			short = "La Croisée de Corin se trouve là où se rejoignent les routes d'Andorhal, de Darrowshire, de Stratholme et de la Main de Tyr, entre la Balafre infecte et le lac Mereldar.",
+			full = "La Croisée de Corin se trouve là où se rejoignent les routes d'Andorhal, de Darrowshire, de Stratholme et de la Main de Tyr, entre la Balafre infecte et le lac Mereldar. Jadis simple bourg de carrefour, elle possédait un hôtel de ville et une forge.\n\nDésormais, le Fléau emplit entièrement ses rues, et parmi les morts se déplacent des choses que l'on ne peut voir du tout : des serviteurs invisibles, qui percent le camouflage comme s'il n'existait pas. Aucun chemin discret ne traverse la Croisée de Corin.",
 			source = "https://warcraft.wiki.gg/wiki/Corin's_Crossing",
 		},
 		["crown guard tower"] = {
@@ -1357,7 +1357,7 @@ local subzones = {
 		["tyrs hand"] = {
 			name = "Main de Tyr",
 			short = "La Main de Tyr est une cité humaine fortifiée, l'un des derniers bastions des vivants face au Fléau dans la région.",
-			full = "La Main de Tyr est une cité humaine fortifiée, l'un des derniers bastions des vivants face au Fléau dans la région. Ses environs sont en bien meilleur état que le reste des Maleterres, même si les arbres et la végétation y pourrissent encore.\n\nLa cité compte parmi les lieux saints les plus anciens et les plus vénérés de l'Église de la Lumière, bâtie presque entièrement d'églises et couronnée par la Basilique écarlate et l'abbaye fortifiée.\n\nLorsque le Fléau arriva et que l'Eastweald devint les Maleterres, la Main de Tyr ne tomba pas. Sous le grand maître Valdelmar, elle résista aux assauts quotidiens, protégée d'abord par les chevaliers de la Main d'argent, puis par la Croisade écarlate, envoyant provisions et renforts vers d'autres possessions écarlates, tandis que des messagers apportaient chaque jour des rapports de Stratholme, contraints de se frayer un chemin à travers des routes infestées par la peste.",
+			full = "La Main de Tyr est une cité humaine fortifiée, l'un des derniers bastions des vivants face au Fléau dans la région. Ses environs sont en bien meilleur état que le reste des Maleterres, même si les arbres et la végétation y pourrissent encore.\n\nLa cité compte parmi les lieux saints les plus anciens et les plus vénérés de l'Église de la Lumière, bâtie presque entièrement d'églises et couronnée par la Basilique écarlate et l'abbaye fortifiée.\n\nLorsque le Fléau arriva et que la Sylve de l'Est devint les Maleterres, la Main de Tyr ne tomba pas. Sous le grand maître Valdelmar, elle résista aux assauts quotidiens, protégée d'abord par les chevaliers de la Main d'argent, puis par la Croisade écarlate, envoyant provisions et renforts vers d'autres possessions écarlates, tandis que des messagers apportaient chaque jour des rapports de Stratholme, contraints de se frayer un chemin à travers des routes infestées par la peste.",
 			source = "https://warcraft.wiki.gg/wiki/Tyr's_Hand",
 		},
 		["undercroft"] = {
@@ -1545,8 +1545,8 @@ local subzones = {
 		},
 		["western strand"] = {
 			name = "Rivage occidental",
-			short = "Le Rivage occidental se trouve sur la côte sud-ouest des contreforts d'Hillsbrad. Les murlocs Torn Fin ont établi de petits camps le long de ses berges, et Andy Murgole patrouille ces eaux, surveillant la côte où ils vivent.",
-			full = "Le Rivage occidental se trouve sur la côte sud-ouest des contreforts d'Hillsbrad. Les murlocs Torn Fin ont établi de petits camps le long de ses berges, et Andy Murgole patrouille ces eaux, surveillant la côte où ils vivent.",
+			short = "Le Rivage occidental se trouve sur la côte sud-ouest des contreforts d'Hillsbrad. Les murlocs Aileron déchiré ont établi de petits camps le long de ses berges, et Andy Murgole patrouille ces eaux, surveillant la côte où ils vivent.",
+			full = "Le Rivage occidental se trouve sur la côte sud-ouest des contreforts d'Hillsbrad. Les murlocs Aileron déchiré ont établi de petits camps le long de ses berges, et Andy Murgole patrouille ces eaux, surveillant la côte où ils vivent.",
 			source = "https://warcraft.wiki.gg/wiki/Western_Strand",
 		},
 	},
@@ -2400,8 +2400,8 @@ local subzones = {
 		},
 		["redridge canyons"] = {
 			name = "Canyons des Carmines",
-			short = "Les canyons entaillent le nord-ouest des Carmines, leurs parois cachant la tanière de Yowler, qui mène les gnolls qui tiennent ce terrain.",
-			full = "Les canyons entaillent le nord-ouest des Carmines, leurs parois cachant la tanière de Yowler, qui mène les gnolls qui tiennent ce terrain.",
+			short = "Les canyons entaillent le nord-ouest des Carmines, leurs parois cachant la tanière de Couineur, qui mène les gnolls qui tiennent ce terrain.",
+			full = "Les canyons entaillent le nord-ouest des Carmines, leurs parois cachant la tanière de Couineur, qui mène les gnolls qui tiennent ce terrain.",
 			source = "https://warcraft.wiki.gg/wiki/Redridge_Canyons",
 		},
 		["renders camp"] = {
@@ -2977,7 +2977,7 @@ local subzones = {
 		["menethil harbor"] = {
 			name = "Port de Menethil",
 			short = "Le mur est la première chose que l'on remarque, une épaisse muraille de pierre dressée autour d'une ville portuaire assise pour moitié sur la roche, pour moitié sur la mer.",
-			full = "Le mur est la première chose que l'on remarque, une épaisse muraille de pierre dressée autour d'une ville portuaire assise pour moitié sur la roche, pour moitié sur la mer. Quatre tours la dominent, surveillant l'eau comme la route, et l'on n'y entre que par le pont, par la marée ou par un passage secret qui court sous terre jusqu'au continent.\n\nCe furent les orcs qui élevèrent ici le premier chantier naval. Après la première guerre, le chef de guerre Orgrim Doomhammer choisit ce rivage pour construire la flotte qui devait porter la Horde au-delà des défenses terrestres de Lordaeron, dépouillant pour cela les mines naines de Khaz Modan de leur fer et de leur bois. À la fin de la deuxième guerre, l'Alliance prit le lieu et le rebâtit pour son propre compte, et le grand amiral Daelin Portvaillant le nomma Port de Menethil, en l'honneur de Terenas Menethil II, roi de Lordaeron.\n\nPendant des années, des raptors descendirent des collines pour attaquer la ville, jamais en grand nombre, mais assez souvent.",
+			full = "Le mur est la première chose que l'on remarque, une épaisse muraille de pierre dressée autour d'une ville portuaire assise pour moitié sur la roche, pour moitié sur la mer. Quatre tours la dominent, surveillant l'eau comme la route, et l'on n'y entre que par le pont, par la marée ou par un passage secret qui court sous terre jusqu'au continent.\n\nCe furent les orcs qui élevèrent ici le premier chantier naval. Après la première guerre, le chef de guerre Orgrim Marteau du Destin choisit ce rivage pour construire la flotte qui devait porter la Horde au-delà des défenses terrestres de Lordaeron, dépouillant pour cela les mines naines de Khaz Modan de leur fer et de leur bois. À la fin de la deuxième guerre, l'Alliance prit le lieu et le rebâtit pour son propre compte, et le grand amiral Daelin Portvaillant le nomma Port de Menethil, en l'honneur de Terenas Menethil II, roi de Lordaeron.\n\nPendant des années, des raptors descendirent des collines pour attaquer la ville, jamais en grand nombre, mais assez souvent.",
 			source = "https://warcraft.wiki.gg/wiki/Menethil_Harbor",
 		},
 		["menethil keep"] = {
@@ -2994,8 +2994,8 @@ local subzones = {
 		},
 		["raptor ridge"] = {
 			name = "Crête des raptors",
-			short = "La Crête des raptors s'élève dans l'est des Paluns, au nord-ouest des Portes des Dragonmaw, ses pentes et sa caverne grouillant de raptors. Tout au fond, la matriarche Tranchegueule couve sa nichée.",
-			full = "La Crête des raptors s'élève dans l'est des Paluns, au nord-ouest des Portes des Dragonmaw, ses pentes et sa caverne grouillant de raptors. Tout au fond, la matriarche Tranchegueule couve sa nichée.",
+			short = "La Crête des raptors s'élève dans l'est des Paluns, au nord-ouest des Portes des Dragonmaw, ses pentes et sa caverne grouillant de raptors. Tout au fond, la matriarche tranchegueules couve sa nichée.",
+			full = "La Crête des raptors s'élève dans l'est des Paluns, au nord-ouest des Portes des Dragonmaw, ses pentes et sa caverne grouillant de raptors. Tout au fond, la matriarche tranchegueules couve sa nichée.",
 			source = "https://warcraft.wiki.gg/wiki/Raptor_Ridge",
 		},
 		["saltspray glen"] = {
@@ -3387,8 +3387,8 @@ local subzones = {
 		},
 		["satyrnaar"] = {
 			name = "Satyrnaar",
-			short = "Satyrnaar se dresse, en ruine, parmi les arbres du nord-est d'Orneval, ses bâtiments depuis longtemps effondrés, bien que des tentes se regroupent désormais parmi les décombres, là où les satyres Bleakheart ont élu domicile.",
-			full = "Satyrnaar se dresse, en ruine, parmi les arbres du nord-est d'Orneval, ses bâtiments depuis longtemps effondrés, bien que des tentes se regroupent désormais parmi les décombres, là où les satyres Bleakheart ont élu domicile. Des trois places fortes satyres de la forêt, Satyrnaar est la seule restée en grande partie intacte, et sa situation au bord de la route qui mène de Bois-brisé vers Azshara en a fait à la fois la plus accessible et la plus disputée des trois.\n\nLes Bleakheart y détiennent plus qu'un abri. Dans Satyrnaar repose l'une des gemmes d'âme du culte de la Rive noire, gage du pacte qui lie les satyres aux sombres desseins de ce culte.",
+			short = "Satyrnaar se dresse, en ruine, parmi les arbres du nord-est d'Orneval, ses bâtiments depuis longtemps effondrés, bien que des tentes se regroupent désormais parmi les décombres, là où les satyres Mornecoeur ont élu domicile.",
+			full = "Satyrnaar se dresse, en ruine, parmi les arbres du nord-est d'Orneval, ses bâtiments depuis longtemps effondrés, bien que des tentes se regroupent désormais parmi les décombres, là où les satyres Mornecoeur ont élu domicile. Des trois places fortes satyres de la forêt, Satyrnaar est la seule restée en grande partie intacte, et sa situation au bord de la route qui mène de Bois-brisé vers Azshara en a fait à la fois la plus accessible et la plus disputée des trois.\n\nLes Mornecoeur y détiennent plus qu'un abri. Dans Satyrnaar repose l'une des gemmes d'âme du culte de la Rive noire, gage du pacte qui lie les satyres aux sombres desseins de ce culte.",
 			source = "https://warcraft.wiki.gg/wiki/Satyrnaar",
 		},
 		["shady nook"] = {
@@ -4056,8 +4056,8 @@ local subzones = {
 		},
 		["dreadmurk shore"] = {
 			name = "Rivage de Troubleffroi",
-			short = "Le rivage entre l'île de Theramore et le Fort du Nord grouille de murlocs de la tribu Mirefin, qui revendiquent le littoral et ses îlots épars comme leur domaine.",
-			full = "Le rivage entre l'île de Theramore et le Fort du Nord grouille de murlocs de la tribu Mirefin, qui revendiquent le littoral et ses îlots épars comme leur domaine. Des tortues de mer et d'autres créatures partagent les eaux qui les entourent.",
+			short = "Le rivage entre l'île de Theramore et le Fort du Nord grouille de murlocs de la tribu Aileron boueux, qui revendiquent le littoral et ses îlots épars comme leur domaine.",
+			full = "Le rivage entre l'île de Theramore et le Fort du Nord grouille de murlocs de la tribu Aileron boueux, qui revendiquent le littoral et ses îlots épars comme leur domaine. Des tortues de mer et d'autres créatures partagent les eaux qui les entourent.",
 			source = "https://warcraft.wiki.gg/wiki/Dreadmurk_Shore",
 		},
 		["dustwallow bay"] = {
@@ -4140,8 +4140,8 @@ local subzones = {
 		},
 		["witch hill"] = {
 			name = "Colline des sorcières",
-			short = "Le Manoir des Flammeroles se dresse au centre de la Colline des sorcières, demeure de Jarl « Œil-des-marais ». Les murlocs Mirefin ont leurs camps non loin, dans la fange.",
-			full = "Le Manoir des Flammeroles se dresse au centre de la Colline des sorcières, demeure de Jarl « Œil-des-marais ». Les murlocs Mirefin ont leurs camps non loin, dans la fange.",
+			short = "Le Manoir des Flammeroles se dresse au centre de la Colline des sorcières, demeure de Jarl « Œil-des-marais ». Les murlocs Aileron boueux ont leurs camps non loin, dans la fange.",
+			full = "Le Manoir des Flammeroles se dresse au centre de la Colline des sorcières, demeure de Jarl « Œil-des-marais ». Les murlocs Aileron boueux ont leurs camps non loin, dans la fange.",
 			source = "https://warcraft.wiki.gg/wiki/Witch_Hill",
 		},
 		["wyrmbog"] = {

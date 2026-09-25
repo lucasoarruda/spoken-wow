@@ -11,7 +11,7 @@ carry the same tables keyed by the same Blizzard ids:
 
 This copies their translations into the vmangos locales_* columns the imports read
 (tts_cli/locale_import.py, pipelines/books/tools/import-locale.mjs), so filling a gap is this
-followed by the ordinary `make web-import-locale`. Two rules make that safe:
+followed by the ordinary `make web-import-locale`. Three rules make that safe:
 
   * ONLY EMPTY CELLS. vmangos's own translation always wins; this never overwrites one.
   * ONLY WHERE THE ENGLISH AGREES. A translation is copied only when the dump it came from has
@@ -19,6 +19,8 @@ followed by the ordinary `make web-import-locale`. Two rules make that safe:
     reworded since, a page that moved -- their translations translate something else, and
     are left out. It is also what keeps retail's placeholder rows (an English "[DEPRECATED]"
     title) out.
+  * ONLY A TRANSLATION. Retail's ptBR quest rows mostly hold English under a Portuguese
+    locale; a "translation" made of its English line's words is left out (untranslated()).
 
 Portuguese gets columns of its own, *_loc9, which a fresh dump does not have; this adds them.
 pipelines/lib/locales.mjs names 9 as ptBR's column, so run this before importing ptBR.
@@ -124,6 +126,30 @@ def same(text: str | None) -> str:
     if not text:
         return ""
     return " ".join(_WORDS.findall(re.sub(r"\$[Bb]", " ", text).lower()))
+
+
+_LETTERS = re.compile(r"[^\W\d_]+")
+
+
+def _letter_words(text: str | None) -> list[str]:
+    return _LETTERS.findall(re.sub(r"\$[A-Za-z]", " ", text or "").lower())
+
+
+def untranslated(text: str | None, english: str | None) -> bool:
+    """A translation that is really English: most of its words are the English line's own.
+
+    Retail TDB's ptBR quest rows are mostly English -- sometimes the English line verbatim,
+    sometimes a later retail wording of it -- so equality alone misses some. A real
+    translation shares only names with its English; measured on every ptBR row, the English
+    ones share 60% of their words or more and the Portuguese ones 50% at most, the top of
+    that being "Olá, $n." and its like, which the word floor keeps out. The floor also lets a
+    two-word name through, which may rightly be the English one.
+    """
+    words = _letter_words(text)
+    if len(words) < 3:
+        return False
+    theirs = set(_letter_words(english))
+    return sum(word in theirs for word in words) / len(words) > 0.55
 
 
 # A field: vmangos's locale table and column stem, the vmangos English it translates, and
@@ -299,6 +325,9 @@ def fill(conn, releases: list[tuple[str, dict]], dry_run: bool) -> Counter:
                         continue
                     if same(source["english"].get(k)) not in english[k] or not same(source["english"].get(k)):
                         counts[(name, lang, "english differs")] += 1
+                        continue
+                    if untranslated(text, source["english"].get(k)):
+                        counts[(name, lang, "untranslated")] += 1
                         continue
                     writes[k][lang] = text
                     counts[(name, lang, f"from TDB {release}")] += 1

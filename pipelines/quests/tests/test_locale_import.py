@@ -35,6 +35,9 @@ class TestCleaning:
         # The English has no split, so there is no :f line for the female form to go to.
         assert clean_localized(text, None) == "Willkommen, Herr."
 
+    def test_portuguese_writes_the_players_gender_as_u(self):
+        assert clean_localized("Você foi $Uvitorioso:vitoriosa;!", "f") == "Você foi vitoriosa!"
+
     def test_the_player_name_is_left_for_a_translator(self):
         # The English cleaner writes "adventurer" here, which would be English in a German
         # sentence. Left in, it keeps the line from being voiced until someone rewrites it.

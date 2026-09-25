@@ -212,7 +212,7 @@ describe("resolveContribution: quests accept", () => {
     const lines = await corpus();
     const line = lines.lines.find((l) => l.lineId === lineId)!;
     expect(isGap(line, new Set())).toBe(true);
-    const missing = matchingLines(lines, new Set(), { missingOnly: true, line: lineId }, NO_CONTEXT);
+    const missing = matchingLines(lines, new Set(), { state: "missing", line: lineId }, NO_CONTEXT);
     expect(missing.map((l) => l.lineId)).toEqual([lineId]);
 
     // Its speaker sits above the extract's own numbering, clear of any re-import.

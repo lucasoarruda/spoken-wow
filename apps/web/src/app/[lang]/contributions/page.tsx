@@ -5,13 +5,14 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import ContributionTable, { type ContributionRow } from "@/components/ContributionTable";
+import ContributionsTabs from "@/components/ContributionsTabs";
 import { auth } from "@/lib/auth";
 import { pageById } from "@/lib/books/catalogue";
 import { clientOf, isClientFamily } from "@/lib/contributions/client";
 import { corpusLookup } from "@/lib/contributions/existing";
 import { isStatus, type ContributionStatus } from "@/lib/contributions/contributions";
 import { lineIsInExplorer } from "@/lib/contributions/accept";
-import { matchesSpeaker, NEEDS_DECISION, type ClientFilter, type SpeakerFilter } from "@/lib/contributions/query";
+import { isSpeakerSentinel, matchesSpeaker, type ClientFilter, type SpeakerFilter } from "@/lib/contributions/query";
 import { listContributions, observationMeta, type Contribution } from "@/lib/contributions/store";
 import {
   npcSummaryFrom,
@@ -188,7 +189,7 @@ export default async function Page({
   // an existing option the way "Confirmed" (a union nobody triages) was safe to just drop.
   // See lib/contributions/query.ts's own NEEDS_DECISION docstring for the rest of this.
   const provenance: SpeakerFilter =
-    rawProvenance === NEEDS_DECISION ? NEEDS_DECISION : isProvenance(rawProvenance) ? rawProvenance : "all";
+    isSpeakerSentinel(rawProvenance) || isProvenance(rawProvenance) ? rawProvenance : "all";
 
   // Which game the text came from, read off `build` (lib/contributions/client.ts). Anything
   // unrecognised in the query string falls back to "all", as the other two dimensions do.
@@ -227,10 +228,9 @@ export default async function Page({
       quest: questFor(row),
       hasLine: linedIds.has(row.id),
     }))
-    // matchesSpeaker handles both a plain provenance and the NEEDS_DECISION sentinel; a row
-    // with no npc at all falls out of every narrowed view there, the same way it did before the
-    // sentinel existed -- "which rows never named an NPC" isn't a Speaker option either way.
-    .filter((row) => matchesSpeaker(row.npc?.provenance, provenance))
+    // matchesSpeaker handles a plain provenance and both sentinels; a row with no npc at all
+    // survives a narrowed view only as MISSING, and only when it is a quests row.
+    .filter((row) => matchesSpeaker(row.npc?.provenance, provenance, row.source))
     .filter((row) => client === "all" || row.client.family === client);
 
   const facetValues = await facets();
@@ -243,6 +243,8 @@ export default async function Page({
         not queue anything -- it only marks the row for the next export, which the pipelines
         pull on their own schedule.
       </p>
+
+      <ContributionsTabs lang={lang} active="contributions" showNpcs={can(viewer, "regenerate", BASE_LANG)} />
 
       <ContributionTable
         initial={rows}

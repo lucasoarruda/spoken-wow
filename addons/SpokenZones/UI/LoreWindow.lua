@@ -138,7 +138,7 @@ local function ShowEntry()
 	local entry = SpokenZones:GetLore(mapID)
 	header:SetText(SpokenZones:GetMapName(mapID) or (entry and entry.name) or tostring(mapID))
 	local subKeys = SubzoneKeys(mapID)
-	subheader:SetText(subKeys and (#subKeys .. " subzones") or "")
+	subheader:SetText(subKeys and string.format(L.SUBZONE_COUNT_FMT, #subKeys) or "")
 	local pending = SpokenZones:IsPending(entry)
 	if pending then
 		body:SetText("|cff888888" .. L.LORE_NOT_WRITTEN:format(

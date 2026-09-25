@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { audioRelPath } from "./audio";
 import { npcKey } from "./corpus";
 import { corpus as catalogue } from "./quests/catalogue";
 import { batchJobs, isGap, matchingLines, search } from "./search";
@@ -189,8 +190,8 @@ describe("gaps", () => {
     expect(isGap(progress, store)).toBe(false);
   });
 
-  it("missingOnly returns only voiceable lines with no audio", () => {
-    const lines = all({ missingOnly: true });
+  it("state missing returns only voiceable lines with no audio", () => {
+    const lines = all({ state: "missing" });
     expect(lines.length).toBeGreaterThan(0);
     // `voiceable`, not the corpus's `generatable`: the latter was baked in before a stage
     // direction could be narrated, so it now says no to lines this app will happily voice.
@@ -304,14 +305,27 @@ describe("overrides", () => {
     const file = "quests/123-complete.mp3";
     const context = { ...rewrite(file, "anything"), stale: new Set([file]) };
 
-    const found = matchingLines(corpus, store, { outdated: true }, context);
+    const found = matchingLines(corpus, store, { state: "stale" }, context);
     expect(found.map((l) => l.lineId)).toEqual(["q:123:complete"]);
+  });
+
+  it("counts as current only voiced audio outside the stale set", () => {
+    const [fresh, outdated] = corpus.lines
+      .filter((l) => l.source !== "progress")
+      .slice(0, 2)
+      .map(audioRelPath);
+    const voiced = new Set([fresh, outdated]);
+    const context = { ...rewrite(outdated, "anything"), stale: new Set([outdated]) };
+
+    const found = matchingLines(corpus, voiced, { state: "current" }, context);
+    expect(new Set(found.map(audioRelPath))).toEqual(new Set([fresh]));
   });
 
   it("matches nothing when staleness was never fetched, rather than everything", () => {
     // The filter costs a query and a hash per take, so it is fetched only when asked for. An
     // absent answer must not read as "every take is out of date".
-    expect(matchingLines(corpus, store, { outdated: true })).toEqual([]);
+    expect(matchingLines(corpus, store, { state: "stale" })).toEqual([]);
+    expect(matchingLines(corpus, store, { state: "current" })).toEqual([]);
   });
 
   it("finds a line whose stage direction an override restored", () => {
@@ -480,7 +494,7 @@ describe("ignored lines", () => {
     // The filter runs first on purpose: a line nobody will voice is not an answer to "what
     // is missing?" either, and counting it there is what makes a gap list unactionable.
     const context = ignoring(TALLY);
-    const gaps = matchingLines(corpus, store, { missingOnly: true, includeProgress: true }, context);
+    const gaps = matchingLines(corpus, store, { state: "missing", includeProgress: true }, context);
     expect(gaps.some((l) => l.lineId === TALLY)).toBe(false);
   });
 
