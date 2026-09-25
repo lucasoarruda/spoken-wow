@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { closeDb, db } from "@/lib/db";
 
-import { getResolution, getResolutionsById, PROVENANCES, upsertResolution } from "./store";
+import { getResolution, getResolutionsById, listResolutions, PROVENANCES, upsertResolution } from "./store";
 
 // A bucket no other run shares: these ids are the primary key, so a fixed one would collide
 // between concurrent runs against the shared dev database.
@@ -200,6 +200,18 @@ describe("getResolutionsById", () => {
   it("answers nothing for an id nobody has resolved", async () => {
     const grouped = await getResolutionsById([npcId]);
     expect(grouped.get(npcId)).toBeUndefined();
+  });
+});
+
+describe("listResolutions", () => {
+  it("lists every kind of an id, whatever its provenance", async () => {
+    await upsertResolution(resolution());
+    await upsertResolution(resolution({ npcKind: "gameobject", provenance: "moderator", confirmed: true }));
+    const ours = (await listResolutions()).filter((row) => row.npcId === npcId);
+    expect(ours.map((row) => [row.npcKind, row.provenance])).toEqual([
+      ["creature", "client"],
+      ["gameobject", "moderator"],
+    ]);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   listContributions,
   observationMeta,
   recordContributionHit,
+  setContributionNpc,
   setContributionNpcKind,
   setContributionStatus,
 } from "./store";
@@ -166,10 +167,39 @@ describe("setContributionNpcKind", () => {
   });
 });
 
+describe("setContributionNpc", () => {
+  it("names the NPC of an envelope that named none", async () => {
+    await createContribution(submission({ meta: {} }));
+    const [row] = ours(await listContributions("new"));
+    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" })).toMatchObject({
+      npcId: 240,
+      npcName: "Marshal Dughan",
+    });
+    const [after] = ours(await listContributions("new"));
+    expect(after.meta).toEqual({});
+    expect(observationMeta(after)).toMatchObject({ npc: "240 Marshal Dughan", kind: "creature" });
+  });
+
+  it("refuses to override the NPC the client's own envelope named", async () => {
+    await createContribution(submission());
+    const [row] = ours(await listContributions("new"));
+    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" })).toBe(null);
+    expect(observationMeta(ours(await listContributions("new"))[0]).npc).toBe("12345 X");
+  });
+});
+
 describe("observationMeta", () => {
+  const stored = { npcKind: null, npcId: null, npcName: null };
+
   it("puts build back and leaves an envelope's own kind alone", () => {
     expect(
-      observationMeta({ meta: { kind: "creature", npc: "1 X" }, build: "1.15.7/1", npcKind: "gameobject" }),
+      observationMeta({ ...stored, meta: { kind: "creature", npc: "1 X" }, build: "1.15.7/1", npcKind: "gameobject" }),
     ).toEqual({ kind: "creature", npc: "1 X", build: "1.15.7/1" });
+  });
+
+  it("leaves an envelope's own npc alone", () => {
+    expect(
+      observationMeta({ ...stored, meta: { npc: "1 X" }, build: "1.15.7/1", npcId: 2, npcName: "Y" }).npc,
+    ).toBe("1 X");
   });
 });

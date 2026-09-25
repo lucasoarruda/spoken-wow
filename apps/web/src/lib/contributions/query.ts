@@ -10,6 +10,7 @@
  */
 import type { ClientFamily } from "./client";
 import type { ContributionStatus } from "./contributions";
+import type { EnvelopeSource } from "./envelope";
 import type { Provenance } from "../npc/npc";
 
 /**
@@ -33,7 +34,19 @@ import type { Provenance } from "../npc/npc";
  */
 export const NEEDS_DECISION = "needs-decision" as const;
 
-export type SpeakerFilter = Provenance | "all" | typeof NEEDS_DECISION;
+/**
+ * "A quest row whose envelope never named an NPC at all" -- the one speaker state with no
+ * provenance, because there is no npc_resolution row to have one. What the manual NPC form in
+ * the triage table exists for. Zones and books never name an NPC, so they are never missing one.
+ */
+export const MISSING = "missing" as const;
+
+export type SpeakerFilter = Provenance | "all" | typeof NEEDS_DECISION | typeof MISSING;
+
+/** The Speaker dropdown's two sentinels, for page.tsx's parsing of the query string. */
+export function isSpeakerSentinel(value: unknown): value is typeof NEEDS_DECISION | typeof MISSING {
+  return value === NEEDS_DECISION || value === MISSING;
+}
 
 export type ClientFilter = ClientFamily | "all";
 
@@ -83,11 +96,12 @@ export function contributionsHref(current: ContributionFilters, next: FilterChan
  * half of the filter, called from page.tsx's own row projection, not just the UI's idea of what
  * is selected.
  *
- * `undefined` (a row with no npc at all) never matches a real filter: "which rows never named an
- * NPC" isn't a Speaker option, so such a row only survives when nothing is narrowing at all.
+ * `undefined` (a row with no npc at all) matches MISSING when it is a quests row, and no other
+ * real filter.
  */
-export function matchesSpeaker(provenance: Provenance | undefined, filter: SpeakerFilter): boolean {
+export function matchesSpeaker(provenance: Provenance | undefined, filter: SpeakerFilter, source: EnvelopeSource): boolean {
   if (filter === "all") return true;
+  if (filter === MISSING) return provenance === undefined && source === "quests";
   if (provenance === undefined) return false;
   if (filter === NEEDS_DECISION) return provenance === "client" || provenance === "none";
   return provenance === filter;

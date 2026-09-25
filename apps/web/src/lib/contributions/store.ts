@@ -19,7 +19,7 @@ import type { EnvelopeSource } from "./envelope";
 /** Exported for accept.ts, whose row lock reads the same shape inside its own transaction. */
 export const CONTRIBUTION_COLUMNS = `"id", "source", "key", "locale", "build", "text", "meta", "raw", "count",
                  "status", "body", "name", "email", "userId", "createdAt"::text,
-                 "updatedAt"::text, "resolvedBy", "npcKind"`;
+                 "updatedAt"::text, "resolvedBy", "npcKind", "npcId", "npcName"`;
 const COLUMNS = CONTRIBUTION_COLUMNS;
 
 export type Contribution = {
@@ -42,17 +42,44 @@ export type Contribution = {
   resolvedBy: string | null;
   /** The kind a moderator chose for a kind-less envelope's NPC (migration 0033); null otherwise. */
   npcKind: NpcKind | null;
+  /** The NPC a moderator named for an envelope that named none (migration 0048); null otherwise. */
+  npcId: number | null;
+  npcName: string | null;
 };
 
 /**
- * The fields observedFrom reads, off a stored row: `meta` as the client sent it, plus the two
- * things kept in columns of their own -- `build` (split out at intake) and a moderator-chosen
- * `kind`, which only ever fills in for an envelope that carried none.
+ * The fields observedFrom reads, off a stored row: `meta` as the client sent it, plus the things
+ * kept in columns of their own -- `build` (split out at intake), and a moderator-chosen `kind`
+ * and NPC, which only ever fill in for an envelope that carried none.
  */
-export function observationMeta(row: Pick<Contribution, "meta" | "build" | "npcKind">): Record<string, string> {
+export function observationMeta(
+  row: Pick<Contribution, "meta" | "build" | "npcKind" | "npcId" | "npcName">,
+): Record<string, string> {
   const meta: Record<string, string> = { ...row.meta, build: row.build };
   if (!meta.kind && row.npcKind) meta.kind = row.npcKind;
+  // In observedFrom's own "<id> <name>" shape, so nothing downstream knows where it came from.
+  if (!meta.npc && row.npcId !== null && row.npcName) meta.npc = `${row.npcId} ${row.npcName}`;
   return meta;
+}
+
+/**
+ * Record which NPC speaks a quest contribution whose envelope named none. A no-op, returning
+ * null, for a row whose envelope already named one -- the client's own observation stands -- and
+ * for a zones or books row, which never has an NPC to name. Returns the updated row.
+ */
+export async function setContributionNpc(
+  id: number,
+  npc: { npcKind: NpcKind; npcId: number; npcName: string },
+): Promise<Contribution | null> {
+  const { rows } = await db().query<Contribution>(
+    `update "contribution"
+        set "npcKind" = case when coalesce("meta"->>'kind', '') = '' then $2 else "npcKind" end,
+            "npcId" = $3, "npcName" = $4, "updatedAt" = now()
+      where "id" = $1 and "source" = 'quests' and coalesce("meta"->>'npc', '') = ''
+      returning ${COLUMNS}`,
+    [id, npc.npcKind, npc.npcId, npc.npcName],
+  );
+  return rows[0] ?? null;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NEEDS_DECISION, contributionsHref, matchesSpeaker, nextContributionFilters } from "./query";
+import { MISSING, NEEDS_DECISION, contributionsHref, matchesSpeaker, nextContributionFilters } from "./query";
 
 describe("nextContributionFilters", () => {
   const current = { status: "new", provenance: "all", client: "all" } as const;
@@ -51,23 +51,30 @@ describe("matchesSpeaker", () => {
     // Bite-check: if the special case in matchesSpeaker were ever deleted or short-circuited to
     // `provenance === filter` like the plain-provenance branch, "corpus" and "moderator" would
     // start passing here too -- this pins that they must not.
-    expect(matchesSpeaker("client", NEEDS_DECISION)).toBe(true);
-    expect(matchesSpeaker("none", NEEDS_DECISION)).toBe(true);
-    expect(matchesSpeaker("corpus", NEEDS_DECISION)).toBe(false);
-    expect(matchesSpeaker("moderator", NEEDS_DECISION)).toBe(false);
+    expect(matchesSpeaker("client", NEEDS_DECISION, "quests")).toBe(true);
+    expect(matchesSpeaker("none", NEEDS_DECISION, "quests")).toBe(true);
+    expect(matchesSpeaker("corpus", NEEDS_DECISION, "quests")).toBe(false);
+    expect(matchesSpeaker("moderator", NEEDS_DECISION, "quests")).toBe(false);
   });
 
   it("still matches a single provenance exactly when the filter names one", () => {
-    expect(matchesSpeaker("corpus", "corpus")).toBe(true);
-    expect(matchesSpeaker("client", "corpus")).toBe(false);
+    expect(matchesSpeaker("corpus", "corpus", "quests")).toBe(true);
+    expect(matchesSpeaker("client", "corpus", "quests")).toBe(false);
   });
 
   it("matches everything when the filter is 'all', including a row with no npc", () => {
-    expect(matchesSpeaker(undefined, "all")).toBe(true);
+    expect(matchesSpeaker(undefined, "all", "quests")).toBe(true);
+  });
+
+  it("matches MISSING only for a quests row with no npc", () => {
+    expect(matchesSpeaker(undefined, MISSING, "quests")).toBe(true);
+    // Zones and books never name an NPC; they are not missing one.
+    expect(matchesSpeaker(undefined, MISSING, "zones")).toBe(false);
+    expect(matchesSpeaker("none", MISSING, "quests")).toBe(false);
   });
 
   it("never matches a row with no npc for a real filter, sentinel included", () => {
-    expect(matchesSpeaker(undefined, NEEDS_DECISION)).toBe(false);
-    expect(matchesSpeaker(undefined, "client")).toBe(false);
+    expect(matchesSpeaker(undefined, NEEDS_DECISION, "quests")).toBe(false);
+    expect(matchesSpeaker(undefined, "client", "quests")).toBe(false);
   });
 });

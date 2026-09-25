@@ -15,6 +15,10 @@
 export const NPC_KINDS = ["creature", "gameobject"] as const;
 export type NpcKind = (typeof NPC_KINDS)[number];
 
+// The ceiling of the `integer` columns an NPC id lands in (migrations 0030 and 0048). Past it
+// Postgres refuses the insert, so every path that takes an id from outside checks it first.
+export const INT32_MAX = 2147483647;
+
 // A tuple, not a bare type alias, so the union is enumerable at runtime -- the rank test in
 // store.ts walks PROVENANCES rather than listing the four values by hand, which is what makes
 // a fifth value added here without a matching rank in provenanceRank fail loudly instead of
