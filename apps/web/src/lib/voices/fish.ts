@@ -53,7 +53,7 @@ export const FISH_MODELS = [
 
 export type FishModelId = (typeof FISH_MODELS)[number]["id"];
 
-export const DEFAULT_FISH_MODEL: FishModelId = "s2.1-pro";
+export const DEFAULT_FISH_MODEL: FishModelId = "s2.1-pro-free";
 
 export function isFishModel(value: unknown): value is FishModelId {
   return FISH_MODELS.some((model) => model.id === value);
