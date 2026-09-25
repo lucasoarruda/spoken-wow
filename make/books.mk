@@ -196,13 +196,13 @@ release-audio: ## Upload the sound pack (LOCALE=xx for a language's)
 # docs/books/CHANGELOG.md first; both uploads quote that section. The pack goes to CurseForge
 # only -- Wago answers 413 to a file this size (scripts/lib/wago.sh) -- and to GitHub, which
 # is where a Wago player gets it.
-full-release: require-droplet ## Sync, pull live takes, build and upload the sound pack
+full-release: require-droplet ## Sync, pull live takes, build and upload the sound pack (LOCALE=xx for a language's)
 	@$(MAKE) --no-print-directory -f make/books.mk sync
-	@$(MAKE) --no-print-directory -f make/books.mk pull-live
-	@$(MAKE) --no-print-directory -f make/books.mk package-audio
-	@./scripts/books/release.sh --dry-run --store=curseforge audio
-	@./scripts/audio-github-release.sh --dry-run books-audio
+	@$(MAKE) --no-print-directory -f make/books.mk pull-live LOCALE=$(LOCALE)
+	@$(MAKE) --no-print-directory -f make/books.mk package-audio LOCALE=$(LOCALE)
+	@./scripts/books/release.sh --dry-run --store=curseforge --lang=$(or $(LOCALE),enUS) audio
+	@./scripts/audio-github-release.sh --dry-run books $(or $(LOCALE),enUS)
 	@printf 'Upload the books pack to CurseForge and GitHub? [y/N] '; \
 	  read -r answer; [ "$$answer" = y ] || { echo aborted; exit 1; }
-	@./scripts/books/release.sh --store=curseforge audio
-	@./scripts/audio-github-release.sh books-audio
+	@./scripts/books/release.sh --store=curseforge --lang=$(or $(LOCALE),enUS) audio
+	@./scripts/audio-github-release.sh books $(or $(LOCALE),enUS)
