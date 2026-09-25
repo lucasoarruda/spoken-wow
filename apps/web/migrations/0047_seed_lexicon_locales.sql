@@ -1690,7 +1690,7 @@ values ('esES', $lexicon$[
     "ipa": "malˈfuɾion"
   },
   {
-    "grapheme": "Malfurion",
+    "grapheme": "Malfurión",
     "confidence": "check",
     "ipa": "malfuˈɾjon",
     "note": "not in English lexicon: esES accented spelling forces final stress"
