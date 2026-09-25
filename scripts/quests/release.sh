@@ -5,6 +5,7 @@
 #   ./scripts/quests/release.sh              # every project, both stores
 #   ./scripts/quests/release.sh player       # just the player addon
 #   ./scripts/quests/release.sh audio-horde  # just one sound pack
+#   ./scripts/quests/release.sh --lang=esMX audio-horde # that language's Horde pack instead
 #   ./scripts/quests/release.sh --store=wago # one store only; --store=curseforge for the other
 #
 # TWO STORES, ONE RELEASE. The same zip goes to both by default: a file that exists on one
@@ -40,6 +41,14 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DIST="${DIST:-$REPO/dist}"
+
+# The language whose four audio-* targets mean its packs. English unless --lang says
+# otherwise; spoken, player and audio-all are not per-language and are refused alongside it.
+LANG_CODE=enUS
+english() { [[ "$LANG_CODE" == enUS ]]; }
+# audio-horde -> horde; the meta addon (audio-all) and the two addons are not packs.
+pack_of() { case "$1" in audio-alliance|audio-horde|audio-shared|audio-gossip) echo "${1#audio-}";; esac; }
+pack_field() { node "$REPO/scripts/lib/packs.mjs" get quests "$LANG_CODE" "$(pack_of "$1")" "$2"; }
 
 # The Wago half, which is the same for every project and so lives in one file.
 # shellcheck source=../lib/wago.sh
@@ -90,10 +99,7 @@ target_curseforge() { case "$1" in
   spoken)         echo "${SPOKEN_PROJECT_ID:-1700375}";;
   player)         echo "1655859";;
   audio-all)      echo "1660196";;
-  audio-alliance) echo "1660197";;
-  audio-horde)    echo "1660198";;
-  audio-shared)   echo "1660199";;
-  audio-gossip)   echo "1660202";;
+  audio-alliance|audio-horde|audio-shared|audio-gossip) pack_field "$1" curseforge;;
 esac; }
 # The Wago project id for the same project: eight alphanumeric characters, from the project's
 # entry in https://addons.wago.io/developers, and also in each page's frontmatter under
@@ -103,10 +109,7 @@ target_wago() { case "$1" in
   spoken)         echo "QN53yXKB";;
   player)         echo "aN0XPlNj";;
   audio-all)      echo "ANzkpD64";;
-  audio-alliance) echo "5NR8mJK3";;
-  audio-horde)    echo "vNAg3OKo";;
-  audio-shared)   echo "QNlz3YKe";;
-  audio-gossip)   echo "XKqA45Ky";;
+  audio-alliance|audio-horde|audio-shared|audio-gossip) pack_field "$1" wago;;
 esac; }
 # The slug each project is published under, the same on both stores. Used for the link printed
 # after an upload, and for the Wago upload's own log line.
@@ -114,10 +117,7 @@ target_slug() { case "$1" in
   spoken)         echo "spoken-player";;
   player)         echo "spoken-quests";;
   audio-all)      echo "spoken-quests-audio-all";;
-  audio-alliance) echo "spoken-quests-audio-alliance";;
-  audio-horde)    echo "spoken-quests-audio-horde";;
-  audio-shared)   echo "spoken-quests-audio-shared";;
-  audio-gossip)   echo "spoken-quests-audio-gossip";;
+  audio-alliance|audio-horde|audio-shared|audio-gossip) pack_field "$1" slug;;
 esac; }
 
 # The addon folder each target ships, which is also the basename package*.sh gives its zip.
@@ -135,10 +135,7 @@ target_zip_name() { case "$1" in
   spoken)         echo "SpokenPlayer";;
   player)         echo "SpokenQuests";;
   audio-all)      echo "SpokenQuestsAudio";;
-  audio-alliance) echo "SpokenQuestsAudioAlliance";;
-  audio-horde)    echo "SpokenQuestsAudioHorde";;
-  audio-shared)   echo "SpokenQuestsAudioShared";;
-  audio-gossip)   echo "SpokenQuestsAudioGossip";;
+  audio-alliance|audio-horde|audio-shared|audio-gossip) pack_field "$1" folder;;
 esac; }
 
 # Where a version comes from, which is not the same question for the player and a pack.
@@ -187,15 +184,52 @@ for arg in "$@"; do
     --store=curseforge) stores="curseforge";;
     --store=wago)       stores="wago";;
     --dry-run|-n) dry_run=1;;
+    --lang=*) LANG_CODE="${arg#--lang=}";;
     spoken|player|audio-all|audio-alliance|audio-horde|audio-shared|audio-gossip) targets+=("$arg");;
-    *) echo "error: unknown argument '$arg' (expected: $ALL_TARGETS, --store=..., --dry-run)" >&2; exit 1;;
+    *) echo "error: unknown argument '$arg' (expected: $ALL_TARGETS, --lang=..., --store=..., --dry-run)" >&2; exit 1;;
   esac
 done
+
+# A language has no player, addon or meta addon project of its own -- spoken, player and
+# audio-all are each one project for every language -- so --lang refuses anything but the
+# four packs, the same way books' and zones' release.sh do.
+if ! english; then
+  # Checked once, before the per-target validation below: an unregistered language has no
+  # pack pages at all, and letting each of the four audio-* targets discover that separately
+  # printed "no quests pack registered" four times for the one problem of a missing language.
+  node "$REPO/scripts/lib/packs.mjs" list quests "$LANG_CODE" >/dev/null
+  # ${targets[@]+...} rather than a bare expansion: macOS's bash 3.2 raises "unbound variable"
+  # under set -u when "${targets[@]}" is empty, which it is for `--lang=xx` alone.
+  for t in ${targets[@]+"${targets[@]}"}; do
+    [[ "$t" == audio-* ]] || { echo "error: --lang=$LANG_CODE releases sound packs; '$t' has one project for every language" >&2; exit 1; }
+  done
+  (( ${#targets[@]} > 0 )) || targets=(audio-alliance audio-horde audio-shared audio-gossip)
+fi
 
 # Asked once, answered at each of the places below that only concern one store.
 store_has() { [[ " $stores " == *" $1 "* ]]; }
 if (( ${#targets[@]} == 0 )); then
   read -r -a targets <<<"$ALL_TARGETS"
+fi
+
+# EVERY TARGET'S ZIP IS RESOLVED BEFORE ANY UPLOAD STARTS. English's meta addon (audio-all)
+# has its own zip and is uploaded last, on purpose -- see below -- so a run that uploads the
+# other five and only then discovers audio-all was never built is a half release. Checked in
+# --dry-run too, since a dry run's job is to say what a real run would hit.
+missing=()
+for target in "${targets[@]}"; do
+  target_version_check="$(target_version "$target")"
+  if [[ -z "$target_version_check" ]]; then
+    missing+=("$target -- not built (no version); run make package / make package-audio")
+    continue
+  fi
+  target_zip_check="$DIST/$(target_zip_name "$target")-$target_version_check.zip"
+  [[ -f "$target_zip_check" ]] || missing+=("$target_zip_check")
+done
+if (( ${#missing[@]} > 0 )); then
+  echo "error: missing zips -- nothing was released:" >&2
+  for m in "${missing[@]}"; do echo "  $m" >&2; done
+  exit 1
 fi
 
 command -v curl >/dev/null || { echo "error: curl is required" >&2; exit 1; }
@@ -279,7 +313,10 @@ changelog_for() {
     const { readFileSync } = require("fs");
     const [path, version, kind] = process.argv.slice(1);
     const lines = readFileSync(path, "utf8").split("\n");
-    const matches = (l) => l.startsWith(`## ${version}`) &&
+    // Restated from isLanguageHeading in scripts/lib/packs.mjs, because this is a node -e
+    // string and cannot import it -- keep the two in step.
+    const language = /^## \S+ — [a-z]+(?:-[a-z]+)+-[a-z]{2}[A-Z]{2}(?:\s|$)/;
+    const matches = (l) => l.startsWith(`## ${version}`) && !language.test(l) &&
       (kind === "spoken" ? true : kind === "player" ? /player/i.test(l) : /pack/i.test(l));
     const start = lines.findIndex(matches);
     if (start === -1) {
@@ -342,8 +379,12 @@ upload_target() {
     return 1
   fi
 
-  case "$target" in player|spoken) kind=$target;; *) kind=pack;; esac
-  changelog="$(changelog_for "$version" "$kind")" || return 1
+  if [[ "$target" == audio-* ]] && ! english; then
+    changelog="$(node "$REPO/scripts/lib/packs.mjs" changelog "$REPO/docs/quests/CHANGELOG.md" "$version" "$(pack_field "$target" release)")" || return 1
+  else
+    case "$target" in player|spoken) kind=$target;; *) kind=pack;; esac
+    changelog="$(changelog_for "$version" "$kind")" || return 1
+  fi
   size="$(du -h "$zip_path" | cut -f1)"
 
   echo "  file:      $zip_path ($size)"
@@ -430,7 +471,13 @@ upload_target() {
   # files for different reasons -- the complete pack is over CurseForge's body-size ceiling
   # and uploads to Wago fine -- and a file one store will not take is still a file the other
   # should have. A failure here fails the target, which the caller collects like any other.
-  if store_has wago; then
+  #
+  # A language's page may carry no Wago id yet -- creating that project is a manual step, same
+  # as CurseForge's -- and skips rather than fails, since its players still get the file from
+  # CurseForge and the GitHub release.
+  if store_has wago && [[ -z "$(target_wago "$target")" ]]; then
+    echo "  wago:      no Wago project for $target -- skipped (its players use CurseForge and GitHub)"
+  elif store_has wago; then
     if [[ -n "$dry_run" ]]; then
       echo "  wago:      project $(target_wago "$target") -- dry run, not uploading"
     else

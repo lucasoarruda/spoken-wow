@@ -36,6 +36,9 @@ import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parseFrontmatter } from "./lib/frontmatter.mjs";
+import { loadPacks } from "./lib/packs.mjs";
+
 // The monorepo root, two levels up from scripts/.
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLISHERS_DIR = join(ROOT, "publishers");
@@ -104,48 +107,10 @@ function forWago(body, urls) {
 const GENERATED_NOTE =
   "<!-- GENERATED from publishers/%s by scripts/descriptions.mjs. Do not edit by hand. -->";
 
-// A deliberately small YAML subset: `key: value` and `key:` followed by `- item`
-// lines. Enough for the fields below, and a parser that cannot express anything
-// else is a parser nobody has to reason about when a page stops rendering.
-function parseFrontmatter(text, file) {
-  if (!text.startsWith("---\n")) {
-    throw new Error(`${file}: no frontmatter block`);
-  }
-  const end = text.indexOf("\n---\n", 3);
-  if (end === -1) {
-    throw new Error(`${file}: frontmatter is not closed`);
-  }
 
-  const meta = {};
-  let listKey = null;
-
-  for (const raw of text.slice(4, end).split("\n")) {
-    const line = raw.replace(/\s+$/, "");
-    if (!line || line.startsWith("#")) continue;
-
-    if (line.startsWith("  - ")) {
-      if (!listKey) throw new Error(`${file}: list item outside a key: ${line}`);
-      meta[listKey].push(line.slice(4).trim());
-      continue;
-    }
-
-    const match = line.match(/^([a-zA-Z][a-zA-Z0-9_]*):\s*(.*)$/);
-    if (!match) throw new Error(`${file}: cannot parse frontmatter line: ${line}`);
-
-    const [, key, value] = match;
-    if (value === "") {
-      meta[key] = [];
-      listKey = key;
-    } else {
-      meta[key] = value;
-      listKey = null;
-    }
-  }
-
-  return { meta, body: text.slice(end + 5).trim() + "\n" };
-}
-
-const REQUIRED = ["curseforge", "wago", "slug", "name", "summary", "categories", "license"];
+// `wago` is not among them: a language's sound pack is on CurseForge alone, since Wago refuses
+// a file its size and the page's `release:` already sends a Wago reader to GitHub instead.
+const REQUIRED = ["curseforge", "slug", "name", "summary", "categories", "license"];
 
 // CurseForge's summary field. Enforced here rather than discovered in the form,
 // where the failure is a truncated sentence nobody re-reads.
@@ -190,7 +155,7 @@ async function loadGroups() {
       // Wago's ids are eight alphanumeric characters and case matters -- QN53yXKB is not
       // qn53yxkb. Checked here because the upload endpoint is /projects/<id>/version: a
       // mistyped id is a 404 in the middle of a release, or worse, somebody else's project.
-      if (!/^[A-Za-z0-9]{8}$/.test(meta.wago)) {
+      if (meta.wago !== undefined && !/^[A-Za-z0-9]{8}$/.test(meta.wago)) {
         throw new Error(
           `${name}/${file}: 'wago' should be the 8-character Wago project id, from the ` +
             `project's page in https://addons.wago.io/developers`,
@@ -265,6 +230,10 @@ function groupFilter() {
 }
 
 async function main() {
+  // The pack rules (scripts/lib/packs.mjs) are checked on every run, so `make lint` fails on a
+  // page that would send a pack to the wrong folder or tag.
+  loadPacks();
+
   const write = process.argv.includes("--write");
   const only = groupFilter();
   const all = await loadGroups();
@@ -317,6 +286,8 @@ async function main() {
     const urls = wagoUrls(all.flatMap((g) => g.pages));
     for (const page of pages) {
       await writeFile(join(OUT_DIR, `${page.meta.slug}.md`), forStore(page.body, "curseforge"));
+      // No Wago project, nothing to paste there.
+      if (page.meta.wago === undefined) continue;
       await writeFile(join(WAGO_OUT_DIR, `${page.meta.slug}.md`), forWago(page.body, urls));
     }
     console.log(
@@ -335,7 +306,8 @@ async function main() {
     for (const group of groups) {
       for (const page of group.pages) {
         console.log(
-          `     ${page.meta.slug} (CurseForge ${page.meta.curseforge}, Wago ${page.meta.wago}): ` +
+          `     ${page.meta.slug} (CurseForge ${page.meta.curseforge}, ` +
+            `${page.meta.wago ? `Wago ${page.meta.wago}` : "not on Wago"}): ` +
             `summary ${page.meta.summary.length}/${SUMMARY_LIMIT} chars`,
         );
       }

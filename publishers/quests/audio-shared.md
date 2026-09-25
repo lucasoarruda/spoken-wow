@@ -2,6 +2,9 @@
 curseforge: 1660199
 wago: QNlz3YKe
 release: quests-audio-shared
+section: quests
+lang: enUS
+pack: shared
 slug: spoken-quests-audio-shared
 name: Spoken Quests Audio: Shared Quests
 summary: Quest dialogue both factions can hear, voiced. Install alongside the Alliance or Horde pack. Needs Spoken Quests.

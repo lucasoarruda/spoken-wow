@@ -26,14 +26,16 @@ import { join } from "node:path";
 import { BASE_LOCALE, LOCALES } from "../lib/locales.mjs";
 import { luaString, ROOT } from "../lib/wiki.mjs";
 import { stringCoverage } from "./check-strings.mjs";
+import { loadPacks } from "../../../../scripts/lib/packs.mjs";
 
 const DATA = join(ROOT, "addons/SpokenZones/Data");
 const OUT_PATH = join(DATA, "Languages.lua");
 
-// Whether a pack has been published for a language. A publishing fact, not one
-// the repository can see: the masters may be on this disk and the pack not on
-// CurseForge, or the reverse on a fresh clone.
-const AUDIO_PUBLISHED = new Set([BASE_LOCALE]);
+// Whether a language has a pack: its page under publishers/zones/ is what says so, since a
+// page is what the release scripts upload from. Not whether the masters are on this disk.
+const AUDIO_PUBLISHED = new Set(
+  loadPacks().filter((pack) => pack.section === "zones").map((pack) => pack.lang),
+);
 
 // Pending entries are places the client can name that nobody has written, in any
 // language. Counting them would say English is complete when 96 of its lines are empty,

@@ -333,6 +333,25 @@ Uploading a file cannot change the page around it: descriptions, relations and p
 settings live in the web UI, and a script that rewrote them each release would be one that
 could quietly undo an edit made there. The complete pack has no project and is not released.
 
+### A language's packs
+
+A language's four packs exist because their pages do: `publishers/quests/audio-<pack>-<lang>.md`
+(one per `alliance`/`horde`/`shared`/`gossip`) names the CurseForge project, version, folder and
+title that `scripts/lib/packs.mjs` reads instead of a case added to a script per language. `LOCALE=`
+moves the whole chain — pull, assemble, build, release — to that language, staged under
+`build/quests/<lang>/audio/` rather than English's `pipelines/quests/audio/`:
+
+```bash
+make pull-live LOCALE=esMX          # this language's live takes
+make sounds LOCALE=esMX             # build/quests/esMX/audio, assembled from the archive
+make package-audio LOCALE=esMX      # the four packs, encoded, into dist/
+make release-audio LOCALE=esMX      # uploads them, ./scripts/quests/release.sh --lang=esMX
+```
+
+Until per-locale gossip tables exist, a translated client is silent on gossip: the lookup a
+pack ships resolves NPC gossip chatter through the English corpus regardless of `LOCALE`, so a
+language's Gossip pack has nothing of its own to play.
+
 ### Browsing the corpus
 
 Nothing in a filename identifies an NPC — quest audio is `{questID}-{accept|complete}.mp3`

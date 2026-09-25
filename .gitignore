@@ -81,6 +81,10 @@ superpowers/
 # No trailing slash: a test client is pointed at this pack by symlinking its audio in,
 # and a trailing slash matches only a real directory, leaving the link to be committed.
 /addons/SpokenZonesAudio/Sounds
+# Another language's pack, staged by `make <section>-sounds LOCALE=xx` and the lookups and
+# manifests built beside it. Build output, never committed: the pages under publishers/ are
+# what says a language has a pack.
+/build/
 
 # The books narration, in the pack folder the client loads. Same rule and same reason as
 # the zones pack above, including the missing trailing slash: a test client is pointed at

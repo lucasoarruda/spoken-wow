@@ -6,7 +6,14 @@ see [Compatibility](#compatibility) below.
 The addon and the pack have numbered themselves independently since 2.0.0, so a heading says
 which of the two it belongs to when there is any doubt: a section headed `## <version> — audio`
 is the pack's, and `scripts/zones/release.sh` matches on the kind as well as the number. A
-section with no kind in its heading is the addon's.
+section with no kind in its heading is the addon's. A language's pack numbers itself too, from
+1.0.0, and its sections are headed by its release tag: `## <version> — zones-audio-esMX`.
+
+## 1.0.0 — zones-audio-esMX — unreleased
+
+- **The first Spanish (AL) sound pack**, `SpokenZonesAudio_esMX`: every zone and subzone
+  Spoken Zones has lore for, read aloud in Latin American Spanish. It plays only while Spoken
+  Zones is showing Spanish (AL) text, and installs beside the English pack rather than over it.
 
 ## 2.1.0 — 2026-09-21
 

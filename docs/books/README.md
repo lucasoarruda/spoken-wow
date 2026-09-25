@@ -263,3 +263,22 @@ into Wago, then record it with `make descriptions-published`.
 in as many words. `make audio-release` then publishes it as a GitHub release under
 `books-audio/vX.Y.Z`, which is where the Wago page for Spoken Books sends anyone looking for
 the narration.
+
+### A language's pack
+
+A page under `publishers/books/`, `spoken-books-audio-<lang>.md`, is what makes a language's
+pack exist — its `curseforge:`, `version:` and `slug:` are what `scripts/lib/packs.mjs` reads,
+rather than a case a script would grow per language. `LOCALE=` moves the whole chain to that
+language, staged under `build/books/<lang>/` rather than the committed `addons/SpokenBooksAudio/`:
+
+```bash
+make books-pull-live LOCALE=esMX      # this language's live takes
+make books-sounds LOCALE=esMX         # build/books/esMX/Sounds, from the archive
+make books-lookup LOCALE=esMX         # build/books/esMX/Data/Sounds.lua
+LOCALE=esMX ./scripts/books/package-audio.sh  # dist/SpokenBooksAudio_esMX-<v>.zip
+make books-release-audio LOCALE=esMX  # uploads it, CurseForge only
+```
+
+Until a per-locale page index exists, a translated client is silent on books: the lookup a
+pack ships still keys every page off the English corpus, so a language's pack has nothing of
+its own for the reader to resolve a translated page against.

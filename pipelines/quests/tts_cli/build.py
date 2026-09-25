@@ -64,6 +64,10 @@ VoiceOver.DataModules:Register("{module}", {module})
 # only once no supported release still looks for it.
 DEFAULT_TITLE = "Spoken Quests Audio"
 
+#: The TOC key naming the language a pack was recorded in. Must match what the addon's
+#: DataModules.lua reads.
+LANGUAGE_KEY = "X-SpokenQuests-Language"
+
 #: The artwork the client shows beside the addon's name in the AddOns list. Committed as a TGA
 #: rather than converted at build time, so building needs no ffmpeg; tools/make_icon.py is what
 #: made it, and its header explains the format.
@@ -202,7 +206,7 @@ def write_lua_table(path: str, module_name: str, table_name: str, data) -> None:
 
 
 def module_toc(module_name: str, generated_files: list, version: str = "1.0.1",
-               title: str = DEFAULT_TITLE) -> str:
+               title: str = DEFAULT_TITLE, language: str = None) -> str:
     """The TOC, listing exactly the files this build produced.
 
     The title is what tells the packs apart in the AddOns list, where five of them can sit at
@@ -210,6 +214,10 @@ def module_toc(module_name: str, generated_files: list, version: str = "1.0.1",
     """
     lines = [TOC_HEADER.format(version=version, title=title,
                                module=module_name, icon=ICON_NAME)]
+    if language:
+        # Only when asked: the addon reads an absent key as enUS, so every English pack keeps
+        # its exact TOC.
+        lines.insert(0, f"## {LANGUAGE_KEY}: {language}\n")
     lines.extend(f"generated\\{name}" for name in generated_files)
     return "\n".join(lines) + "\n"
 
@@ -217,7 +225,7 @@ def module_toc(module_name: str, generated_files: list, version: str = "1.0.1",
 def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
                  module_name: str = DEFAULT_MODULE_NAME, version: str = "1.0.1",
                  progress: bool = False, ignored=(), include=None,
-                 title: str = DEFAULT_TITLE) -> dict:
+                 title: str = DEFAULT_TITLE, language: str = None) -> dict:
     """Assemble the data module. Returns a report.
 
     An ignored line's audio is left behind as well as its lookup entry, so a take made
@@ -273,8 +281,11 @@ def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
 
     with open(os.path.join(module_dir, "Module.lua"), "w", encoding="utf-8") as f:
         f.write(MODULE_LUA.format(module=module_name, extension=extension))
+        if language:
+            # The unguarded tables are built from the English corpus whatever the pack speaks.
+            f.write(f'{module_name}.LookupLocale = "enUS"\n')
     with open(os.path.join(module_dir, module_name + ".toc"), "w", encoding="utf-8") as f:
-        f.write(module_toc(module_name, sorted(written), version, title))
+        f.write(module_toc(module_name, sorted(written), version, title, language))
 
     return {
         "moduleDir": module_dir,
@@ -282,6 +293,7 @@ def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
         "audioFormat": extension,
         "tables": sorted(written),
         "tableRows": {name: len(data) for name, (_, data) in tables.items()},
+        "language": language,
     }
 
 

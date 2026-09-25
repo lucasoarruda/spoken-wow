@@ -6,7 +6,7 @@
         status remove clean voice voice-zones lookup export \
         pull-history pull-live history-status sounds ssh-check sync check-synced full-release \
         icon lore-import lore-import-names lore-export lore-check lore-rewrite aliases languages locale-check \
-        release release-dry release-wago release-curse
+        release release-dry release-wago release-curse release-audio release-audio-dry
 
 # The \# escapes are required: an unescaped # starts a make comment, even
 # inside a $(shell ...) call.
@@ -65,10 +65,12 @@ clean: ## Remove build output
 # "Generating voicelines".
 #-------------------------------------------------------------------------------
 
-# The pipeline takes no language: the lore is English and the tools say so themselves.
-# The addon keeps its locale data -- alias tables and interface strings, both keyed by
-# CLIENT locale -- and `make zones-aliases` and `make zones-languages` still maintain it.
-VOICE_LANG =
+# Which language's takes and pack the voice targets act on: English, or LOCALE=esMX for
+# another language's pack (addons/SpokenZonesAudio_esMX). pipelines/zones/tools/voice/store.mjs
+# reads it; sounds, pull-live and package-audio take the same LOCALE, so one variable on the
+# command line moves the whole chain and a run cannot build one language's lookup over
+# another's clips.
+VOICE_LANG = SPOKEN_ZONES_LANG=$(or $(LOCALE),enUS)
 
 # The manifest comes from Postgres when DATABASE_URL is set and from the committed files
 # otherwise, and the repo-root .env sets it -- so a laptop whose Postgres is not running gets
@@ -228,7 +230,7 @@ pull-history: require-droplet ## Fetch the droplet's archived takes (non-destruc
 # `make zones-sync` first. pull-history is the whole archive, for listening to old takes.
 pull-live: require-droplet ## Fetch only the live takes the local database names (after sync)
 	$(preflight)
-	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh zones
+	@$(DB_ENV) RSYNC="$(RSYNC)" scripts/audio/pull-live.sh zones $(or $(LOCALE),enUS)
 
 history-status: require-droplet ## Compare archived take count and size on both sides
 	@echo "local:   $$(find pipelines/zones/audio-history -name '*.mp3' 2>/dev/null | wc -l | tr -d ' ') takes, $$(du -sh pipelines/zones/audio-history 2>/dev/null | cut -f1 || echo 0)"
@@ -237,8 +239,8 @@ history-status: require-droplet ## Compare archived take count and size on both 
 
 # The pack's Sounds/ is not kept: it is assembled from the live takes and the archive, and
 # made again before every build. See scripts/audio/sounds.mjs.
-sounds: ## Assemble addons/SpokenZonesAudio/Sounds from the live takes and the archive
-	@$(DB_ENV) node scripts/audio/sounds.mjs zones
+sounds: ## Assemble the pack's Sounds/ (LOCALE=xx: into build/zones/xx) from the live takes
+	@$(DB_ENV) node scripts/audio/sounds.mjs --lang=$(or $(LOCALE),enUS) zones
 
 #-------------------------------------------------------------------------------
 # Moving the database between machines
@@ -261,14 +263,22 @@ check-synced: ## Compare the local zones data with the droplet's, and prompt if 
 
 # From the database, against production's data: the lookup table is rebuilt here rather than
 # on the droplet after every generation, which is what the site used to do.
-package-audio: check-synced sounds lookup validate-audio ## Build the sound-pack zip
-	@./scripts/zones/package-audio.sh
+package-audio: check-synced sounds lookup validate-audio ## Build the sound-pack zip (LOCALE=esMX for that language's)
+	@LOCALE="$(or $(LOCALE),enUS)" ./scripts/zones/package-audio.sh
 
 release-dry: ## Show what `make release` would upload to CurseForge and Wago
 	@./scripts/zones/release.sh --dry-run
 
 release: ## Upload the built zips to CurseForge and Wago (needs both tokens)
 	@./scripts/zones/release.sh
+
+# One language's sound pack, to CurseForge (and Wago where its page has an id). English's is
+# `release` as always; LOCALE picks another language's page under publishers/zones/.
+release-audio-dry: ## Show what uploading the sound pack would send (LOCALE=xx for a language)
+	@./scripts/zones/release.sh --dry-run --lang=$(or $(LOCALE),enUS) audio
+
+release-audio: ## Upload the sound pack (LOCALE=xx for a language's)
+	@./scripts/zones/release.sh --lang=$(or $(LOCALE),enUS) audio
 
 # One store at a time, for the case a release half-landed: a zip CurseForge took and Wago
 # refused, or the other way round. Re-running `release` would upload the file twice to the
@@ -286,13 +296,13 @@ release-curse: ## Upload the built zips to CurseForge only (needs CURSEFORGE_TOK
 # to docs/zones/CHANGELOG.md first; both uploads quote that section. The pack goes to
 # CurseForge only -- Wago answers 413 to a file this size (scripts/lib/wago.sh) -- and to
 # GitHub, which is where a Wago player gets it.
-full-release: require-droplet ## Sync, pull live takes, build and upload the sound pack
+full-release: require-droplet ## Sync, pull live takes, build and upload the sound pack (LOCALE=xx for a language's)
 	@$(MAKE) --no-print-directory -f make/zones.mk sync
-	@$(MAKE) --no-print-directory -f make/zones.mk pull-live
-	@$(MAKE) --no-print-directory -f make/zones.mk package-audio
-	@./scripts/zones/release.sh --dry-run --store=curseforge audio
-	@./scripts/audio-github-release.sh --dry-run zones-audio
+	@$(MAKE) --no-print-directory -f make/zones.mk pull-live LOCALE=$(LOCALE)
+	@$(MAKE) --no-print-directory -f make/zones.mk package-audio LOCALE=$(LOCALE)
+	@./scripts/zones/release.sh --dry-run --store=curseforge --lang=$(or $(LOCALE),enUS) audio
+	@./scripts/audio-github-release.sh --dry-run zones $(or $(LOCALE),enUS)
 	@printf 'Upload the zones pack to CurseForge and GitHub? [y/N] '; \
 	  read -r answer; [ "$$answer" = y ] || { echo aborted; exit 1; }
-	@./scripts/zones/release.sh --store=curseforge audio
-	@./scripts/audio-github-release.sh zones-audio
+	@./scripts/zones/release.sh --store=curseforge --lang=$(or $(LOCALE),enUS) audio
+	@./scripts/audio-github-release.sh zones $(or $(LOCALE),enUS)

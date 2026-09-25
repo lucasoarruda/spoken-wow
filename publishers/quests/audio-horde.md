@@ -2,6 +2,9 @@
 curseforge: 1660198
 wago: vNAg3OKo
 release: quests-audio-horde
+section: quests
+lang: enUS
+pack: horde
 slug: spoken-quests-audio-horde
 name: Spoken Quests Audio: Horde
 summary: Horde-only quest dialogue, voiced. Pair it with the Shared pack. Needs Spoken Quests.

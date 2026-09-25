@@ -1539,6 +1539,39 @@ as the beta disclaimer in the descriptions: marking the files `beta` would stop
 most addon managers offering them to players on the default channel, which is the
 audience this is for. `RELEASE_TYPE=beta` overrides it.
 
+### A language's sound pack
+
+A page under `publishers/zones/` is what makes a language's pack exist at all —
+`publishers/zones/spoken-zones-audio-esmx.md` for `esMX`. Its frontmatter (`curseforge:`,
+`version:`, `slug:`, `name:`) is the CurseForge project, the version and the folder name
+(`SpokenZonesAudio_esMX`) that every build and release script reads through
+`scripts/lib/packs.mjs`, rather than a case a second language would add to. Add a language by
+adding its page; nothing else names it.
+
+`LOCALE=esMX` moves the whole chain to that language, and every step's build output lands
+under `build/zones/esMX/` (never in English's `addons/SpokenZonesAudio/`, which stays
+English's alone):
+
+```sh
+make zones-pull-live LOCALE=esMX      # this language's live takes, from the database
+make zones-sounds LOCALE=esMX         # build/zones/esMX/Sounds, assembled from the archive
+make zones-lookup LOCALE=esMX         # build/zones/esMX/Data/Sounds.lua
+make zones-package-audio LOCALE=esMX  # dist/SpokenZonesAudio_esMX-<v>.zip
+make zones-release-audio LOCALE=esMX  # uploads it, from ./scripts/zones/release.sh --lang=esMX
+```
+
+A language ships at the one `high`-tier quality every English pack ships at — its clips arrive
+already at the bitrate they ship, so there is nothing to transcode. Its `.toc` says
+`X-SpokenZones-Language: esMX`, so Spoken Zones plays it only under Spanish (AL) text, and it
+installs beside the English pack rather than over it.
+
+The pack numbers itself from 1.0.0 in its own page, and its changelog sections are headed by
+its release tag: `## <version> — zones-audio-esMX`. It has no Wago project — Wago refuses a
+file this size — so its page has no `wago:`, and `./scripts/audio-github-release.sh zones esMX`
+is where a Wago player finds it. Nothing under `build/` or `dist/` is committed, so after a
+release there is nothing left to commit — a second language is a page, a release and nothing
+else.
+
 ### Descriptions live in `publishers/`, and are pasted by hand
 
 Neither store has **an API for project descriptions, summaries or categories** —
