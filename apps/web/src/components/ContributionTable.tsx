@@ -31,6 +31,7 @@ import { Refreshing } from "@/components/Loading";
 import { usePendingPush } from "@/components/usePendingPush";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { ContributionStatus } from "@/lib/contributions/contributions";
 import { CLIENT_FAMILIES, CLIENT_FAMILY_LABELS, type ClientSummary } from "@/lib/contributions/client";
 import { flavorOptionsFor, summaryFromResolution, type FlavorScope } from "@/lib/contributions/speaker";
@@ -281,33 +282,97 @@ export default function ContributionTable({
     [flavorScopes, router],
   );
 
-  const resolve = useCallback(async (id: number, next: ContributionStatus) => {
-    setBusy(id);
+  /** One row's status change, shared by its own buttons and the bulk ones. True when it landed. */
+  const send = useCallback(async (id: number, next: ContributionStatus): Promise<boolean> => {
     const response = await fetch("/api/contributions/resolve", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, status: next }),
     }).catch(() => null);
-    setBusy(null);
 
     if (!response?.ok) {
       // The route already gives a plain-words reason for needs-speaker and one-way (accept.ts);
       // anything else (bad status, unknown row) degrades the same way this always has.
       const body = await response?.json().catch(() => null);
       setRefusals(withRefusal(id, body?.error));
-      return;
+      return false;
     }
     setRefusals(withoutRefusal(id));
     setResolved((current) => ({ ...current, [id]: next }));
     // "Add to explorer" is the same POST as Accept, re-sent for a row already accepted -- this
     // is what hides the button once it has worked, without waiting for a reload.
     if (next === "accepted") setLineCreated((current) => new Set(current).add(id));
+    return true;
   }, []);
+
+  const resolve = useCallback(
+    async (id: number, next: ContributionStatus) => {
+      setBusy(id);
+      await send(id, next);
+      setBusy(null);
+    },
+    [send],
+  );
+
+  /** Rows ticked for "Accept selected" / "Reject selected". */
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  /** A bulk run in flight, for its progress line and to hold every other button still meanwhile. */
+  const [bulk, setBulk] = useState<{ next: ContributionStatus; done: number; total: number } | null>(null);
+  /** What the last bulk run came to, until the next one starts. */
+  const [bulkOutcome, setBulkOutcome] = useState<string | null>(null);
+  /** "Accept all shown" asks twice: accepting writes quest lines, and a quests row can't be reopened after. */
+  const [confirmAll, setConfirmAll] = useState(false);
+
+  /**
+   * The same POST as a row's own button, once per row, one at a time: each accept is its own
+   * transaction writing quest lines (accept.ts), and running them in parallel is how two rows
+   * for the same line would race each other's collision check. A row that is refused keeps its
+   * refusal under it, exactly as if its own button had been pressed, and the rest carry on.
+   */
+  const resolveMany = useCallback(
+    async (ids: number[], next: ContributionStatus) => {
+      setBulkOutcome(null);
+      setBulk({ next, done: 0, total: ids.length });
+      const refused: number[] = [];
+      for (const [index, id] of ids.entries()) {
+        if (!(await send(id, next))) refused.push(id);
+        setBulk({ next, done: index + 1, total: ids.length });
+      }
+      setBulk(null);
+      // The refused rows stay ticked, so fixing their speakers and pressing the same button again
+      // is the whole retry.
+      setSelected(new Set(refused));
+      setBulkOutcome(
+        `${STATUS_LABELS[next]}: ${ids.length - refused.length} of ${ids.length}` +
+          (refused.length > 0 ? ` -- ${refused.length} refused and left selected.` : "."),
+      );
+    },
+    [send],
+  );
 
   const rows = initial.filter((row) => {
     const current = resolved[row.id] ?? row.status;
     return status === "all" || current === status;
   });
+
+  // Only rows still on screen count: a selected row a bulk reject just moved out of this view
+  // must not be accepted by the next click on a button that no longer shows it.
+  const selectedRows = rows.filter((row) => selected.has(row.id));
+  /** The ids among `from` a bulk change to `next` would actually change. */
+  const changeable = (from: ContributionRow[], next: ContributionStatus) =>
+    from.filter((row) => (resolved[row.id] ?? row.status) !== next).map((row) => row.id);
+  const shownToAccept = changeable(rows, "accepted");
+  const selectedToAccept = changeable(selectedRows, "accepted");
+  const selectedToReject = changeable(selectedRows, "rejected");
+  const allTicked = rows.length > 0 && selectedRows.length === rows.length;
+
+  const toggle = (id: number, on: boolean) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   /**
    * Move one dropdown and keep the other, then push it -- a soft navigation, not a state
@@ -346,6 +411,70 @@ export default function ContributionTable({
         {pending && <Refreshing />}
       </nav>
 
+      {rows.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          {bulk ? (
+            <span className="text-muted-foreground">
+              {STATUS_LABELS[bulk.next]}: {bulk.done} of {bulk.total}…
+            </span>
+          ) : (
+            <>
+              {confirmAll ? (
+                <>
+                  <span>Accept all {shownToAccept.length} shown? A quests line can&apos;t be reopened after.</span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setConfirmAll(false);
+                      void resolveMany(shownToAccept, "accepted");
+                    }}
+                  >
+                    Accept {shownToAccept.length}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmAll(false)}>
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={shownToAccept.length === 0}
+                  onClick={() => setConfirmAll(true)}
+                >
+                  Accept all shown ({shownToAccept.length})
+                </Button>
+              )}
+              {selectedRows.length > 0 ? (
+                <>
+                  <span className="text-muted-foreground ml-2">{selectedRows.length} selected</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={selectedToAccept.length === 0}
+                    onClick={() => void resolveMany(selectedToAccept, "accepted")}
+                  >
+                    Accept selected ({selectedToAccept.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={selectedToReject.length === 0}
+                    onClick={() => void resolveMany(selectedToReject, "rejected")}
+                  >
+                    Reject selected ({selectedToReject.length})
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                    Clear
+                  </Button>
+                </>
+              ) : null}
+              {bulkOutcome ? <span className="text-muted-foreground ml-2">{bulkOutcome}</span> : null}
+            </>
+          )}
+        </div>
+      ) : null}
+
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">Nothing here.</p>
       ) : (
@@ -355,6 +484,14 @@ export default function ContributionTable({
         >
           <thead className="text-muted-foreground text-left text-xs">
             <tr>
+              <th className="border-b py-2 pr-2 font-normal">
+                <Checkbox
+                  aria-label="Select every row shown"
+                  checked={allTicked ? true : selectedRows.length > 0 ? "indeterminate" : false}
+                  disabled={bulk !== null}
+                  onCheckedChange={(on) => setSelected(on === true ? new Set(rows.map((row) => row.id)) : new Set())}
+                />
+              </th>
               <th className="border-b py-2 pr-3 font-normal">Filed</th>
               <th className="border-b py-2 pr-3 font-normal">Source</th>
               <th className="border-b py-2 pr-3 font-normal">NPC</th>
@@ -388,6 +525,15 @@ export default function ContributionTable({
                   id={`contribution-${row.id}`}
                   className="align-top [&>td]:border-b [&>td]:py-2 [&>td]:leading-5"
                 >
+                  <td className="pr-2">
+                    <Checkbox
+                      aria-label={`Select contribution ${row.id}`}
+                      checked={selected.has(row.id)}
+                      disabled={bulk !== null}
+                      onCheckedChange={(on) => toggle(row.id, on === true)}
+                    />
+                  </td>
+
                   <td className="text-muted-foreground pr-3 text-xs whitespace-nowrap">
                     {when(row.createdAt)}
                   </td>
@@ -541,7 +687,7 @@ export default function ContributionTable({
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulk !== null}
                           onClick={() => void resolve(row.id, "accepted")}
                         >
                           Accept
@@ -555,7 +701,7 @@ export default function ContributionTable({
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulk !== null}
                           onClick={() => void resolve(row.id, "accepted")}
                         >
                           Add to explorer
@@ -565,7 +711,7 @@ export default function ContributionTable({
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulk !== null}
                           onClick={() => void resolve(row.id, "rejected")}
                         >
                           Reject
@@ -575,7 +721,7 @@ export default function ContributionTable({
                         <Button
                           size="sm"
                           variant="ghost"
-                          disabled={busy === row.id}
+                          disabled={busy === row.id || bulk !== null}
                           onClick={() => void resolve(row.id, "new")}
                         >
                           Reopen
