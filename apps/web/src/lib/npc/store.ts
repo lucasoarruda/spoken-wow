@@ -180,6 +180,18 @@ export async function getResolutions(
 }
 
 /**
+ * Every NPC on file, for /contributions/npcs. Every row here came from a contribution naming the
+ * NPC (resolveNpc at intake or at triage) or a moderator answering one, so this is "every NPC
+ * the contributions have named".
+ */
+export async function listResolutions(): Promise<NpcResolution[]> {
+  const { rows } = await db().query<NpcResolution>(
+    `select ${COLUMNS} from "npc_resolution" order by "npcId", "npcKind"`,
+  );
+  return rows;
+}
+
+/**
  * Every NPC of a kind that nobody has settled: no answer at all, or only a guess.
  *
  * What /contributions/game-data asks the client about. The unconfirmed index covers it.

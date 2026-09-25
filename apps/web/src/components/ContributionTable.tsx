@@ -25,13 +25,14 @@ import { localeHref } from "@/lib/lang";
 import { useCallback, useState } from "react";
 
 import FilterChip, { type ChipOption } from "@/components/FilterChip";
+import SpeakerCell, { ProvenanceBadge, summaryFromResolution, type FlavorScope } from "@/components/SpeakerCell";
 import { Refreshing } from "@/components/Loading";
 import { usePendingPush } from "@/components/usePendingPush";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ContributionStatus } from "@/lib/contributions/contributions";
 import { CLIENT_FAMILIES, CLIENT_FAMILY_LABELS, type ClientSummary } from "@/lib/contributions/client";
-import { contributionsHref, NEEDS_DECISION, type ClientFilter, type SpeakerFilter } from "@/lib/contributions/query";
+import { contributionsHref, MISSING, NEEDS_DECISION, type ClientFilter, type SpeakerFilter } from "@/lib/contributions/query";
 import type { Contribution } from "@/lib/contributions/store";
 // Both are computed server-side (npcSummaryFrom pulls in corpus.ts's flavorsFor) -- `import
 // type` erases the whole thing at compile time, so none of that follows the type in here. The
@@ -41,7 +42,6 @@ import type { NpcConflictOption, NpcSummary, QuestSummary } from "@/lib/contribu
 // (values, not just types) out of it would drag Postgres's own node built-ins into this bundle.
 import { NPC_KINDS, PROVENANCES, type NpcKind, type Provenance } from "@/lib/npc/npc";
 import type { NpcResolution } from "@/lib/npc/store";
-import { GENDERS, gendersOf, RACES, type Gender } from "@/lib/voices/voices";
 import { cn } from "@/lib/utils";
 import { wowheadEntityUrl, wowheadForeverUrl, wowheadQuestUrl } from "@/lib/wowhead";
 
@@ -66,9 +66,6 @@ export type ContributionRow = Pick<
   hasLine: boolean;
 };
 
-/** A race-gender-flavor triple the corpus actually has, for the "nothing known" state's selects. */
-type FlavorScope = { race: string; gender: string; flavor: string };
-
 const SOURCE_LABELS: Record<Contribution["source"], string> = {
   quests: "Quests",
   zones: "Zones",
@@ -89,36 +86,21 @@ const STATUS_CHIP_OPTIONS: ChipOption[] = STATUS_OPTIONS.map((option) => ({
 
 const PROVENANCE_LABELS: Record<Provenance, string> = {
   corpus: "Corpus",
-  client: "Client guess",
-  moderator: "Moderator",
-  none: "No race",
+  client: "Guessed",
+  moderator: "Moderated",
+  none: "Unknown",
 };
 
-// A speaker's provenance as a pill: a letter or two, so the answer and its Edit fit on one
-// line, with what it means on hover.
-const PROVENANCE_PILLS: Record<Provenance, { short: string; title: string }> = {
-  corpus: { short: "C", title: "Corpus: the game's own data for this NPC" },
-  client: { short: "G", title: "Guess: from the model the client reported" },
-  moderator: { short: "M", title: "Moderator: set by hand in triage" },
-  none: { short: "?", title: "No race: nothing known about this NPC" },
-};
-
-function ProvenanceBadge({ provenance }: { provenance: Provenance }) {
-  const pill = PROVENANCE_PILLS[provenance];
-  return (
-    <Badge variant="outline" className="cursor-help px-1.5 py-0 leading-5" title={pill.title}>
-      {pill.short}
-    </Badge>
-  );
-}
 
 // The Speaker dropdown's options: NEEDS_DECISION first -- it's the view this queue exists for,
-// "everything nobody has settled yet" -- then PROVENANCES's own four, unchanged. "Confirmed"
+// "everything nobody has settled yet" -- then PROVENANCES's own four, then MISSING: a quest row
+// that names no NPC at all, which the NPC column's own form fills in. "Confirmed"
 // (the union nobody triages: settled rows) is deliberately not here; see NEEDS_DECISION's own
 // docstring in lib/contributions/query.ts for why that one dropped out while this one didn't.
 const SPEAKER_CHIP_OPTIONS: ChipOption[] = [
   { value: NEEDS_DECISION, label: "Needs a decision" },
   ...PROVENANCES.map((option) => ({ value: option, label: PROVENANCE_LABELS[option] })),
+  { value: MISSING, label: "Missing" },
 ];
 
 const CLIENT_CHIP_OPTIONS: ChipOption[] = CLIENT_FAMILIES.map((option) => ({
@@ -136,36 +118,6 @@ function when(at: string): string {
   });
 }
 
-/** "race-gender-flavor", or as much of it as is known -- a moderator can fill in the rest. */
-function speaker(npc: NpcSummary): string {
-  // A known race-gender with no flavor is a whole answer -- the voice is bare race-gender
-  // (voiceNameFor) -- not a flavor still to be decided.
-  if (npc.race && npc.gender && !npc.flavor) return `${npc.race}-${npc.gender}`;
-  return [npc.race, npc.gender, npc.flavor].map((part) => part ?? "?").join("-");
-}
-
-/**
- * A row's speaker column must never read as a confident answer when it isn't one: `confirmed`
- * is the one column resolveNpc and the override route agree means "trust this", so it -- not
- * provenance alone -- is what this table shows plainly versus flags.
- *
- * A confirmed row with every field null is still a decision, not an absence -- a moderator (or
- * the corpus, for a narrator-style pseudo-race) looked and there is no race to assign. Left
- * unlabelled, "?-?-?" next to a "moderator" badge would be one small badge away from looking
- * identical to a genuinely unresolved "?-?-?"/"none" row, which defeats the point of this column
- * being a skimmable "still needs a human" signal.
- *
- * Null (no note at all) for an unconfirmed row with no provenance opinion: the nothing-known
- * form rendered right below already says "nobody has answered this" as plainly as a caption
- * could -- a redundant "not identified" used to sit here saying the same thing a third time,
- * after the missing provenance badge (see the `none` branch below) already dropped it once.
- */
-function speakerNote(npc: NpcSummary): string | null {
-  if (npc.confirmed) {
-    return npc.race || npc.gender || npc.flavor ? null : "confirmed: no race";
-  }
-  return null;
-}
 
 export default function ContributionTable({
   initial,
@@ -248,26 +200,10 @@ export default function ContributionTable({
       if (npc.npcKind === null && answer.npcKind) {
         await recordKind(contributionId, answer.npcKind);
       }
-      const summary: NpcSummary = {
-          npcKind: resolution.npcKind,
-          npcId: resolution.npcId,
-          npcName: resolution.npcName,
-          race: resolution.race,
-          gender: resolution.gender,
-          flavor: resolution.flavor,
-          provenance: resolution.provenance,
-          confirmed: resolution.confirmed,
-          // A saved answer is always "settled" (provenance "moderator" is always confirmed --
-          // migration 0031), so nothing here ever renders the flavor select again to need
-          // these -- computed anyway so the type stays honest rather than lying with `[]`.
-          flavorOptions:
-            resolution.race && resolution.gender
-              ? flavorScopes
-                  .filter((scope) => scope.race === resolution.race && scope.gender === resolution.gender)
-                  .map((scope) => scope.flavor)
-              : [],
-          conflict: [],
-      };
+      // A saved answer is always "settled" (provenance "moderator" is always confirmed --
+      // migration 0031), so nothing here ever renders the flavor select again to need
+      // flavorOptions -- computed anyway so the type stays honest rather than lying with `[]`.
+      const summary = summaryFromResolution(resolution, flavorScopes);
       setNpcOverrides((current) => ({
         ...current,
         [contributionKey(contributionId)]: summary,
@@ -309,6 +245,57 @@ export default function ContributionTable({
           conflict: [],
         },
       }));
+    },
+    [flavorScopes],
+  );
+
+  /**
+   * A quest row whose envelope named no NPC, given one by hand (api/contributions/npc-identity).
+   * Shown under the contribution's own key: until the next render there is only this row that
+   * knows the NPC, and resolveNpc's answer (if the corpus or an earlier row had one) comes back
+   * with it. The error, when there is one, is the route's own words.
+   */
+  const nameNpc = useCallback(
+    async (contributionId: number, answer: { npcKind: NpcKind; npcId: string; npcName: string }) => {
+      setNpcBusy(contributionId);
+      const response = await fetch("/api/contributions/npc-identity", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: contributionId, ...answer }),
+      }).catch(() => null);
+      setNpcBusy(null);
+
+      const body = (await response?.json().catch(() => null)) as
+        | { resolution?: NpcResolution | null; error?: string }
+        | null;
+      if (!response?.ok) {
+        setRefusals((current) => ({
+          ...current,
+          [contributionId]: typeof body?.error === "string" ? body.error : "That didn't go through -- try again.",
+        }));
+        return;
+      }
+      setRefusals((current) => {
+        if (!(contributionId in current)) return current;
+        const { [contributionId]: _dropped, ...rest } = current;
+        return rest;
+      });
+      const summary: NpcSummary = body?.resolution
+        ? summaryFromResolution(body.resolution, flavorScopes)
+        : {
+            // Resolving failed; the answer itself is recorded and the next render resolves it.
+            npcKind: answer.npcKind,
+            npcId: Number(answer.npcId),
+            npcName: answer.npcName.trim(),
+            race: null,
+            gender: null,
+            flavor: null,
+            provenance: "none",
+            confirmed: false,
+            flavorOptions: [],
+            conflict: [],
+          };
+      setNpcOverrides((current) => ({ ...current, [contributionKey(contributionId)]: summary }));
     },
     [flavorScopes],
   );
@@ -495,6 +482,9 @@ export default function ContributionTable({
                           />
                         )}
                       </div>
+                    ) : row.source === "quests" ? (
+                      // No NPC named at all: whoever triages it can say who speaks it.
+                      <MissingNpcForm busy={npcBusy === row.id} onSave={(answer) => void nameNpc(row.id, answer)} />
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -647,6 +637,64 @@ async function recordKind(contributionId: number, npcKind: NpcKind): Promise<boo
 }
 
 /**
+ * The NPC column of a quest row that names no NPC: kind, id and name, the last two required --
+ * an id with no name, or a name with no id, is not an answer (migration 0048's check).
+ */
+function MissingNpcForm({
+  busy,
+  onSave,
+}: {
+  busy: boolean;
+  onSave: (answer: { npcKind: NpcKind; npcId: string; npcName: string }) => void;
+}) {
+  const [npcKind, setNpcKind] = useState<NpcKind>("creature");
+  const [npcId, setNpcId] = useState("");
+  const [npcName, setNpcName] = useState("");
+  const valid = /^\d+$/.test(npcId.trim()) && npcName.trim() !== "";
+
+  return (
+    <form
+      className="flex flex-wrap items-center gap-1"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (valid) onSave({ npcKind, npcId: npcId.trim(), npcName });
+      }}
+    >
+      <select
+        value={npcKind}
+        onChange={(event) => setNpcKind(event.target.value as NpcKind)}
+        className="h-7 rounded border bg-transparent text-xs"
+      >
+        {NPC_KINDS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      <input
+        required
+        inputMode="numeric"
+        pattern="\d+"
+        placeholder="id"
+        value={npcId}
+        onChange={(event) => setNpcId(event.target.value)}
+        className="h-7 w-20 rounded border bg-transparent px-1.5 text-xs"
+      />
+      <input
+        required
+        placeholder="name"
+        value={npcName}
+        onChange={(event) => setNpcName(event.target.value)}
+        className="h-7 w-32 rounded border bg-transparent px-1.5 text-xs"
+      />
+      <Button type="submit" size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={busy || !valid}>
+        Add
+      </Button>
+    </form>
+  );
+}
+
+/**
  * A kind-less row whose id has disagreeing answers on file -- one as a creature, another as a
  * gameobject. Each is shown with where it came from; the moderator picks the one this
  * contribution meant, and nothing is used until they do (triage.ts's idOnlyResolution).
@@ -684,27 +732,6 @@ function NpcConflict({
   );
 }
 
-/**
- * The voice line of the merged NPC/Speaker column (finding 4), in the three states finding 2
- * asks for -- keyed on `confirmed`, not
- * `provenance` alone, for the reason speakerNote already draws that distinction: `confirmed` is
- * the column resolveNpc and the override route agree means "trust this" (migration 0031 only
- * ever sets it for "corpus" or "moderator"), so a moderator's own settled answer gets the same
- * plain, uncontrolled rendering the corpus's does -- there is nothing left to decide either way,
- * and re-opening one would need a distinct "reopen" affordance this table does not yet have.
- *
- *   - confirmed (corpus or moderator): plain text, no controls.
- *   - unconfirmed, race and gender known ("client"): race-gender as text, a flavor select
- *     narrowed to flavorsFor(race, gender) -- npc.flavorOptions, computed server-side.
- *   - unconfirmed, nothing known ("none"): race and gender selects from the voiced list
- *     (lib/voices/voices.ts), gender narrowed to the chosen race, and a flavor select that fills
- *     in from flavorScopes once both are chosen.
- *
- * Saving never resends a field the moderator didn't touch: the route's own orExisting is what
- * makes that safe, and doing it here too is what lets "this is a tauren male" (no flavor
- * opinion) and "just the flavor" (client row, race/gender already right) both post a partial
- * answer instead of a full one.
- */
 /** npcOverrides' key for an NPC's own answer, shared by every row that NPC speaks. */
 function overrideKey(npcKind: NpcKind, npcId: number): string {
   return `npc:${npcKind}:${npcId}`;
@@ -713,204 +740,4 @@ function overrideKey(npcKind: NpcKind, npcId: number): string {
 /** npcOverrides' key for one contribution's own answer, for a row with no NPC key yet. */
 function contributionKey(contributionId: number): string {
   return `contribution:${contributionId}`;
-}
-
-function SpeakerCell({
-  npc,
-  flavorScopes,
-  readOnly,
-  busy,
-  onSave,
-}: {
-  npc: NpcSummary;
-  flavorScopes: FlavorScope[];
-  readOnly: boolean;
-  busy: boolean;
-  onSave: (answer: Partial<{ npcKind: NpcKind; race: string; gender: string; flavor: string }>) => void;
-}) {
-  const [race, setRace] = useState(npc.race ?? "");
-  const [gender, setGender] = useState(npc.gender ?? "");
-  const [flavor, setFlavor] = useState(npc.flavor ?? "");
-  // Only ever read for a kind-less row (npc.npcKind === null): NPC_KINDS's own values, "creature"
-  // or "gameobject", picked by the moderator rather than guessed -- see NpcSummary's own
-  // docstring for why resolveNpc refuses to make this guess itself.
-  const [kind, setKind] = useState<NpcKind | "">("");
-  // Only ever reachable for a `moderator` row (see below) -- a moderator's own settled answer
-  // stays plain until they ask to change it, so an always-present form isn't one stray click
-  // away from silently overwriting a considered "no race" with an empty save.
-  const [editing, setEditing] = useState(false);
-
-  // Read-only too for somebody api/contributions/npc would refuse: the answer as it stands,
-  // with no form that could only end in a 403.
-  if (npc.provenance === "corpus" || readOnly) {
-    // The corpus is the exact answer, taken from the same display data the game itself uses --
-    // there is nothing for a moderator to decide, and unlike a `moderator` row (below) there is
-    // no "edit" affordance either: overriding the corpus's own answer would need to be a
-    // deliberate act (e.g. direct SQL), not an accident of a form this table always shows.
-    return (
-      <div>
-        <div className="flex items-center gap-1 whitespace-nowrap">
-          <span>{speaker(npc)}</span>
-          <ProvenanceBadge provenance={npc.provenance} />
-        </div>
-        {speakerNote(npc) ? <p className="text-muted-foreground mt-0.5">{speakerNote(npc)}</p> : null}
-      </div>
-    );
-  }
-
-  if (npc.confirmed && !editing) {
-    // A moderator's own settled answer (the only other `confirmed` provenance -- migration
-    // 0031). Shown plainly like the corpus, but with a small edit control that reopens the form
-    // below, preselected with the current values via the same useState initialisers above. The
-    // store already lets a moderator write over a moderator row -- upsertResolution's `where`
-    // compares ranks with `<=`, so an equal rank still updates (store.test.ts's "lets a
-    // moderator write over a moderator row update") -- so nothing there needs to change for
-    // this to work.
-    return (
-      <div>
-        <div className="flex items-center gap-1 whitespace-nowrap">
-          <span>{speaker(npc)}</span>
-          <ProvenanceBadge provenance={npc.provenance} />
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-5 px-1.5 py-0 text-xs"
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </Button>
-        </div>
-        {speakerNote(npc) ? <p className="text-muted-foreground mt-0.5">{speakerNote(npc)}</p> : null}
-      </div>
-    );
-  }
-
-  // `known` (race and gender already right, only the flavor is a guess) is specifically the
-  // `client` provenance's own shape -- a moderator reopening their own row via Edit gets the
-  // full race/gender/flavor selects below instead, since a moderator revising their own answer
-  // may want to correct any of the three, not just the flavor.
-  const known = npc.provenance === "client";
-  // The "nothing known" state's own flavor options: flavorScopes is the whole corpus, so this
-  // narrows to whatever race and gender were just picked, the same shape flavorOptions already
-  // is for the "client" state -- there is no npc.flavorOptions to fall back on here because
-  // page.tsx has no row-specific race/gender to have asked flavorsFor about.
-  const flavorOptions = known
-    ? npc.flavorOptions
-    : flavorScopes.filter((scope) => scope.race === race && scope.gender === gender).map((scope) => scope.flavor);
-
-  return (
-    <div className="flex flex-col gap-1 py-1">
-      <div className="flex flex-wrap items-center gap-1">
-        {known ? (
-          <span className="font-mono">
-            {npc.race}-{npc.gender}
-            {flavorOptions.length > 0 ? "-" : null}
-          </span>
-        ) : (
-          <>
-            {npc.npcKind === null ? (
-              <select
-                value={kind}
-                onChange={(event) => setKind(event.target.value as NpcKind | "")}
-                className="h-7 rounded border bg-transparent text-xs"
-              >
-                <option value="">kind?</option>
-                {NPC_KINDS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            {/* No separator spans between these -- each select already reads as its own field
-                (a border, a "race?"/"gender?" placeholder), and a bare `·`/`-` between them was
-                clutter, not information, once the gap the flex row already gives them separates
-                them just as clearly. */}
-            <select
-              value={race}
-              onChange={(event) => {
-                setRace(event.target.value);
-                // A gender the new race is not voiced in would post a pair nothing can speak.
-                if (event.target.value && !gendersOf(event.target.value).includes(gender as Gender)) setGender("");
-                setFlavor("");
-              }}
-              className="h-7 rounded border bg-transparent text-xs"
-            >
-              <option value="">race?</option>
-              {RACES.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <select
-              value={gender}
-              onChange={(event) => {
-                setGender(event.target.value);
-                setFlavor("");
-              }}
-              className="h-7 rounded border bg-transparent text-xs"
-            >
-              <option value="">gender?</option>
-              {(race ? gendersOf(race) : GENDERS).map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-        {/* A race-gender with no flavors in the corpus yet (bloodelf, skybourneelf) is voiced as
-            bare race-gender, so there is nothing to pick and the answer saves without one. */}
-        {(known || (race && gender)) && flavorOptions.length > 0 ? (
-          <select
-            value={flavor}
-            onChange={(event) => setFlavor(event.target.value)}
-            className="h-7 rounded border bg-transparent text-xs"
-          >
-            <option value="">flavor?</option>
-            {flavorOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        {/* `none` gets no badge: it is the provenance's own way of saying "we tried and learned
-            nothing", which the form sitting right here already says -- see finding 5. `client`
-            still earns one, since "a guess came from somewhere" is real information the form
-            alone doesn't carry. */}
-        {npc.provenance !== "none" ? (
-          <ProvenanceBadge provenance={npc.provenance} />
-        ) : null}
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2 text-xs"
-          // A kind-less row with no kind picked yet has nothing valid to POST -- the route
-          // requires npcKind and would 400 -- so the button waits rather than silently failing.
-          disabled={busy || (npc.npcKind === null && !kind)}
-          onClick={() => {
-            // The "client" state never sends race/gender at all: leaving those keys off is what
-            // tells the route to keep what the client already reported, rather than resending
-            // (and risking retyping wrong) values this form doesn't even offer as inputs there.
-            onSave(
-              known
-                ? { flavor }
-                : { npcKind: kind || undefined, race, gender, flavor },
-            );
-            // Collapses back to the plain, settled view either way -- overrideNpc's own request
-            // is fire-and-forget from here (see its "if (!response?.ok) return" silent no-op,
-            // the same failure handling every other action in this table already has), so a
-            // failed save leaves `npc` exactly as it was and this simply re-shows that answer
-            // rather than a form now out of sync with it.
-            setEditing(false);
-          }}
-        >
-          Save
-        </Button>
-      </div>
-      {speakerNote(npc) ? <p className="text-muted-foreground">{speakerNote(npc)}</p> : null}
-    </div>
-  );
 }
