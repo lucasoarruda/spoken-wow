@@ -1357,7 +1357,7 @@ local subzones = {
 		["tyrs hand"] = {
 			name = "Manopla de Tyr",
 			short = "A Manopla de Tyr é uma cidade humana fortificada, um dos últimos redutos dos vivos contra o Flagelo na região.",
-			full = "A Manopla de Tyr é uma cidade humana fortificada, um dos últimos redutos dos vivos contra o Flagelo na região. Seus arredores estão em condições muito melhores que o resto das Terras Pestilentas, embora as árvores e a vegetação ainda apodreçam.\n\nA cidade está entre os locais sagrados mais antigos e reverenciados da Igreja da Luz, construída quase inteiramente de igrejas e coroada pela Basílica Escarlate e pela abadia fortificada.\n\nQuando o Flagelo chegou e Eastweald se tornou as Terras Pestilentas, a Manopla de Tyr não caiu. Sob o comando do Lorde Valdelmar, resistiu a ataques diários, protegida primeiro pelos Cavaleiros do Punho de Prata e depois pela Cruzada Escarlate, enviando suprimentos e reforços a outras posses Escarlates, com relatórios diários trazidos de Stratholme por mensageiros que precisavam abrir caminho à força pelas estradas tomadas pela praga.",
+			full = "A Manopla de Tyr é uma cidade humana fortificada, um dos últimos redutos dos vivos contra o Flagelo na região. Seus arredores estão em condições muito melhores que o resto das Terras Pestilentas, embora as árvores e a vegetação ainda apodreçam.\n\nA cidade está entre os locais sagrados mais antigos e reverenciados da Igreja da Luz, construída quase inteiramente de igrejas e coroada pela Basílica Escarlate e pela abadia fortificada.\n\nQuando o Flagelo chegou e o Leste se tornou as Terras Pestilentas, a Manopla de Tyr não caiu. Sob o comando do Lorde Valdelmar, resistiu a ataques diários, protegida primeiro pelos Cavaleiros do Punho de Prata e depois pela Cruzada Escarlate, enviando suprimentos e reforços a outras posses Escarlates, com relatórios diários trazidos de Stratholme por mensageiros que precisavam abrir caminho à força pelas estradas tomadas pela praga.",
 			source = "https://warcraft.wiki.gg/wiki/Tyr's_Hand",
 		},
 		["undercroft"] = {
@@ -1419,8 +1419,8 @@ local subzones = {
 		},
 		["dun garok"] = {
 			name = "Dun Garok",
-			short = "Dun Garok fica nas colinas do Contraforte de Eira dos Montes, uma fortaleza anã sob o comando do Capitão Ironhill.",
-			full = "Dun Garok fica nas colinas do Contraforte de Eira dos Montes, uma fortaleza anã sob o comando do Capitão Ironhill. Sua guarnição protege os humanos de Eira dos Montes e vigia a Mina Veioazul, uma presença que os Renegados não toleram e que os levou a oferecer ouro a quem se infiltrasse na fortaleza e passasse seus anões a fio de espada.",
+			short = "Dun Garok fica nas colinas do Contraforte de Eira dos Montes, uma fortaleza anã sob o comando do Capitão Monteferro.",
+			full = "Dun Garok fica nas colinas do Contraforte de Eira dos Montes, uma fortaleza anã sob o comando do Capitão Monteferro. Sua guarnição protege os humanos de Eira dos Montes e vigia a Mina Veioazul, uma presença que os Renegados não toleram e que os levou a oferecer ouro a quem se infiltrasse na fortaleza e passasse seus anões a fio de espada.",
 			source = "https://warcraft.wiki.gg/wiki/Dun_Garok",
 		},
 		["durnholde keep"] = {
@@ -1545,8 +1545,8 @@ local subzones = {
 		},
 		["western strand"] = {
 			name = "Praia Ocidental",
-			short = "A Praia Ocidental fica no litoral sudoeste do Contraforte de Eira dos Montes. Os murlocs Torn Fin ergueram pequenos acampamentos ao longo de sua margem, e Andy Murgole patrulha estas águas, vigiando o litoral onde eles vivem.",
-			full = "A Praia Ocidental fica no litoral sudoeste do Contraforte de Eira dos Montes. Os murlocs Torn Fin ergueram pequenos acampamentos ao longo de sua margem, e Andy Murgole patrulha estas águas, vigiando o litoral onde eles vivem.",
+			short = "A Praia Ocidental fica no litoral sudoeste do Contraforte de Eira dos Montes. Os murlocs Rancapina ergueram pequenos acampamentos ao longo de sua margem, e Andy Murgole patrulha estas águas, vigiando o litoral onde eles vivem.",
+			full = "A Praia Ocidental fica no litoral sudoeste do Contraforte de Eira dos Montes. Os murlocs Rancapina ergueram pequenos acampamentos ao longo de sua margem, e Andy Murgole patrulha estas águas, vigiando o litoral onde eles vivem.",
 			source = "https://warcraft.wiki.gg/wiki/Western_Strand",
 		},
 	},
@@ -2400,8 +2400,8 @@ local subzones = {
 		},
 		["redridge canyons"] = {
 			name = "Garganta Cristarrubra",
-			short = "Os desfiladeiros cortam o noroeste de Cristarrubra, com paredes que escondem o covil de Yowler, que lidera os gnolls que dominam este terreno.",
-			full = "Os desfiladeiros cortam o noroeste de Cristarrubra, com paredes que escondem o covil de Yowler, que lidera os gnolls que dominam este terreno.",
+			short = "Os desfiladeiros cortam o noroeste de Cristarrubra, com paredes que escondem o covil de Berrante, que lidera os gnolls que dominam este terreno.",
+			full = "Os desfiladeiros cortam o noroeste de Cristarrubra, com paredes que escondem o covil de Berrante, que lidera os gnolls que dominam este terreno.",
 			source = "https://warcraft.wiki.gg/wiki/Redridge_Canyons",
 		},
 		["renders camp"] = {
@@ -2994,8 +2994,8 @@ local subzones = {
 		},
 		["raptor ridge"] = {
 			name = "Serra dos Raptores",
-			short = "A Serra dos Raptores se ergue no leste do Pantanal, a noroeste dos Portões Presa do Dragão, com encostas e caverna repletas de raptores. Lá no fundo, a Matriarca Navalhada choca sua ninhada.",
-			full = "A Serra dos Raptores se ergue no leste do Pantanal, a noroeste dos Portões Presa do Dragão, com encostas e caverna repletas de raptores. Lá no fundo, a Matriarca Navalhada choca sua ninhada.",
+			short = "A Serra dos Raptores se ergue no leste do Pantanal, a noroeste dos Portões Presa do Dragão, com encostas e caverna repletas de raptores. Lá no fundo, a Matriarca Rasgaqueixo choca sua ninhada.",
+			full = "A Serra dos Raptores se ergue no leste do Pantanal, a noroeste dos Portões Presa do Dragão, com encostas e caverna repletas de raptores. Lá no fundo, a Matriarca Rasgaqueixo choca sua ninhada.",
 			source = "https://warcraft.wiki.gg/wiki/Raptor_Ridge",
 		},
 		["saltspray glen"] = {
@@ -3387,8 +3387,8 @@ local subzones = {
 		},
 		["satyrnaar"] = {
 			name = "Satyrnaar",
-			short = "Satyrnaar está em ruínas entre as árvores do nordeste do Vale Gris, com suas construções há muito caídas, embora agora tendas se amontoem entre os destroços onde os sátiros Bleakheart fizeram seu lar.",
-			full = "Satyrnaar está em ruínas entre as árvores do nordeste do Vale Gris, com suas construções há muito caídas, embora agora tendas se amontoem entre os destroços onde os sátiros Bleakheart fizeram seu lar. Dos três redutos de sátiros da floresta, apenas Satyrnaar continua em grande parte intacto, e sua posição ao lado da estrada que vai do Posto Machadada até Azshara fez dele o mais fácil de alcançar e o mais disputado dos três.\n\nOs Bleakheart guardam mais que abrigo aqui. Dentro de Satyrnaar repousa uma das gemas de alma do Culto da Trama Sombria, um símbolo do pacto que liga os sátiros aos propósitos sombrios desse culto.",
+			short = "Satyrnaar está em ruínas entre as árvores do nordeste do Vale Gris, com suas construções há muito caídas, embora agora tendas se amontoem entre os destroços onde os sátiros Cordúmbria fizeram seu lar.",
+			full = "Satyrnaar está em ruínas entre as árvores do nordeste do Vale Gris, com suas construções há muito caídas, embora agora tendas se amontoem entre os destroços onde os sátiros Cordúmbria fizeram seu lar. Dos três redutos de sátiros da floresta, apenas Satyrnaar continua em grande parte intacto, e sua posição ao lado da estrada que vai do Posto Machadada até Azshara fez dele o mais fácil de alcançar e o mais disputado dos três.\n\nOs Cordúmbria guardam mais que abrigo aqui. Dentro de Satyrnaar repousa uma das gemas de alma do Culto da Trama Sombria, um símbolo do pacto que liga os sátiros aos propósitos sombrios desse culto.",
 			source = "https://warcraft.wiki.gg/wiki/Satyrnaar",
 		},
 		["shady nook"] = {
@@ -4056,8 +4056,8 @@ local subzones = {
 		},
 		["dreadmurk shore"] = {
 			name = "Costa Tenebrosa",
-			short = "A costa entre a Ilha Theramore e a Fortaleza da Guardanorte está repleta de murlocs da tribo Mirefin, que reivindicam o litoral e suas ilhas espalhadas como seus.",
-			full = "A costa entre a Ilha Theramore e a Fortaleza da Guardanorte está repleta de murlocs da tribo Mirefin, que reivindicam o litoral e suas ilhas espalhadas como seus. Tartarugas marinhas e outras criaturas dividem com eles as águas ao redor.",
+			short = "A costa entre a Ilha Theramore e a Fortaleza da Guardanorte está repleta de murlocs da tribo Lamapina, que reivindicam o litoral e suas ilhas espalhadas como seus.",
+			full = "A costa entre a Ilha Theramore e a Fortaleza da Guardanorte está repleta de murlocs da tribo Lamapina, que reivindicam o litoral e suas ilhas espalhadas como seus. Tartarugas marinhas e outras criaturas dividem com eles as águas ao redor.",
 			source = "https://warcraft.wiki.gg/wiki/Dreadmurk_Shore",
 		},
 		["dustwallow bay"] = {
@@ -4140,8 +4140,8 @@ local subzones = {
 		},
 		["witch hill"] = {
 			name = "Morro das Bruxas",
-			short = "O Casarão do Pantanal Iluminado fica no centro do Morro das Bruxas, lar de Zé \"Olho de Lama\". Os murlocs Mirefin mantêm seus acampamentos perto dali, no lodaçal.",
-			full = "O Casarão do Pantanal Iluminado fica no centro do Morro das Bruxas, lar de Zé \"Olho de Lama\". Os murlocs Mirefin mantêm seus acampamentos perto dali, no lodaçal.",
+			short = "O Casarão do Pantanal Iluminado fica no centro do Morro das Bruxas, lar de Zé \"Olho de Lama\". Os murlocs Lamapina mantêm seus acampamentos perto dali, no lodaçal.",
+			full = "O Casarão do Pantanal Iluminado fica no centro do Morro das Bruxas, lar de Zé \"Olho de Lama\". Os murlocs Lamapina mantêm seus acampamentos perto dali, no lodaçal.",
 			source = "https://warcraft.wiki.gg/wiki/Witch_Hill",
 		},
 		["wyrmbog"] = {

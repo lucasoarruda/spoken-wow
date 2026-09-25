@@ -91,7 +91,7 @@ local subzones = {
 		["orgrimmar"] = {
 			name = "Orgrimmar",
 			short = "Orgrimmar se alzó en los años posteriores al Monte Hyjal, cuando el Jefe de Guerra Thrall condujo a su pueblo a una costa desolada de Kalimdor.",
-			full = "Orgrimmar se alzó en los años posteriores al Monte Hyjal, cuando el Jefe de Guerra Thrall condujo a su pueblo a una costa desolada de Kalimdor. Llamó a la tierra Durotar en honor a su padre, y a la ciudad que levantó allí la llamó Orgrimmar, por Orgrim Doomhammer, el amigo y mentor que lo había formado. Se construyó deprisa, pero no a la ligera: murallas robustas, puertas enormes y altas torres, con las montañas a su espalda talladas para formar parte de la propia fortaleza, de modo que la tierra montara guardia sobre la ciudad.\n\nLa Horda que la construyó no era la Horda que antaño había arrasado el mundo. Rota la maldición demoníaca, el pueblo de Thrall pasó de la conquista a la supervivencia, y Orgrimmar la levantaron tanto otros como los orcos: goblins, tauren y trols Lanza Negra trabajaron junto a ellos, y el mok'nathal Rexxar echó una mano en la obra. Centauros, arpías, truenagartos, kóbolds y jabaespines pusieron a prueba a la joven ciudad en sus primeros años, pero resistió, y se convirtió en hogar no solo de orcos, sino también de trols, tauren y, con el tiempo, de los Renegados, recién acogidos en la Horda.\n\nEl propio viento no es ningún amigo aquí: los vientos cortantes barren los valles con fuerza suficiente para arrancar los tejados de los edificios levantados sin cuidado.",
+			full = "Orgrimmar se alzó en los años posteriores al Monte Hyjal, cuando el Jefe de Guerra Thrall condujo a su pueblo a una costa desolada de Kalimdor. Llamó a la tierra Durotar en honor a su padre, y a la ciudad que levantó allí la llamó Orgrimmar, por Orgrim Martillo Maldito, el amigo y mentor que lo había formado. Se construyó deprisa, pero no a la ligera: murallas robustas, puertas enormes y altas torres, con las montañas a su espalda talladas para formar parte de la propia fortaleza, de modo que la tierra montara guardia sobre la ciudad.\n\nLa Horda que la construyó no era la Horda que antaño había arrasado el mundo. Rota la maldición demoníaca, el pueblo de Thrall pasó de la conquista a la supervivencia, y Orgrimmar la levantaron tanto otros como los orcos: goblins, tauren y trols Lanza Negra trabajaron junto a ellos, y el mok'nathal Rexxar echó una mano en la obra. Centauros, arpías, truenagartos, kóbolds y jabaespines pusieron a prueba a la joven ciudad en sus primeros años, pero resistió, y se convirtió en hogar no solo de orcos, sino también de trols, tauren y, con el tiempo, de los Renegados, recién acogidos en la Horda.\n\nEl propio viento no es ningún amigo aquí: los vientos cortantes barren los valles con fuerza suficiente para arrancar los tejados de los edificios levantados sin cuidado.",
 			source = "https://warcraft.wiki.gg/wiki/Orgrimmar",
 		},
 		["razor hill"] = {
@@ -589,7 +589,7 @@ local subzones = {
 		["hammerfall"] = {
 			name = "Sentencia",
 			short = "El suelo de Sentencia recuerda lo que fue.",
-			full = "El suelo de Sentencia recuerda lo que fue. Tras la Segunda Guerra, la Alianza de Lordaeron construyó aquí uno de sus mayores campos de reclusión, donde encerraba a los orcos capturados tras sus muros. No siguió siendo una prisión. El Jefe de Guerra Thrall y Orgrim Doomhammer lanzaron a la Horda contra el campo para liberar a su pueblo, y en el caos de aquella liberación, mientras Thrall cubría la retirada, un caballero a la carga clavó una lanza en la espalda de Orgrim con tanta fuerza que le atravesó la armadura por delante y por detrás. Doomhammer murió allí, en la tierra que había venido a liberar.\n\nTras la Tercera Guerra, la Horda regresó a las ruinas y levantó entre ellas una base avanzada a la que llamó Sentencia en honor al Jefe de Guerra que había caído al tomarla. Se convirtió en algo más que un puesto: en un refugio para quienes sentían que ya no tenían lugar en el mundo, con sus cabañas espirituales, sus establos, su forja y su gran salón alzados allí donde antes estaban los muros del campo de reclusión.",
+			full = "El suelo de Sentencia recuerda lo que fue. Tras la Segunda Guerra, la Alianza de Lordaeron construyó aquí uno de sus mayores campos de reclusión, donde encerraba a los orcos capturados tras sus muros. No siguió siendo una prisión. El Jefe de Guerra Thrall y Orgrim Martillo Maldito lanzaron a la Horda contra el campo para liberar a su pueblo, y en el caos de aquella liberación, mientras Thrall cubría la retirada, un caballero a la carga clavó una lanza en la espalda de Orgrim con tanta fuerza que le atravesó la armadura por delante y por detrás. Doomhammer murió allí, en la tierra que había venido a liberar.\n\nTras la Tercera Guerra, la Horda regresó a las ruinas y levantó entre ellas una base avanzada a la que llamó Sentencia en honor al Jefe de Guerra que había caído al tomarla. Se convirtió en algo más que un puesto: en un refugio para quienes sentían que ya no tenían lugar en el mundo, con sus cabañas espirituales, sus establos, su forja y su gran salón alzados allí donde antes estaban los muros del campo de reclusión.",
 			source = "https://warcraft.wiki.gg/wiki/Hammerfall",
 		},
 		["northfold manor"] = {
@@ -1051,7 +1051,7 @@ local subzones = {
 		["pyrewood village"] = {
 			name = "Aldea Piroleña",
 			short = "La Aldea Piroleña se alza en el límite del Bosque de Argénteos, un puñado de humanos que sobrevivieron a la primera llegada de la Plaga durante la Tercera Guerra.",
-			full = "La Aldea Piroleña se alza en el límite del Bosque de Argénteos, un puñado de humanos que sobrevivieron a la primera llegada de la Plaga durante la Tercera Guerra. Al norte se alza un castillo que perteneció al barón Silverlaine, custodiado por el paladín comandante Springvale y la Mano de Plata. Silverlaine y sus hombres fueron masacrados por los ferocanis del archimago Arugal, que se quedó con el castillo y lo rebautizó como Castillo de Colmillo Oscuro. Desde allí, Arugal volvió su locura contra la propia Piroleña y maldijo a sus gentes para que cada noche se convirtieran en babeantes ferocanis Furia Lunar que despedazan a cualquiera que se cruce en su camino, solo para despertar de nuevo como humanos al llegar el alba.\n\nAun así, la aldea sigue abriendo sus puertas a los viajeros durante el día, con sus gentes atadas a la maldición que Arugal les impuso y sin que se vea un final.",
+			full = "La Aldea Piroleña se alza en el límite del Bosque de Argénteos, un puñado de humanos que sobrevivieron a la primera llegada de la Plaga durante la Tercera Guerra. Al norte se alza un castillo que perteneció al barón Filargenta, custodiado por el paladín comandante Springvale y la Mano de Plata. Filargenta y sus hombres fueron masacrados por los ferocanis del archimago Arugal, que se quedó con el castillo y lo rebautizó como Castillo de Colmillo Oscuro. Desde allí, Arugal volvió su locura contra la propia Piroleña y maldijo a sus gentes para que cada noche se convirtieran en babeantes ferocanis Furia Lunar que despedazan a cualquiera que se cruce en su camino, solo para despertar de nuevo como humanos al llegar el alba.\n\nAun así, la aldea sigue abriendo sus puertas a los viajeros durante el día, con sus gentes atadas a la maldición que Arugal les impuso y sin que se vea un final.",
 			source = "https://warcraft.wiki.gg/wiki/Pyrewood_Village",
 		},
 		["sepulcher"] = {
@@ -1063,7 +1063,7 @@ local subzones = {
 		["shadowfang keep"] = {
 			name = "Castillo de Colmillo Oscuro",
 			short = "El Castillo de Colmillo Oscuro se alza sobre un alto risco por encima de la Aldea Piroleña.",
-			full = "El Castillo de Colmillo Oscuro se alza sobre un alto risco por encima de la Aldea Piroleña. Perteneció en su día al barón Silverlaine, un señor de Gilneas, hasta que la Plaga cayó sobre Lordaeron y el archimago real Arugal buscó la manera de detenerla. Basándose en las investigaciones del mago Ur, y con la bendición del rey Genn Greymane pero en contra del consejo del Kirin Tor, Arugal invocó a los ferocanis. Estos hicieron retroceder la marea de no-muertos y después se volvieron contra la propia Gilneas, destrozando la Muralla de Greymane antes de desatarse por Argénteos. Cayeron sobre el castillo y mataron al barón Silverlaine y a los suyos.\n\nArugal, destrozado por lo que había desatado, no huyó de ello. Llamó a los ferocanis sus hijos, se quedó con el castillo y lo rebautizó como Colmillo Oscuro. En comunión con un amo al que servía en el Culto del Lobo, extendió la maldición por el bosque hasta que la propia Aldea Piroleña quedó transformada, con sus gentes humanas de día y bestias de noche, gobernadas por un consejo que solo respondía ante él.",
+			full = "El Castillo de Colmillo Oscuro se alza sobre un alto risco por encima de la Aldea Piroleña. Perteneció en su día al barón Filargenta, un señor de Gilneas, hasta que la Plaga cayó sobre Lordaeron y el archimago real Arugal buscó la manera de detenerla. Basándose en las investigaciones del mago Ur, y con la bendición del rey Genn Greymane pero en contra del consejo del Kirin Tor, Arugal invocó a los ferocanis. Estos hicieron retroceder la marea de no-muertos y después se volvieron contra la propia Gilneas, destrozando la Muralla de Greymane antes de desatarse por Argénteos. Cayeron sobre el castillo y mataron al barón Filargenta y a los suyos.\n\nArugal, destrozado por lo que había desatado, no huyó de ello. Llamó a los ferocanis sus hijos, se quedó con el castillo y lo rebautizó como Colmillo Oscuro. En comunión con un amo al que servía en el Culto del Lobo, extendió la maldición por el bosque hasta que la propia Aldea Piroleña quedó transformada, con sus gentes humanas de día y bestias de noche, gobernadas por un consejo que solo respondía ante él.",
 			source = "https://warcraft.wiki.gg/wiki/Shadowfang_Keep",
 		},
 		["shining strand"] = {
@@ -1218,8 +1218,8 @@ local subzones = {
 		},
 		["corins crossing"] = {
 			name = "Cruce de Corin",
-			short = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y Mano de Tyr, entre la cicatriz Infectis y el Lago Mereldar. Antaño fue un pueblo de cruce corriente, con su ayuntamiento y su herrería.",
-			full = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y Mano de Tyr, entre la cicatriz Infectis y el Lago Mereldar. Antaño fue un pueblo de cruce corriente, con su ayuntamiento y su herrería.\n\nAhora la Plaga llena por completo sus calles, y entre los muertos se mueven cosas que no pueden verse en absoluto: sirvientes invisibles que ven a través del sigilo como si no existiera. No hay ningún camino discreto a través del Cruce de Corin.",
+			short = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y Mano de Tyr, entre la Cicatriz Purulenta y el Lago Mereldar. Antaño fue un pueblo de cruce corriente, con su ayuntamiento y su herrería.",
+			full = "El Cruce de Corin se encuentra donde se unen los caminos hacia Andorhal, Villa Darrow, Stratholme y Mano de Tyr, entre la Cicatriz Purulenta y el Lago Mereldar. Antaño fue un pueblo de cruce corriente, con su ayuntamiento y su herrería.\n\nAhora la Plaga llena por completo sus calles, y entre los muertos se mueven cosas que no pueden verse en absoluto: sirvientes invisibles que ven a través del sigilo como si no existiera. No hay ningún camino discreto a través del Cruce de Corin.",
 			source = "https://warcraft.wiki.gg/wiki/Corin's_Crossing",
 		},
 		["crown guard tower"] = {
@@ -1357,7 +1357,7 @@ local subzones = {
 		["tyrs hand"] = {
 			name = "Mano de Tyr",
 			short = "Mano de Tyr es una ciudad humana fortificada, uno de los últimos reductos de los vivos frente a la Plaga en la región.",
-			full = "Mano de Tyr es una ciudad humana fortificada, uno de los últimos reductos de los vivos frente a la Plaga en la región. Sus alrededores están en mucho mejor estado que el resto de las Tierras de la Peste, aunque los árboles y la vegetación siguen pudriéndose.\n\nLa ciudad es uno de los lugares sagrados más antiguos y venerados de la Iglesia de la Luz, construida casi por completo de iglesias y coronada por la Basílica Escarlata y la abadía fortificada.\n\nCuando llegó la Plaga y Eastweald se convirtió en las Tierras de la Peste, Mano de Tyr no cayó. Bajo lord Valdemar resistió asaltos a diario, protegida primero por los Caballeros de la Mano de Plata y después por la Cruzada Escarlata, enviando suministros y refuerzos a otros enclaves Escarlata y recibiendo informes diarios de Stratholme, traídos por correos que tenían que abrirse paso a través de caminos plagados de peste.",
+			full = "Mano de Tyr es una ciudad humana fortificada, uno de los últimos reductos de los vivos frente a la Plaga en la región. Sus alrededores están en mucho mejor estado que el resto de las Tierras de la Peste, aunque los árboles y la vegetación siguen pudriéndose.\n\nLa ciudad es uno de los lugares sagrados más antiguos y venerados de la Iglesia de la Luz, construida casi por completo de iglesias y coronada por la Basílica Escarlata y la abadía fortificada.\n\nCuando llegó la Plaga y la Foresta Oriental se convirtió en las Tierras de la Peste, Mano de Tyr no cayó. Bajo lord Valdemar resistió asaltos a diario, protegida primero por los Caballeros de la Mano de Plata y después por la Cruzada Escarlata, enviando suministros y refuerzos a otros enclaves Escarlata y recibiendo informes diarios de Stratholme, traídos por correos que tenían que abrirse paso a través de caminos plagados de peste.",
 			source = "https://warcraft.wiki.gg/wiki/Tyr's_Hand",
 		},
 		["undercroft"] = {
@@ -1419,8 +1419,8 @@ local subzones = {
 		},
 		["dun garok"] = {
 			name = "Dun Garok",
-			short = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ironhill.",
-			full = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ironhill. Su guarnición protege a los humanos de Trabalomas y vigila la Mina Azur, una presencia que los Renegados no soportan y por la que han ofrecido oro a quien se cuele en la fortaleza y pase a cuchillo a sus enanos.",
+			short = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ferrocolina.",
+			full = "Dun Garok se alza en las colinas de las Laderas de Trabalomas, una fortaleza enana bajo el mando del capitán Ferrocolina. Su guarnición protege a los humanos de Trabalomas y vigila la Mina Azur, una presencia que los Renegados no soportan y por la que han ofrecido oro a quien se cuele en la fortaleza y pase a cuchillo a sus enanos.",
 			source = "https://warcraft.wiki.gg/wiki/Dun_Garok",
 		},
 		["durnholde keep"] = {
@@ -1546,7 +1546,7 @@ local subzones = {
 		["western strand"] = {
 			name = "Playa del Oeste",
 			short = "La Playa del Oeste se encuentra en la costa suroccidental de las Laderas de Trabalomas.",
-			full = "La Playa del Oeste se encuentra en la costa suroccidental de las Laderas de Trabalomas. Los múrlocs Torn Fin han levantado pequeños campamentos a lo largo de su orilla, y Andy Murgole patrulla estas aguas, vigilando la costa donde habitan.",
+			full = "La Playa del Oeste se encuentra en la costa suroccidental de las Laderas de Trabalomas. Los múrlocs Rompeanca han levantado pequeños campamentos a lo largo de su orilla, y Andy Murgole patrulla estas aguas, vigilando la costa donde habitan.",
 			source = "https://warcraft.wiki.gg/wiki/Western_Strand",
 		},
 	},
@@ -1566,8 +1566,8 @@ local subzones = {
 		},
 		["altar of zul"] = {
 			name = "El Altar de Zul",
-			short = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga the Keeper vigila desde lo alto de las piedras, custodia del poder que el altar aún conserve.",
-			full = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga the Keeper vigila desde lo alto de las piedras, custodia del poder que el altar aún conserve.",
+			short = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga el Vigilante vigila desde lo alto de las piedras, custodia del poder que el altar aún conserve.",
+			full = "El Altar de Zul se alza en las Tierras del Interior, levantado por los trols del bosque Vilrama para sus antiguos ritos. Qiaga el Vigilante vigila desde lo alto de las piedras, custodia del poder que el altar aún conserve.",
 			source = "https://warcraft.wiki.gg/wiki/Altar_of_Zul",
 		},
 		["bogens ledge"] = {
@@ -2400,8 +2400,8 @@ local subzones = {
 		},
 		["redridge canyons"] = {
 			name = "Cañones de Crestagrana",
-			short = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Yowler, que dirige a los gnolls que dominan este terreno.",
-			full = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Yowler, que dirige a los gnolls que dominan este terreno.",
+			short = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Ululante, que dirige a los gnolls que dominan este terreno.",
+			full = "Los cañones atraviesan el noroeste de Crestagrana, y sus paredes ocultan la guarida de Ululante, que dirige a los gnolls que dominan este terreno.",
 			source = "https://warcraft.wiki.gg/wiki/Redridge_Canyons",
 		},
 		["renders camp"] = {
@@ -2977,7 +2977,7 @@ local subzones = {
 		["menethil harbor"] = {
 			name = "Puerto de Menethil",
 			short = "La muralla es lo primero que cualquiera advierte: gruesa piedra levantada alrededor de un pueblo portuario que se asienta mitad sobre la roca, mitad sobre el mar.",
-			full = "La muralla es lo primero que cualquiera advierte: gruesa piedra levantada alrededor de un pueblo portuario que se asienta mitad sobre la roca, mitad sobre el mar. Cuatro torres se alzan por encima, vigilando tanto el agua como el camino, y no hay forma de entrar salvo por el puente, por la marea o por un sendero oculto que discurre bajo tierra hasta el continente.\n\nLos orcos levantaron aquí el primer astillero. Tras la Primera Guerra, el Jefe de Guerra Orgrim Doomhammer eligió esta costa para construir la flota destinada a llevar a la Horda más allá de las defensas terrestres de Lordaeron, y para ello despojó de hierro y madera las minas enanas de Khaz Modan. Cuando terminó la Segunda Guerra, la Alianza se quedó con el lugar y lo reconstruyó como propio, y el almirante general Daelin Valiente lo llamó Puerto de Menethil en honor a Terenas Menethil II, rey de Lordaeron.\n\nDurante años después, los raptores bajaron de las colinas para atacar el pueblo, nunca en gran número, pero sí con bastante frecuencia.",
+			full = "La muralla es lo primero que cualquiera advierte: gruesa piedra levantada alrededor de un pueblo portuario que se asienta mitad sobre la roca, mitad sobre el mar. Cuatro torres se alzan por encima, vigilando tanto el agua como el camino, y no hay forma de entrar salvo por el puente, por la marea o por un sendero oculto que discurre bajo tierra hasta el continente.\n\nLos orcos levantaron aquí el primer astillero. Tras la Primera Guerra, el Jefe de Guerra Orgrim Martillo Maldito eligió esta costa para construir la flota destinada a llevar a la Horda más allá de las defensas terrestres de Lordaeron, y para ello despojó de hierro y madera las minas enanas de Khaz Modan. Cuando terminó la Segunda Guerra, la Alianza se quedó con el lugar y lo reconstruyó como propio, y el almirante general Daelin Valiente lo llamó Puerto de Menethil en honor a Terenas Menethil II, rey de Lordaeron.\n\nDurante años después, los raptores bajaron de las colinas para atacar el pueblo, nunca en gran número, pero sí con bastante frecuencia.",
 			source = "https://warcraft.wiki.gg/wiki/Menethil_Harbor",
 		},
 		["menethil keep"] = {
@@ -2995,7 +2995,7 @@ local subzones = {
 		["raptor ridge"] = {
 			name = "Colina del Raptor",
 			short = "La Colina del Raptor se alza en el este de Los Humedales, al noroeste de las Puertas Faucedraco, con sus laderas y su caverna repletas de raptores.",
-			full = "La Colina del Raptor se alza en el este de Los Humedales, al noroeste de las Puertas Faucedraco, con sus laderas y su caverna repletas de raptores. En lo más profundo, la matriarca Razormaw vela por su nidada.",
+			full = "La Colina del Raptor se alza en el este de Los Humedales, al noroeste de las Puertas Faucedraco, con sus laderas y su caverna repletas de raptores. En lo más profundo, la matriarca Tajobuche vela por su nidada.",
 			source = "https://warcraft.wiki.gg/wiki/Raptor_Ridge",
 		},
 		["saltspray glen"] = {
@@ -3058,7 +3058,7 @@ local subzones = {
 		["darnassus"] = {
 			name = "Darnassus",
 			short = "Los elfos de la noche construyeron Darnassus después de la Tercera Guerra, cuando su larga inmortalidad les falló. Muchos no pudieron soportar el repentino peso del envejecimiento y la fragilidad.",
-			full = "Los elfos de la noche construyeron Darnassus después de la Tercera Guerra, cuando su larga inmortalidad les falló. Muchos no pudieron soportar el repentino peso del envejecimiento y la fragilidad. Un grupo de druidas afligidos decidió plantar un nuevo Árbol del Mundo para restaurar su vínculo con el mundo eterno. Con Malfurión Tempestira desaparecido, Fandral Corzocelada asumió el manto de archidruida y dirigió la empresa. El árbol que alzaron, Teldrassil, creció frente a la costa hasta que su copa atravesó las nubes, y entre sus ramas los elfos de la noche fundaron su ciudad como testimonio de la supervivencia de su pueblo.\n\nDarnassus está abierta al cielo, a diferencia de las ciudades cerradas y amuralladas de los humanos y los enanos. Está construida alrededor de un amplio lago, cuyas orillas se unen mediante elegantes puentes, y sus senderos están alfombrados de hojas caídas. El Templo de la Luna se alza sobre los árboles como sede de la suma sacerdotisa Tyrande Susurravientos y sus Hermanas de Elune. La ciudad sigue siendo aquello para lo que fue construida: un refugio tranquilo y un monumento a un pueblo que aprende a vivir con la mortalidad.",
+			full = "Los elfos de la noche construyeron Darnassus después de la Tercera Guerra, cuando su larga inmortalidad les falló. Muchos no pudieron soportar el repentino peso del envejecimiento y la fragilidad. Un grupo de druidas afligidos decidió plantar un nuevo Árbol del Mundo para restaurar su vínculo con el mundo eterno. Con Malfurion Tempestira desaparecido, Fandral Corzocelada asumió el manto de archidruida y dirigió la empresa. El árbol que alzaron, Teldrassil, creció frente a la costa hasta que su copa atravesó las nubes, y entre sus ramas los elfos de la noche fundaron su ciudad como testimonio de la supervivencia de su pueblo.\n\nDarnassus está abierta al cielo, a diferencia de las ciudades cerradas y amuralladas de los humanos y los enanos. Está construida alrededor de un amplio lago, cuyas orillas se unen mediante elegantes puentes, y sus senderos están alfombrados de hojas caídas. El Templo de la Luna se alza sobre los árboles como sede de la suma sacerdotisa Tyrande Susurravientos y sus Hermanas de Elune. La ciudad sigue siendo aquello para lo que fue construida: un refugio tranquilo y un monumento a un pueblo que aprende a vivir con la mortalidad.",
 			source = "https://warcraft.wiki.gg/wiki/Darnassus",
 		},
 		["dolanaar"] = {
@@ -3387,8 +3387,8 @@ local subzones = {
 		},
 		["satyrnaar"] = {
 			name = "Satyrnaar",
-			short = "Satyrnaar se alza en ruinas entre los árboles del noreste de Vallefresno, con sus edificios caídos hace mucho, aunque ahora se agrupan tiendas entre los restos donde los sátiros Bleakheart han establecido su hogar.",
-			full = "Satyrnaar se alza en ruinas entre los árboles del noreste de Vallefresno, con sus edificios caídos hace mucho, aunque ahora se agrupan tiendas entre los restos donde los sátiros Bleakheart han establecido su hogar. De los tres bastiones sátiros del bosque, solo Satyrnaar sigue en gran parte intacto, y su posición junto al camino que va del Puesto del Hachazo hacia Azshara lo ha convertido a la vez en el más accesible y en el más disputado de los tres.\n\nLos Bleakheart guardan aquí algo más que refugio. Dentro de Satyrnaar reposa una de las gemas de alma del Culto de la Facción Oscura, prenda del pacto que une a los sátiros con los oscuros propósitos de ese culto.",
+			short = "Satyrnaar se alza en ruinas entre los árboles del noreste de Vallefresno, con sus edificios caídos hace mucho, aunque ahora se agrupan tiendas entre los restos donde los sátiros Lobrecuore han establecido su hogar.",
+			full = "Satyrnaar se alza en ruinas entre los árboles del noreste de Vallefresno, con sus edificios caídos hace mucho, aunque ahora se agrupan tiendas entre los restos donde los sátiros Lobrecuore han establecido su hogar. De los tres bastiones sátiros del bosque, solo Satyrnaar sigue en gran parte intacto, y su posición junto al camino que va del Puesto del Hachazo hacia Azshara lo ha convertido a la vez en el más accesible y en el más disputado de los tres.\n\nLos Lobrecuore guardan aquí algo más que refugio. Dentro de Satyrnaar reposa una de las gemas de alma del Culto de la Facción Oscura, prenda del pacto que une a los sátiros con los oscuros propósitos de ese culto.",
 			source = "https://warcraft.wiki.gg/wiki/Satyrnaar",
 		},
 		["shady nook"] = {
@@ -4056,8 +4056,8 @@ local subzones = {
 		},
 		["dreadmurk shore"] = {
 			name = "Playa Tenebruma",
-			short = "La orilla entre la Isla Theramore y el Fuerte del Norte está plagada de múrlocs de la tribu Mirefin, que reclaman como propios el litoral y sus islotes dispersos.",
-			full = "La orilla entre la Isla Theramore y el Fuerte del Norte está plagada de múrlocs de la tribu Mirefin, que reclaman como propios el litoral y sus islotes dispersos. Tortugas marinas y otras criaturas comparten las aguas que los rodean.",
+			short = "La orilla entre la Isla Theramore y el Fuerte del Norte está plagada de múrlocs de la tribu Ancalodo, que reclaman como propios el litoral y sus islotes dispersos.",
+			full = "La orilla entre la Isla Theramore y el Fuerte del Norte está plagada de múrlocs de la tribu Ancalodo, que reclaman como propios el litoral y sus islotes dispersos. Tortugas marinas y otras criaturas comparten las aguas que los rodean.",
 			source = "https://warcraft.wiki.gg/wiki/Dreadmurk_Shore",
 		},
 		["dustwallow bay"] = {
@@ -4141,7 +4141,7 @@ local subzones = {
 		["witch hill"] = {
 			name = "Colina de las Brujas",
 			short = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de «Ojolodo» Jarl.",
-			full = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de «Ojolodo» Jarl. Los múrlocs Mirefin tienen sus campamentos cerca, en el fango.",
+			full = "La Mansión Cienaluz se alza en el centro de la Colina de las Brujas, hogar de «Ojolodo» Jarl. Los múrlocs Ancalodo tienen sus campamentos cerca, en el fango.",
 			source = "https://warcraft.wiki.gg/wiki/Witch_Hill",
 		},
 		["wyrmbog"] = {
@@ -4642,7 +4642,7 @@ local subzones = {
 		["stormrage barrow dens"] = {
 			name = "Túmulo de Tempestira",
 			short = "Bajo el tranquilo césped del Claro de la Luna se encuentran los túmulos, hundidos en una tierra que muchos druidas elfos de la noche nunca abandonan del todo, con sus cuerpos en reposo mientras sus espíritus vagan por el Sueño Esmeralda.",
-			full = "Bajo el tranquilo césped del Claro de la Luna se encuentran los túmulos, hundidos en una tierra que muchos druidas elfos de la noche nunca abandonan del todo, con sus cuerpos en reposo mientras sus espíritus vagan por el Sueño Esmeralda.\n\nFue aquí donde durmió en su día Malfurión Tempestira, y por ello los túmulos llevan su nombre. Cuando Tichondrius y sus señores del terror llegaron durante la Tercera Guerra, atacaron a Malfurión donde yacía y estuvieron a punto de destrozar su túmulo. Fue Tyrande Susurravientos quien lo despertó y lo llamó de vuelta al mundo para enfrentarse a Archimonde y a la Legión Ardiente.\n\nDespués, cuando el Círculo Cenarion habló de alzar un segundo Árbol del Mundo, Malfurión regresó a los túmulos para meditar. Tyrande acudió más tarde a buscarlo y encontró su cuerpo inmóvil, como dormido, sin que hubiera forma de despertarlo. El Círculo consideró más prudente no moverlo: si su espíritu seguía vagando por el Sueño en busca del camino a casa, necesitaría encontrar el cuerpo donde lo había dejado. Así que allí permaneció, vigilado por el Círculo Cenarion y las Hermanas de Elune, con su cuerpo inmóvil en el túmulo que lleva su nombre.",
+			full = "Bajo el tranquilo césped del Claro de la Luna se encuentran los túmulos, hundidos en una tierra que muchos druidas elfos de la noche nunca abandonan del todo, con sus cuerpos en reposo mientras sus espíritus vagan por el Sueño Esmeralda.\n\nFue aquí donde durmió en su día Malfurion Tempestira, y por ello los túmulos llevan su nombre. Cuando Tichondrius y sus señores del terror llegaron durante la Tercera Guerra, atacaron a Malfurion donde yacía y estuvieron a punto de destrozar su túmulo. Fue Tyrande Susurravientos quien lo despertó y lo llamó de vuelta al mundo para enfrentarse a Archimonde y a la Legión Ardiente.\n\nDespués, cuando el Círculo Cenarion habló de alzar un segundo Árbol del Mundo, Malfurion regresó a los túmulos para meditar. Tyrande acudió más tarde a buscarlo y encontró su cuerpo inmóvil, como dormido, sin que hubiera forma de despertarlo. El Círculo consideró más prudente no moverlo: si su espíritu seguía vagando por el Sueño en busca del camino a casa, necesitaría encontrar el cuerpo donde lo había dejado. Así que allí permaneció, vigilado por el Círculo Cenarion y las Hermanas de Elune, con su cuerpo inmóvil en el túmulo que lleva su nombre.",
 			source = "https://warcraft.wiki.gg/wiki/Stormrage_Barrow_Dens",
 		},
 		["timbermaw hold"] = {

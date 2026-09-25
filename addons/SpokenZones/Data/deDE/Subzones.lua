@@ -1357,7 +1357,7 @@ local subzones = {
 		["tyrs hand"] = {
 			name = "Tyrs Hand",
 			short = "Tyrs Hand ist eine befestigte Stadt der Menschen, eine der letzten Bastionen der Lebenden gegen die Geißel in der Region.",
-			full = "Tyrs Hand ist eine befestigte Stadt der Menschen, eine der letzten Bastionen der Lebenden gegen die Geißel in der Region. Ihre Umgebung ist in weit besserem Zustand als der Rest der Pestländer, auch wenn die Bäume und Pflanzen noch immer verfallen.\n\nDie Stadt gehört zu den ältesten und meistverehrten heiligen Stätten der Kirche des Lichts und besteht fast ausschließlich aus Kirchen, gekrönt von der Scharlachroten Basilika und der befestigten Abtei.\n\nAls die Geißel kam und der Ostweald zu den Pestländern wurde, fiel Tyrs Hand nicht. Unter Lord Valdelmar hielt sie täglichen Angriffen stand, geschützt zuerst von den Rittern der Silbernen Hand und später vom Scharlachroten Kreuzzug, und schickte Vorräte und Verstärkung weiter zu anderen Stützpunkten des Kreuzzugs, während Kuriere, die sich durch die seuchenverpesteten Straßen kämpfen mussten, täglich Berichte aus Stratholme brachten.",
+			full = "Tyrs Hand ist eine befestigte Stadt der Menschen, eine der letzten Bastionen der Lebenden gegen die Geißel in der Region. Ihre Umgebung ist in weit besserem Zustand als der Rest der Pestländer, auch wenn die Bäume und Pflanzen noch immer verfallen.\n\nDie Stadt gehört zu den ältesten und meistverehrten heiligen Stätten der Kirche des Lichts und besteht fast ausschließlich aus Kirchen, gekrönt von der Scharlachroten Basilika und der befestigten Abtei.\n\nAls die Geißel kam und die Östlichen Lande zu den Pestländern wurden, fiel Tyrs Hand nicht. Unter Lord Valdelmar hielt sie täglichen Angriffen stand, geschützt zuerst von den Rittern der Silbernen Hand und später vom Scharlachroten Kreuzzug, und schickte Vorräte und Verstärkung weiter zu anderen Stützpunkten des Kreuzzugs, während Kuriere, die sich durch die seuchenverpesteten Straßen kämpfen mussten, täglich Berichte aus Stratholme brachten.",
 			source = "https://warcraft.wiki.gg/wiki/Tyr's_Hand",
 		},
 		["undercroft"] = {
@@ -1419,8 +1419,8 @@ local subzones = {
 		},
 		["dun garok"] = {
 			name = "Dun Garok",
-			short = "Dun Garok steht in den Hügeln des Vorgebirges von Hillsbrad, eine Zwergenfeste unter dem Befehl von Hauptmann Ironhill.",
-			full = "Dun Garok steht in den Hügeln des Vorgebirges von Hillsbrad, eine Zwergenfeste unter dem Befehl von Hauptmann Ironhill. Seine Garnison schützt die Menschen von Hillsbrad und wacht über den Azurschacht, eine Gegenwart, die die Verlassenen nicht dulden können, die jedem Gold geboten haben, der sich in die Feste schleicht und ihre Zwerge niedermacht.",
+			short = "Dun Garok steht in den Hügeln des Vorgebirges von Hillsbrad, eine Zwergenfeste unter dem Befehl von Captain Eisenberg.",
+			full = "Dun Garok steht in den Hügeln des Vorgebirges von Hillsbrad, eine Zwergenfeste unter dem Befehl von Captain Eisenberg. Seine Garnison schützt die Menschen von Hillsbrad und wacht über den Azurschacht, eine Gegenwart, die die Verlassenen nicht dulden können, die jedem Gold geboten haben, der sich in die Feste schleicht und ihre Zwerge niedermacht.",
 			source = "https://warcraft.wiki.gg/wiki/Dun_Garok",
 		},
 		["durnholde keep"] = {
@@ -1566,8 +1566,8 @@ local subzones = {
 		},
 		["altar of zul"] = {
 			name = "Der Altar von Zul",
-			short = "Der Altar von Zul erhebt sich im Hinterland, errichtet von den Waldtrollen der Vilebranch für ihre alten Riten. Qiaga die Hüterin hält oben auf den Steinen Wacht, Wächterin über welche Macht auch immer der Altar noch birgt.",
-			full = "Der Altar von Zul erhebt sich im Hinterland, errichtet von den Waldtrollen der Vilebranch für ihre alten Riten. Qiaga die Hüterin hält oben auf den Steinen Wacht, Wächterin über welche Macht auch immer der Altar noch birgt.",
+			short = "Der Altar von Zul erhebt sich im Hinterland, errichtet von den Waldtrollen der Vilebranch für ihre alten Riten. Qiaga die Bewahrerin hält oben auf den Steinen Wacht, Wächterin über welche Macht auch immer der Altar noch birgt.",
+			full = "Der Altar von Zul erhebt sich im Hinterland, errichtet von den Waldtrollen der Vilebranch für ihre alten Riten. Qiaga die Bewahrerin hält oben auf den Steinen Wacht, Wächterin über welche Macht auch immer der Altar noch birgt.",
 			source = "https://warcraft.wiki.gg/wiki/Altar_of_Zul",
 		},
 		["bogens ledge"] = {
@@ -2400,8 +2400,8 @@ local subzones = {
 		},
 		["redridge canyons"] = {
 			name = "Rotkammschlucht",
-			short = "Die Schluchten schneiden sich durch den Nordwesten des Rotkammgebirges, und ihre Wände verbergen den Bau von Yowler, der die Gnolle anführt, die dieses Gebiet halten.",
-			full = "Die Schluchten schneiden sich durch den Nordwesten des Rotkammgebirges, und ihre Wände verbergen den Bau von Yowler, der die Gnolle anführt, die dieses Gebiet halten.",
+			short = "Die Schluchten schneiden sich durch den Nordwesten des Rotkammgebirges, und ihre Wände verbergen den Bau von Jauler, der die Gnolle anführt, die dieses Gebiet halten.",
+			full = "Die Schluchten schneiden sich durch den Nordwesten des Rotkammgebirges, und ihre Wände verbergen den Bau von Jauler, der die Gnolle anführt, die dieses Gebiet halten.",
 			source = "https://warcraft.wiki.gg/wiki/Redridge_Canyons",
 		},
 		["renders camp"] = {
@@ -3387,8 +3387,8 @@ local subzones = {
 		},
 		["satyrnaar"] = {
 			name = "Satyrnaar",
-			short = "Satyrnaar steht zerbrochen zwischen den Bäumen im Nordosten von Eschental, seine Gebäude längst zu Ruinen verfallen, doch nun drängen sich Zelte zwischen den Trümmern, wo die Satyrn der Bleakheart ihr Heim aufgeschlagen haben.",
-			full = "Satyrnaar steht zerbrochen zwischen den Bäumen im Nordosten von Eschental, seine Gebäude längst zu Ruinen verfallen, doch nun drängen sich Zelte zwischen den Trümmern, wo die Satyrn der Bleakheart ihr Heim aufgeschlagen haben. Von den drei Satyrfestungen im Wald ist allein Satyrnaar weitgehend erhalten, und seine Lage an der Straße, die von Splintertree nach Azshara führt, hat es zur am leichtesten erreichbaren und am meisten umkämpften der drei gemacht.\n\nDie Bleakheart haben hier mehr als nur Unterschlupf. In Satyrnaar ruht einer der Seelensteine des Kults des Dunklen Strangs, ein Zeichen des Paktes, der die Satyrn an die finsteren Absichten jenes Kults bindet.",
+			short = "Satyrnaar steht zerbrochen zwischen den Bäumen im Nordosten von Eschental, seine Gebäude längst zu Ruinen verfallen, doch nun drängen sich Zelte zwischen den Trümmern, wo die Satyrn der Herzschinder ihr Heim aufgeschlagen haben.",
+			full = "Satyrnaar steht zerbrochen zwischen den Bäumen im Nordosten von Eschental, seine Gebäude längst zu Ruinen verfallen, doch nun drängen sich Zelte zwischen den Trümmern, wo die Satyrn der Herzschinder ihr Heim aufgeschlagen haben. Von den drei Satyrfestungen im Wald ist allein Satyrnaar weitgehend erhalten, und seine Lage an der Straße, die von Splintertree nach Azshara führt, hat es zur am leichtesten erreichbaren und am meisten umkämpften der drei gemacht.\n\nDie Herzschinder haben hier mehr als nur Unterschlupf. In Satyrnaar ruht einer der Seelensteine des Kults des Dunklen Strangs, ein Zeichen des Paktes, der die Satyrn an die finsteren Absichten jenes Kults bindet.",
 			source = "https://warcraft.wiki.gg/wiki/Satyrnaar",
 		},
 		["shady nook"] = {
