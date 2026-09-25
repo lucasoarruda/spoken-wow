@@ -108,4 +108,6 @@ L.CMD_DEBUG = "  /spz debug      -- 點擊地圖時回報地區名稱"
 L.CMD_VERIFY = "  /spz verify     -- 根據此客戶端校驗資料"
 L.CMD_DUMP = "  /spz dump       -- 列舉地圖樹 (dev)"
 
+L.SUBZONE_COUNT_FMT = "%1$d 個次級地區"
+
 SpokenZones:RegisterStrings("zhTW", L)

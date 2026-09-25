@@ -108,4 +108,6 @@ L.CMD_DEBUG = "  /spz debug      -- сообщать имена при клик�
 L.CMD_VERIFY = "  /spz verify     -- проверить данные"
 L.CMD_DUMP = "  /spz dump       -- перечислить дерево карт (dev)"
 
+L.SUBZONE_COUNT_FMT = "%1$d подзон"
+
 SpokenZones:RegisterStrings("ruRU", L)

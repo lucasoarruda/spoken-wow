@@ -108,4 +108,6 @@ L.CMD_DEBUG = "  /spz debug      -- 点击地图时报告地区名称"
 L.CMD_VERIFY = "  /spz verify     -- 根据此客户端校验数据"
 L.CMD_DUMP = "  /spz dump       -- 枚举地图树 (dev)"
 
+L.SUBZONE_COUNT_FMT = "%1$d 个次级地区"
+
 SpokenZones:RegisterStrings("zhCN", L)
