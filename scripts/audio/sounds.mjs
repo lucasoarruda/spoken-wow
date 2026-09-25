@@ -6,11 +6,9 @@
 //   node scripts/audio/sounds.mjs --list <quests|zones|books>   the archive files it would copy
 //   node scripts/audio/sounds.mjs --lang=esMX zones               another language's pack
 //
-// A language other than English is zones only, the one section that ships a pack per language
-// (addons/SpokenZonesAudio_<lang>, pipelines/zones/tools/lib/locales.mjs sourceFolder). Its
-// takes are archived under <archive>/<lang>/, beside English's rather than among them
-// (historyDirOf in apps/web/src/lib/takes/adapters.ts), so the two cannot overwrite each other
-// in the archive, in a pull or in the folder built here.
+// A language other than English is assembled into `build/<section>/<lang>/`, never into
+// English's folder; its takes are archived under `<archive>/<lang>/` (`historyDirOf` in
+// `apps/web/src/lib/takes/adapters.ts`).
 //
 // THE ARCHIVE IS THE ONLY AUDIO THERE IS. Every take is one file there, written once by the
 // site and never changed; which take is live is a flag on its row. So the folder a pack is
@@ -65,15 +63,16 @@ if (!english || !/^[a-z]{2}[A-Z]{2}$/.test(lang)) {
   console.error("usage: sounds.mjs [--list] [--lang=<code>] <quests|zones|books>");
   process.exit(1);
 }
-if (lang !== BASE_LANG && section !== "zones") {
-  console.error(`${section} has no ${lang} pack to build: only zones ships one per language`);
-  process.exit(1);
-}
-// The archive root stays the section's: a language's takes are a directory inside it, and
-// --list prints paths relative to the root, which is what pull-live.sh hands to rsync.
+// Another language never writes where English's pack is assembled: its folder is a work area
+// under build/, which the section's packaging stages its pack from. The archive root stays the
+// section's -- a language's takes are its <lang>/ directory -- and --list prints paths relative
+// to the root, which is what pull-live.sh hands to rsync.
 const paths = lang === BASE_LANG
   ? english
-  : { archive: english.archive, out: join(ROOT, `addons/SpokenZonesAudio_${lang}/Sounds`) };
+  : {
+      archive: english.archive,
+      out: join(ROOT, "build", section, lang, section === "quests" ? "audio" : "Sounds"),
+    };
 const prefix = lang === BASE_LANG ? "" : lang;
 const database = process.env.LOCAL_DB;
 if (!database) {

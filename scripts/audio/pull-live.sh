@@ -2,7 +2,7 @@
 # Fetch the archived takes a section's pack is built from, and no others.
 #
 #   scripts/audio/pull-live.sh <quests|zones|books>
-#   scripts/audio/pull-live.sh zones esMX      another language's pack, zones only
+#   scripts/audio/pull-live.sh <section> <lang>   another language's pack
 #
 # The list is the local database's live takes, written by `sounds.mjs --list` -- the same
 # query that later copies them into the pack -- so run the section's sync first: a pull
