@@ -49,6 +49,14 @@ done
 
 # What to release: every English pack (no arguments, as before), one section's English packs,
 # or one section's packs in a language. Each is a (section, lang, pack) the registry resolves.
+#
+# A third positional argument is refused rather than silently ignored: [section] [lang] is the
+# whole grammar, and a typo'd third word (a pack name, say) would otherwise be dropped without
+# a trace, which reads as "it did what I asked" when it did not.
+if (( ${#args[@]} > 2 )); then
+  echo "error: too many arguments -- expected [section] [lang], got: ${args[*]}" >&2
+  exit 2
+fi
 SECTIONS_ALL="quests zones books"
 section="${args[0]:-}"; lang="${args[1]:-enUS}"
 targets=()   # "section lang pack"
@@ -82,6 +90,38 @@ changelog_for() {
     process.stdout.write(lines.slice(start, end).join("\n").trim());
   ' "$1" "$2" "$3"
 }
+
+# A PACK WHOSE ZIP IS NOT IN dist/ FAILS BEFORE ANY UPLOAD. Without this, a run of several
+# packs uploads the ones it finds and only then discovers the last one was never built --
+# which for a GitHub release means some tags already exist and others do not, a half release
+# indistinguishable from a partial failure. Checked in --dry-run too, since a dry run's job is
+# to say what a real run would hit.
+missing=()
+for t in ${targets[@]+"${targets[@]}"}; do
+  read -r t_section t_lang t_pack <<<"$t"
+  t_folder="$(field "$t_section" "$t_lang" "$t_pack" folder)"
+  if [[ "$t_lang" == enUS ]]; then
+    if [[ "$t_section" == quests ]]; then
+      t_toc="$DIST/$t_folder/$t_folder.toc"
+    else
+      t_toc="$REPO/addons/$t_folder/$t_folder.toc"
+    fi
+    t_version="$(sed -n 's/^## Version:[[:space:]]*//p' "$t_toc" 2>/dev/null | head -1 | tr -d '\r')"
+  else
+    t_version="$(field "$t_section" "$t_lang" "$t_pack" version)"
+  fi
+  if [[ -z "$t_version" ]]; then
+    missing+=("$t_section/$t_lang/$t_pack -- not built (no version); run make <group>-package-audio")
+    continue
+  fi
+  t_zip="$DIST/$t_folder-$t_version.zip"
+  [[ -f "$t_zip" ]] || missing+=("$t_zip")
+done
+if (( ${#missing[@]} > 0 )); then
+  echo "error: missing zips -- nothing was released:" >&2
+  for m in "${missing[@]}"; do echo "  $m" >&2; done
+  exit 1
+fi
 
 failed=()
 released=()

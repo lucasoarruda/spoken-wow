@@ -199,6 +199,33 @@ changelog_for() {
   ' "$REPO/docs/books/CHANGELOG.md" "$1"
 }
 
+#-- preflight -------------------------------------------------------------------
+# EVERY TARGET'S ZIP IS RESOLVED BEFORE ANY UPLOAD STARTS. English's default run covers both
+# books and audio, and uploading the addon before discovering the pack was never built is a
+# half release. Checked in --dry-run too, since a dry run's job is to say what a real run
+# would hit.
+missing=()
+for target in "${targets[@]}"; do
+  addon="$(target_addon "$target")"
+  if [[ "$target" == audio ]] && ! english; then
+    version="$(pack_field version)"
+  else
+    toc="$REPO/addons/$addon/$addon.toc"
+    version="$(sed -n 's/^## Version:[[:space:]]*//p' "$toc" 2>/dev/null | head -1 | tr -d '\r')"
+  fi
+  if [[ -z "$version" ]]; then
+    missing+=("$target -- not built (no version); run make books-package / make books-package-audio")
+    continue
+  fi
+  zip_path="$DIST/$(target_zip "$target")-$version.zip"
+  [[ -f "$zip_path" ]] || missing+=("$zip_path")
+done
+if (( ${#missing[@]} > 0 )); then
+  echo "error: missing zips -- nothing was released:" >&2
+  for m in "${missing[@]}"; do echo "  $m" >&2; done
+  exit 1
+fi
+
 #-- upload --------------------------------------------------------------------
 for target in "${targets[@]}"; do
   project="$(target_curseforge "$target")"

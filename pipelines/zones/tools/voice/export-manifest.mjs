@@ -16,7 +16,8 @@
 // can prove the committed manifest is what the database says. The database is the record;
 // this file is only ever written from it.
 
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadEnvFile } from "../lib/env.mjs";
@@ -82,6 +83,11 @@ export async function exportManifest({ check = false } = {}) {
         `${before}. Check DATABASE_URL points at the database you mean.`,
     );
   }
+
+  // A language's directory may not exist yet -- `make zones-lookup LOCALE=xx` can run before
+  // `make zones-sounds LOCALE=xx` has staged build/zones/<lang>/ -- so the write below would
+  // otherwise die with ENOENT before the manifest could ever be exported.
+  await mkdir(dirname(path), { recursive: true });
 
   // Temp file and rename, for the reason store.mjs gives: this is the record of
   // everything already paid for, and a crash partway through a write would destroy it.

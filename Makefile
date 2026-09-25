@@ -140,10 +140,21 @@ character-models: ## Print how to regenerate apps/web/src/lib/npc/character-mode
 # its zips on the runner, and the audio is outside git. This uploads what the machine that
 # generated it already has in dist/.
 
+# LOCALE without SECTION would otherwise vanish into $(if $(SECTION),$(LOCALE)) below and
+# silently release every English pack instead of the language asked for.
+define require_section_for_locale
+	@if [ -n "$(LOCALE)" ] && [ "$(LOCALE)" != "enUS" ] && [ -z "$(SECTION)" ]; then \
+	  echo "error: LOCALE=$(LOCALE) needs SECTION= too -- without it this releases every English pack" >&2; \
+	  exit 2; \
+	fi
+endef
+
 audio-release-dry: ## Show which pack releases would be cut (SECTION=zones LOCALE=esMX to narrow)
+	$(require_section_for_locale)
 	@./scripts/audio-github-release.sh --dry-run $(SECTION) $(if $(SECTION),$(LOCALE))
 
 audio-release: ## Publish the built sound packs as GitHub releases (needs gh; SECTION=, LOCALE=)
+	$(require_section_for_locale)
 	@./scripts/audio-github-release.sh $(SECTION) $(if $(SECTION),$(LOCALE))
 
 package-all: ## Build every addon zip: the player, quests, zones

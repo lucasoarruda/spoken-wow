@@ -129,6 +129,14 @@ tier_title() {
 # they ship at, so there is nothing to transcode.
 tiers=("high")
 
+# A language ships one tier, `high`, at the bitrate its clips already arrive at -- there is no
+# standard/VBR variant to build for it, and letting a tier argument through would quietly build
+# one at VBR and prune English's vbr-v6 cache of masters this run never touched.
+if [[ $# -gt 0 ]] && ! english; then
+  echo "error: LOCALE=$LOCALE ships one tier (high) -- pass no tier argument for a language" >&2
+  exit 1
+fi
+
 if [[ $# -gt 0 ]]; then
   for arg in "$@"; do
     if [[ -z "$(tier_bitrate "$arg")" ]]; then
@@ -227,7 +235,10 @@ for tier in "${tiers[@]}"; do
   # client sees is identical apart from those and the .toc lines rewritten below.
   rsync -a --exclude 'Sounds/' --exclude 'Data/Sounds.lua' --exclude '.DS_Store' "$SRC/" "$staging/$folder/"
   mkdir -p "$staging/$folder/Data"
-  cp "$LOOKUP" "$staging/$folder/Data/Sounds.lua"
+  # -p, not a bare cp: this used to arrive through the rsync -a below before Sounds.lua was
+  # split out of it, and a plain cp stamps the copy with "now" instead of preserving the
+  # source's mtime, which is a zip entry that no longer matches master's byte for byte.
+  cp -p "$LOOKUP" "$staging/$folder/Data/Sounds.lua"
   # The .toc must be named after its folder. The source tier already is, and mv
   # onto itself is an error rather than a no-op.
   if [[ "$folder" != "$(basename "$SRC")" ]]; then

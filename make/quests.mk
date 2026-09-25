@@ -249,10 +249,10 @@ release: ## Upload the built zips to CurseForge and Wago (needs both tokens)
 PACKS_AUDIO := audio-alliance audio-horde audio-shared audio-gossip
 
 ifneq ($(filter-out enUS,$(LOCALE)),)
-release-audio-dry: ## Show what uploading the sound packs would send (LOCALE=xx for a language's)
+release-audio-dry: ## Show what uploading the four packs would send (and, for English, the meta addon); LOCALE=xx for a language's
 	@./scripts/quests/release.sh --dry-run --lang=$(LOCALE) $(PACKS_AUDIO)
 
-release-audio: ## Upload the four packs and their meta addon (LOCALE=xx for a language's)
+release-audio: ## Upload the four packs (and, for English, the meta addon); LOCALE=xx for a language's
 	@./scripts/quests/release.sh --lang=$(LOCALE) $(PACKS_AUDIO)
 else
 release-audio-dry:
