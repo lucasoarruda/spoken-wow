@@ -866,7 +866,7 @@ local subzones = {
 			source = "https://warcraft.wiki.gg/wiki/Garren's_Haunt",
 		},
 		["gunthers retreat"] = {
-			name = "Gunther's Retreat",
+			name = "군터의 은거지",
 			short = "청명 호수의 한 섬에는 군터의 은거지가 서 있으며, 포세이큰 리치 군터 아르카누스와 그의 좀비 하수인들이 차지하고 있다.",
 			full = "청명 호수의 한 섬에는 군터의 은거지가 서 있으며, 포세이큰 리치 군터 아르카누스와 그의 좀비 하수인들이 차지하고 있다. 그 남서쪽 해안 앞의 이름 없는 헐벗은 작은 섬에는, 그저 릴리스의 식탁이라고만 알려진 기이한 표지가 놓여 있다.",
 			source = "https://warcraft.wiki.gg/wiki/Gunther's_Retreat",
