@@ -12,7 +12,7 @@ local Expect, Failures = H.Expecter(print)
 
 local function LoadBooks()
     local SpokenBooks = {}
-    for _, file in ipairs({ "Locale/enUS", "Checksum", "Core", "Language", "Reader" }) do
+    for _, file in ipairs({ "Locale/enUS", "Checksum", "Core", "Language", "Reader", "Audio" }) do
         local chunk = assert(loadfile(BOOKS .. file .. ".lua"))
         chunk("SpokenBooks", SpokenBooks)
     end

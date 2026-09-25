@@ -65,11 +65,21 @@ function SpokenBooks:PageOnScreen()
 	local number = (ItemTextGetPage and ItemTextGetPage()) or 1
 
 	-- The client's own locale first: the title and the words are what this client shows, and
-	-- a German client's are German. `locales` holds an index per language in the shape of the
-	-- English one; a build without it leaves every client on the English index, as before.
-	local localized = data.locales and data.locales[self:GetClientLanguage()]
-	return (localized and Find(localized, title, number, checksum))
-		or Find(data, title, number, checksum)
+	-- a German client's are German. A language's index ships in that language's pack, in the
+	-- shape of the English one, because a client in that locale is the only one it can match
+	-- and a player there who wants the language installs its pack. A pack in another language
+	-- is not asked: its words are not the ones on this screen. Without one, every client is
+	-- left on the English index, as before.
+	local client = self:GetClientLanguage()
+	for _, pack in ipairs(self:GetAudioPacks()) do
+		if type(pack.index) == "table" and self:PackLanguage(pack) == client then
+			local found = Find(pack, title, number, checksum)
+			if found then
+				return found
+			end
+		end
+	end
+	return Find(data, title, number, checksum)
 end
 
 --- Where a page sits: its book and its number. Nil for a page the lookup does not carry.

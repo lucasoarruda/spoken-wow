@@ -59,7 +59,7 @@ endef
         package-audio-complete package-meta push-complete icon \
         downloads-status \
         factions release release-audio release-audio-dry release-wago release-curse \
-        release-dry import-corpus import-locale fill-locales export-corpus export-ignores \
+        release-dry import-corpus import-locale fill-locales export-corpus export-ignores export-locale-text \
         sync check-synced full-release
 
 help: ## Show this help
@@ -173,7 +173,7 @@ icon: ## Rebuild the addons' icon.tga and the minimap BLP from pipelines/quests/
 package: ## Zip the player addon into dist/: one Blizzard zip, one per legacy client
 	@./scripts/quests/package.sh
 
-package-audio: check-synced export-corpus export-ignores sounds ## Transcode, build and zip the five sound packs into dist/ (VERSION=1.4.0)
+package-audio: check-synced export-corpus export-ignores $(if $(filter-out enUS,$(LOCALE)),export-locale-text) sounds ## Transcode, build and zip the five sound packs into dist/ (VERSION=1.4.0)
 	@VERSION=$(VERSION) ENCODE=$(if $(ENCODE),$(ENCODE),ogg-q0-44k) MODULE=SpokenQuestsAudio \
 	  LANGUAGE="$(or $(LOCALE),enUS)" JOBS=$(JOBS) ./scripts/quests/package-audio.sh
 
@@ -363,6 +363,13 @@ fill-locales: ## Fill vmangos's empty *_locN columns from TrinityCore (TDB335= T
 
 export-corpus: check-synced ## quest_line -> corpus/corpus.json.gz (ARGS=--check to compare instead)
 	@$(QUESTS_CLI) export-corpus $(ARGS)
+
+# A language's gossip as its client shows it, for that language's Gossip pack to match on
+# (tts_cli/locale_text.py). Written to the language's work area rather than committed: the
+# pack build is the only thing that reads it, and it already needs the database for the corpus.
+export-locale-text: ## quest_line localeText -> build/quests/$(LOCALE)/locale-text.json.gz (LOCALE=esMX)
+	@test -n "$(filter-out enUS,$(LOCALE))" || { echo "export-locale-text: set LOCALE to a language other than English, e.g. LOCALE=esMX"; exit 2; }
+	@$(QUESTS_CLI) export-locale-text --lang $(LOCALE) --out $(abspath build/quests/$(LOCALE)/locale-text.json.gz)
 
 export-ignores: ## line_ignore -> corpus/ignored.json, replacing the old ssh export
 	@$(QUESTS_CLI) export-ignores $(ARGS)

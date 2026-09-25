@@ -348,9 +348,16 @@ make package-audio LOCALE=esMX      # the four packs, encoded, into dist/
 make release-audio LOCALE=esMX      # uploads them, ./scripts/quests/release.sh --lang=esMX
 ```
 
-Until per-locale gossip tables exist, a translated client is silent on gossip: the lookup a
-pack ships resolves NPC gossip chatter through the English corpus regardless of `LOCALE`, so a
-language's Gossip pack has nothing of its own to play.
+The client never says which gossip line is on screen, only who is speaking and the words, and
+the addon matches those words against a table to find the line's file. A client in another
+locale shows them in its language, so a language's Gossip pack also carries that language's
+gossip tables under `generated/<lang>/`, loaded only on a client in it (`tts_cli/locale_text.py`).
+They are keyed on `quest_line.localeText` — the line as the world database, and so the client,
+has it, not a correction made on the site — and `package-audio` exports it first
+(`make export-locale-text LOCALE=esMX`, into `build/quests/esMX/`). Only the Gossip pack
+carries them, once per language; the faction packs and every English pack are built as
+before. A language with no imported text (`make import-locale LOCALE=esMX`) still builds, with
+a warning, and its gossip is matched against the English text.
 
 ### Browsing the corpus
 

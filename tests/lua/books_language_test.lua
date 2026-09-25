@@ -18,7 +18,7 @@ local function Install(packs, locale)
     _G.SpokenBooksAudioPacks = {}
     for _, pack in ipairs(packs) do
         _G.SpokenBooksAudioPacks[pack.addon] = { version = 1, addon = pack.addon,
-            language = pack.language, pages = pack.pages }
+            language = pack.language, pages = pack.pages, index = pack.index, loose = pack.loose }
     end
     _G.SpokenBooksData = {
         version = 1,
@@ -71,16 +71,26 @@ Expect("C. ...and German once a German pack is installed", B:GetPackLanguage(), 
 
 ---------------------------------------------------------------- D. the page on screen, in the client's words
 local GERMAN_TEXT = "Das Register der Stadt Hillsbrad."
+local GERMAN_INDEX = { ["Stadtregister"] = { [1] = { [B:ChecksumOf(GERMAN_TEXT)] = PAGE } } }
+local INDEXED = { addon = "SpokenBooksAudio_deDE", language = "deDE", pages = GERMAN.pages,
+    index = GERMAN_INDEX, loose = {} }
 B = Install({ ENGLISH }, "deDE")
 stub.ShowPage({ title = "Stadtregister", number = 1, text = GERMAN_TEXT })
-Expect("D. without a German index a German page is not recognised", B:PageOnScreen(), nil)
-SpokenBooksData.locales = { deDE = {
-    index = { ["Stadtregister"] = { [1] = { [B:ChecksumOf(GERMAN_TEXT)] = PAGE } } },
-    loose = {},
-} }
+Expect("D. without a German pack a German page is not recognised", B:PageOnScreen(), nil)
+B = Install({ ENGLISH, INDEXED }, "deDE")
+stub.ShowPage({ title = "Stadtregister", number = 1, text = GERMAN_TEXT })
 Expect("D. with one, it is found by the German title and words", B:PageOnScreen(), PAGE)
-stub.SetLocale("enUS")
+B = Install({ ENGLISH, INDEXED }, "enUS")
+stub.ShowPage({ title = "Stadtregister", number = 1, text = GERMAN_TEXT })
 Expect("D. ...and only on a German client", B:PageOnScreen(), nil)
+B = Install({ ENGLISH, { addon = "SpokenBooksAudio_deDE", language = "deDE", pages = GERMAN.pages,
+    index = {}, loose = { [B:ChecksumOf(GERMAN_TEXT)] = PAGE } } }, "deDE")
+stub.ShowPage({ title = "Ein anderer Titel", number = 1, text = GERMAN_TEXT })
+Expect("D. a German checksum no other page shares is found under any title", B:PageOnScreen(), PAGE)
+B = Install({ ENGLISH, { addon = "SpokenBooksAudio_frFR", language = "frFR", pages = GERMAN.pages,
+    index = GERMAN_INDEX, loose = {} } }, "deDE")
+stub.ShowPage({ title = "Stadtregister", number = 1, text = GERMAN_TEXT })
+Expect("D. a pack in another language is not asked", B:PageOnScreen(), nil)
 
 ---------------------------------------------------------------- E. reports
 B = Install({ ENGLISH })

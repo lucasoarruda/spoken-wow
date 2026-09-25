@@ -437,3 +437,43 @@ def export_ignores(path, check=False, verbose=True):
     if verbose:
         print(f"wrote {path}: {len(ignored)} ignored lines")
     return True
+
+
+def export_locale_text(lang, path, verbose=True):
+    """One language's gossip text as its client shows it -> `path` (tts_cli/locale_text.py).
+
+    `localeText` is the line as the world database has it, which is what that language's
+    client puts on screen and so what the addon matches. It is taken from the newest version
+    that has one rather than the live row: a translator's correction changes what is voiced,
+    not what the client shows. It is paired with the English original text, which is what the
+    corpus knows the line by. A line with no localeText (written on the site, not imported)
+    is left out: there is nothing to match it on.
+
+    Both of a gendered line's variants are kept. They read differently on screen and name
+    the same file, to which the addon adds the player's gender itself.
+    """
+    from tts_cli.locale_text import write_locale_text
+
+    if lang == LANG:
+        raise SystemExit("English is the corpus itself -- export-corpus writes it")
+    conn = connect()
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                """select distinct on ("lineId", "variant")
+                          "lineId", "originalText", "localeText"
+                     from "quest_line"
+                    where "lang" = %s and "source" = 'gossip'
+                      and coalesce("localeText", '') <> ''
+                    order by "lineId", "variant", "version" desc""",
+                (lang,),
+            )
+            lines = [{"lineId": line_id, "originalText": original, "localeText": text}
+                     for line_id, original, text in cur.fetchall()]
+    finally:
+        conn.close()
+
+    write_locale_text(path, lang, lines)
+    if verbose:
+        print(f"wrote {path}: {len(lines)} {lang} gossip lines with client text")
+    return lines

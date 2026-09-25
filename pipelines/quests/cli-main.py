@@ -7,6 +7,7 @@ the corpus, and building a pack from audio/ once `make quests-sounds` has assemb
     extract       world DB -> corpus/corpus.json.gz         maintainer, rare
     import-corpus corpus/corpus.json.gz -> Postgres         after an extract
     export-corpus Postgres -> corpus/corpus.json.gz         before a build
+    export-locale-text  Postgres -> one language's gossip text   before its Gossip pack
     build         corpus + audio/ -> dist/<module>          per release
     install       dist/<module> -> WoW AddOns               per release
 """
@@ -18,6 +19,7 @@ from tts_cli.corpus import DEFAULT_CORPUS_PATH, load_corpus
 from tts_cli.factions import (DEFAULT_FACTIONS_PATH, PACKS, load_sides, pack_stems,
                               pack_title)
 from tts_cli.ignores import DEFAULT_IGNORED_PATH, load_ignored
+from tts_cli.locale_text import load_locale_text
 from tts_cli.store import DEFAULT_STORE_DIR
 
 # init-db and extract are imported inside their branches: they pull in
@@ -55,6 +57,12 @@ exp.add_argument("--corpus", default=DEFAULT_CORPUS_PATH)
 exp.add_argument("--check", action="store_true",
                  help="Compare instead of writing; exits 1 if they differ.")
 
+lxt = subparsers.add_parser(
+    "export-locale-text",
+    help="One language's gossip text as its client shows it -> a file build --locale-text reads.")
+lxt.add_argument("--lang", required=True, help="e.g. esMX")
+lxt.add_argument("--out", required=True, help="e.g. build/quests/esMX/locale-text.json.gz")
+
 bld = subparsers.add_parser(
     "build",
     help="Assemble the addon data module from the corpus and audio/ (make quests-sounds).")
@@ -72,6 +80,9 @@ bld.add_argument("--module-title", default=None,
 bld.add_argument("--language", default=None,
                  help="The language the pack speaks, e.g. esMX. Omitted means English, and "
                       "leaves the TOC as every English pack has it.")
+bld.add_argument("--locale-text", default=None,
+                 help="A file export-locale-text wrote for --language; adds that language's "
+                      "gossip tables, loaded only on a client in it. Gossip pack only.")
 
 ins = subparsers.add_parser(
     "install", help="Copy the built module into a WoW AddOns folder.")
@@ -124,7 +135,24 @@ elif args.mode == "export-corpus":
         # the table would produce, so the table is not carrying everything it needs to.
         raise SystemExit(1)
 
+elif args.mode == "export-locale-text":
+    from tts_cli.corpus_db import export_locale_text
+    export_locale_text(args.lang, args.out)
+
 elif args.mode == "build":
+    locale_text = None
+    if args.locale_text:
+        # The client-locale tables ship once per language, in the pack that holds its gossip:
+        # a faction pack carrying them too would be the same megabytes three more times.
+        if args.pack != "gossip":
+            raise SystemExit(f"--locale-text is for the gossip pack, not '{args.pack}'")
+        lang, locale_text = load_locale_text(args.locale_text)
+        if lang != args.language:
+            raise SystemExit(f"{args.locale_text} holds {lang} text, not --language "
+                             f"{args.language}'s")
+        if not locale_text:
+            print(f"warning: no {lang} gossip lines with client text; on a {lang} client "
+                  "gossip will be matched against the English text")
     corpus = load_corpus(args.corpus)
     # None for the whole store rather than the 'all' stem set, so a store file the corpus
     # cannot address still ships in the complete pack the way it always has.
@@ -134,7 +162,7 @@ elif args.mode == "build":
                           args.module, args.version, progress=True,
                           ignored=load_ignored(args.ignored), include=include,
                           title=args.module_title or pack_title(args.pack),
-                          language=args.language)
+                          language=args.language, locale_text=locale_text)
     print(f"\nbuilt {report['moduleDir']}")
     print(f"  audio files {report['audioFiles']} ({report['audioFormat']}, pack: {args.pack})")
     for name, rows in sorted(report["tableRows"].items()):
