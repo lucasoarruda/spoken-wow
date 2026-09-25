@@ -90,7 +90,7 @@ ssh-check: require-droplet ## Test the CI deploy key against the droplet, as CI 
 
 # The native local Postgres, not a container: the books pipeline writes to whatever
 # DATABASE_URL names, and this is where it has been run.
-LOCAL_DB ?= postgres://localhost/spoken_quests_dev
+LOCAL_DB ?= postgres://localhost/spoken_dev
 
 # pg_dump 16.10 and later wrap output in \restrict / \unrestrict, psql meta-commands that
 # an older psql fails on. Both clusters are ours, so strip them rather than requiring the

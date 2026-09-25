@@ -48,5 +48,5 @@ require-droplet:
 # The database a pack is built from, and what the sync and freshness scripts need to reach
 # production. One definition for every section: scripts/db/sync-section.sh and
 # scripts/db/check-synced.sh are the same recipe for quests, zones and books.
-LOCAL_DB ?= postgres://localhost/spoken_quests_dev
+LOCAL_DB ?= postgres://localhost/spoken_dev
 DB_ENV    = DROPLET="$(DROPLET)" SSH="$(SSH)" REMOTE_ROOT="$(REMOTE_ROOT)" LOCAL_DB="$(LOCAL_DB)"
