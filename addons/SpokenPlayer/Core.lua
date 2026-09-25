@@ -25,6 +25,8 @@ Defaults = {
             HidePortrait = false,
             HideFrame = false,
             MinimalPlayer = true,
+            -- Forever only: the bronze its own frames wear, on the minimal player's metal.
+            BronzeTint = true,
             MinimalWidth = 380,
             -- Per action id, for the ones an addon declared optional. Absent means shown.
             HiddenActions = {},

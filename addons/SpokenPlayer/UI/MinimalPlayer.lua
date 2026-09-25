@@ -5,6 +5,8 @@ setfenv(1, SpokenEnv)
 MinimalPlayer = { rows = {}, offset = 0, expanded = false }
 local ART = [[Interface\AddOns\SpokenPlayer\Textures\]]
 local HEIGHT, WIDTH, MAX_ROWS = 98, 380, 4
+-- The Forever client tints its frame metal bronze; its palette, so the player matches.
+local BRONZE = Version.IsCamelot and { .95, .68, .35 } or nil
 -- Portrait badges by bullet id. Quests use trimmed copies of their own glyphs; books
 -- and zones take native ones, since their registered bullet (or none) is not a badge.
 local BADGES = {
@@ -188,6 +190,7 @@ function MinimalPlayer:Initialize(original)
     track:SetColorTexture(.035, .035, .025, 1)
     local trim = self.bar:CreateTexture(nil, "OVERLAY")
     trim:SetTexture(ART .. "MinimalCastBorder")
+    self.trim = trim
     trim:SetPoint("TOPLEFT", -4, 4)
     trim:SetPoint("BOTTOMRIGHT", 4, -4)
 
@@ -254,6 +257,7 @@ function MinimalPlayer:BuildPortrait()
     local ring = chrome:CreateTexture(nil, "ARTWORK")
     ring:SetAllPoints()
     ring:SetTexture(ART .. "MinimalPortraitRing")
+    self.ring = ring
     self.badge = chrome:CreateTexture(nil, "OVERLAY")
     self.badge:SetSize(16, 16)
     self.badge:SetPoint("CENTER", host, "TOPLEFT", 90 * 56.5 / 71, -90 * 56.5 / 71)
@@ -575,6 +579,11 @@ function MinimalPlayer:RefreshConfig(original)
     self.content:SetPoint("TOPLEFT", cfg.HidePortrait and 16 or 96, -18)
     self.content:SetPoint("TOPRIGHT", -18, -18)
     self.portrait:SetShown(not cfg.HidePortrait)
+    local r, g, b = 1, 1, 1
+    if BRONZE and cfg.BronzeTint then r, g, b = unpack(BRONZE) end
+    self.panel:SetBackdropBorderColor(r, g, b)
+    self.trim:SetVertexColor(r, g, b)
+    self.ring:SetVertexColor(r, g, b)
     if cfg.LockFrame then frame:StopMovingOrSizing(); self.sizing = false end
     self:Update()
 end
