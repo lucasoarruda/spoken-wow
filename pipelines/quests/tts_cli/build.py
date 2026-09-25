@@ -232,29 +232,25 @@ def locale_tables(corpus: dict, rows: list, ignored=()) -> dict:
             for kind, (filename, table_name) in LOCALE_TABLES.items()}
 
 
-def write_locale_lua_table(path: str, module_name: str, lang: str, table_name: str,
-                           data) -> None:
-    """A table that exists only on a client in `lang`.
+def write_lua_table(path: str, module_name: str, table_name: str, data,
+                    lang: str = None) -> None:
+    """One generated table. With `lang`, a copy that exists only on a client in that locale.
 
-    The pack is that language's, but a player on an English client may install it to hear
-    the language, and their client shows English: the English tables are the ones that
-    match there, so this one returns before it is built.
+    That copy is in a language's pack, but a player on an English client may install the
+    pack to hear the language, and their client shows English: the English tables are the
+    ones that match there, so the copy returns before it is built.
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(GUARD + "\n")
-        f.write("if not VoiceOver.Language or "
-                f'VoiceOver.Language:GetClientLanguage() ~= "{lang}" then return end\n')
-        f.write(f"{module_name}.ClientLocaleLookups = {module_name}.ClientLocaleLookups or {{}}\n")
-        f.write(f"{module_name}.ClientLocaleLookups.{table_name} = ")
-        f.write(lua.encode(data))
-        f.write("\n")
-
-
-def write_lua_table(path: str, module_name: str, table_name: str, data) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(GUARD + "\n")
-        f.write(f"{module_name}.{table_name} = ")
+        target = f"{module_name}.{table_name}"
+        if lang:
+            f.write("if not VoiceOver.Language or "
+                    f'VoiceOver.Language:GetClientLanguage() ~= "{lang}" then return end\n')
+            f.write(f"{module_name}.ClientLocaleLookups = "
+                    f"{module_name}.ClientLocaleLookups or {{}}\n")
+            target = f"{module_name}.ClientLocaleLookups.{table_name}"
+        f.write(f"{target} = ")
         f.write(lua.encode(data))
         f.write("\n")
 
@@ -339,8 +335,8 @@ def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
     if locale_text is not None:
         for filename, (table_name, data) in sorted(
                 locale_tables(corpus, locale_text, ignored).items()):
-            write_locale_lua_table(os.path.join(generated_dir, language, filename + ".lua"),
-                                   module_name, language, table_name, data)
+            write_lua_table(os.path.join(generated_dir, language, filename + ".lua"),
+                            module_name, table_name, data, lang=language)
             written.append(f"{language}\\{filename}.lua")
             locale_rows[f"{language}/{filename}"] = len(data)
 

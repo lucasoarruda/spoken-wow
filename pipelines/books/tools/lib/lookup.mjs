@@ -140,21 +140,23 @@ export async function buildLookup({ lang = LANG, out = lookupPath(lang) } = {}) 
       // The newest extracted version, not the live row: the client shows the world
       // database's words, and a correction made here changes what is voiced, not what is on
       // screen. Placed by the English page, which is what fixes a page's book and number.
-      const pages = await pool.query(
-        `select e."pageId", e."bookId", e."pageNumber", e."ownerKind", e."ownerIds", l."text"
-           from (select distinct on ("lineId") "lineId", "text" from "book_line"
-                  where "lang" = $1 and "origin" = 'extracted'
-                  order by "lineId", "version" desc) l
-           join "book_line" e on e."lineId" = l."lineId" and e."lang" = $2 and e."isCurrent"`,
-        [lang, LANG],
-      );
-      // The same rule for the owners' names.
-      const names = await pool.query(
-        `select distinct on ("kind", "entityId") "kind", "entityId", "name" from "entity_name"
-          where "lang" = $1 and "origin" = 'extracted' and "kind" in ('gameobject', 'item')
-          order by "kind", "entityId", "version" desc`,
-        [lang],
-      );
+      const [pages, names] = await Promise.all([
+        pool.query(
+          `select e."pageId", e."bookId", e."pageNumber", e."ownerKind", e."ownerIds", l."text"
+             from (select distinct on ("lineId") "lineId", "text" from "book_line"
+                    where "lang" = $1 and "origin" = 'extracted'
+                    order by "lineId", "version" desc) l
+             join "book_line" e on e."lineId" = l."lineId" and e."lang" = $2 and e."isCurrent"`,
+          [lang, LANG],
+        ),
+        // The same rule for the owners' names.
+        pool.query(
+          `select distinct on ("kind", "entityId") "kind", "entityId", "name" from "entity_name"
+            where "lang" = $1 and "origin" = 'extracted' and "kind" in ('gameobject', 'item')
+            order by "kind", "entityId", "version" desc`,
+          [lang],
+        ),
+      ]);
       entries = localeEntries(pages.rows, names.rows);
     }
 

@@ -15,23 +15,19 @@ load only on a client in that locale (see build.locale_tables).
 
 Nothing here needs a database: this reads and writes the file, and corpus_db does the query.
 """
-import gzip
-import json
-import os
+from tts_cli.corpus import load_corpus, write_corpus
 
 
 def write_locale_text(path: str, lang: str, lines: list) -> str:
-    """Write one language's rows: [{lineId, originalText, localeText}, ...]."""
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    # mtime=0 for the reason write_corpus gives: unchanged data, identical file.
-    with gzip.GzipFile(path, "wb", mtime=0) as raw:
-        raw.write(json.dumps({"lang": lang, "lines": lines},
-                             ensure_ascii=False, indent=1).encode("utf-8"))
+    """Write one language's rows: [{lineId, originalText, localeText}, ...].
+
+    In the corpus's own envelope, so an unchanged export is an identical file.
+    """
+    write_corpus(path, {"lang": lang, "lines": lines})
     return path
 
 
 def load_locale_text(path: str):
     """(lang, rows) from a file write_locale_text wrote."""
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        document = json.load(f)
+    document = load_corpus(path)
     return document["lang"], document["lines"]

@@ -64,7 +64,7 @@ export function pageIndex(entries) {
   const seen = new Map();
   for (const entry of sorted) {
     const sum = checksums.get(entry.pageId);
-    seen.set(sum, seen.has(sum) && seen.get(sum) !== entry.pageId ? null : entry.pageId);
+    seen.set(sum, seen.has(sum) ? null : entry.pageId);
   }
   const loose = [...seen.entries()].filter(([, pageId]) => pageId !== null);
 
