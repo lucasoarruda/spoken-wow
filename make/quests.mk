@@ -295,12 +295,12 @@ full-release: require-droplet
 	@$(MAKE) --no-print-directory -f make/quests.mk package-meta
 	@./scripts/quests/release.sh --dry-run --store=curseforge $(PACKS_AUDIO)
 	@./scripts/quests/release.sh --dry-run audio-all
-	@./scripts/audio-github-release.sh --dry-run $(addprefix quests-,$(PACKS_AUDIO))
+	@./scripts/audio-github-release.sh --dry-run quests $(or $(LOCALE),enUS)
 	@printf 'Upload quests packs $(VERSION) to CurseForge and GitHub? [y/N] '; \
 	  read -r answer; [ "$$answer" = y ] || { echo aborted; exit 1; }
 	@./scripts/quests/release.sh --store=curseforge $(PACKS_AUDIO)
 	@./scripts/quests/release.sh audio-all
-	@./scripts/audio-github-release.sh $(addprefix quests-,$(PACKS_AUDIO))
+	@./scripts/audio-github-release.sh quests $(or $(LOCALE),enUS)
 endif
 
 # --- the ignore list ------------------------------------------------------------------

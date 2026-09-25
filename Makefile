@@ -140,11 +140,11 @@ character-models: ## Print how to regenerate apps/web/src/lib/npc/character-mode
 # its zips on the runner, and the audio is outside git. This uploads what the machine that
 # generated it already has in dist/.
 
-audio-release-dry: ## Show which pack releases `make audio-release` would cut
-	@./scripts/audio-github-release.sh --dry-run
+audio-release-dry: ## Show which pack releases would be cut (SECTION=zones LOCALE=esMX to narrow)
+	@./scripts/audio-github-release.sh --dry-run $(SECTION) $(if $(SECTION),$(LOCALE))
 
-audio-release: ## Publish the built sound packs as GitHub releases (needs gh)
-	@./scripts/audio-github-release.sh
+audio-release: ## Publish the built sound packs as GitHub releases (needs gh; SECTION=, LOCALE=)
+	@./scripts/audio-github-release.sh $(SECTION) $(if $(SECTION),$(LOCALE))
 
 package-all: ## Build every addon zip: the player, quests, zones
 	@./scripts/spoken/package.sh

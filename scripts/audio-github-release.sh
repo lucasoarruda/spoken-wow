@@ -2,8 +2,9 @@
 # Publishes the sound packs as GitHub releases, which is the only channel that will take them.
 #
 #   ./scripts/audio-github-release.sh --dry-run          # say what would be sent, send nothing
-#   ./scripts/audio-github-release.sh                    # every pack
-#   ./scripts/audio-github-release.sh zones-audio        # just one
+#   ./scripts/audio-github-release.sh                    # every English pack
+#   ./scripts/audio-github-release.sh zones              # zones' English packs
+#   ./scripts/audio-github-release.sh zones esMX         # zones' Spanish packs
 #
 # WHY THIS EXISTS. CurseForge takes the packs and Wago does not: each is 280-452 MB and
 # Cloudflare answers 413 to Wago's version endpoint before Wago sees the body. A player who
@@ -34,87 +35,41 @@ DIST="$REPO/dist"
 # squashed, and takes the "what shipped" answer with it.
 TARGET_BRANCH="${TARGET_BRANCH:-master}"
 
-# tag prefix -> the zip basename, where the version is read, and which changelog it is in.
-#
-# A pack has no committed .toc: the build generates one and package-audio.sh passes the version
-# in, so the quests packs read theirs back out of the built module in dist/. Releasing a pack
-# nobody built therefore fails here rather than uploading whatever stale zip is lying about.
-target_zip() { case "$1" in
-  quests-audio-alliance) echo "SpokenQuestsAudioAlliance";;
-  quests-audio-horde)    echo "SpokenQuestsAudioHorde";;
-  quests-audio-shared)   echo "SpokenQuestsAudioShared";;
-  quests-audio-gossip)   echo "SpokenQuestsAudioGossip";;
-  zones-audio)           echo "SpokenZonesAudio";;
-  zones-audio-esMX)      echo "SpokenZonesAudio_esMX";;
-  books-audio)           echo "SpokenBooksAudio";;
-esac; }
-target_toc() { local zip; zip="$(target_zip "$1")"; case "$1" in
-  quests-audio-*) echo "$DIST/$zip/$zip.toc";;
-  *)              echo "$REPO/addons/$zip/$zip.toc";;
-esac; }
-target_changelog() { case "$1" in
-  quests-audio-*) echo "$REPO/docs/quests/CHANGELOG.md";;
-  zones-audio*)   echo "$REPO/docs/zones/CHANGELOG.md";;
-  books-audio)    echo "$REPO/docs/books/CHANGELOG.md";;
-esac; }
-# Which heading in that file is this pack's. The kind is half the key in two of the three:
-# the quests player and its packs have collided on a version number before, and zones numbers
-# its addon and its pack independently, so `## 2.0.1 — audio` is the pack's and anything else
-# at that number is the addon's. Books has one changelog per version and no such split. A
-# language's zones pack is `— audio esMX`, which English's pattern has to step over.
-target_changelog_kind() { case "$1" in
-  quests-audio-*) echo "pack";;
-  zones-audio)    echo "audio(?! [a-z]{2}[A-Z]{2})";;
-  zones-audio-esMX) echo "audio esMX";;
-  books-audio)    echo "";;
-esac; }
-# What the pack is called in the release title and in the store pages it is linked from.
-target_title() { case "$1" in
-  quests-audio-alliance) echo "Spoken Quests Audio: Alliance";;
-  quests-audio-horde)    echo "Spoken Quests Audio: Horde";;
-  quests-audio-shared)   echo "Spoken Quests Audio: Shared Quests";;
-  quests-audio-gossip)   echo "Spoken Quests Audio: Gossip";;
-  zones-audio)           echo "Spoken Zones Audio";;
-  zones-audio-esMX)      echo "Spoken Zones Audio: Spanish (AL)";;
-  books-audio)           echo "Spoken Books Audio";;
-esac; }
-# The addon each pack is inert without, by store slug, for the release notes. A pack installed
-# alone is several hundred megabytes of silence.
-target_needs() { case "$1" in
-  quests-audio-*) echo "spoken-quests";;
-  zones-audio*)   echo "spoken-zones";;
-  books-audio)    echo "spoken-books";;
-esac; }
-
-ALL_TARGETS="quests-audio-alliance quests-audio-horde quests-audio-shared quests-audio-gossip \
-zones-audio books-audio"
-
-dry_run=""
-targets=()
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run|-n) dry_run=1;;
-    quests-audio-alliance|quests-audio-horde|quests-audio-shared|quests-audio-gossip|zones-audio|books-audio|zones-audio-esMX)
-      targets+=("$arg");;
-    *) echo "error: unknown argument '$arg' (expected: $ALL_TARGETS, --dry-run)" >&2; exit 1;;
-  esac
-done
-if (( ${#targets[@]} == 0 )); then
-  read -r -a targets <<<"$ALL_TARGETS"
-fi
-
 command -v gh >/dev/null || { echo "error: gh is required (https://cli.github.com)" >&2; exit 1; }
 command -v node >/dev/null || { echo "error: node is required (for the changelog)" >&2; exit 1; }
 
+dry_run=""
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run|-n) dry_run=1;;
+    *) args+=("$arg");;
+  esac
+done
+
+# What to release: every English pack (no arguments, as before), one section's English packs,
+# or one section's packs in a language. Each is a (section, lang, pack) the registry resolves.
+SECTIONS_ALL="quests zones books"
+section="${args[0]:-}"; lang="${args[1]:-enUS}"
+targets=()   # "section lang pack"
+for s in ${section:-$SECTIONS_ALL}; do
+  list_output="$(node "$REPO/scripts/lib/packs.mjs" list "$s" "$lang")" || exit 1
+  while IFS= read -r p; do [[ -n "$p" ]] && targets+=("$s $lang $p"); done <<<"$list_output"
+done
+field() { node "$REPO/scripts/lib/packs.mjs" get "$1" "$2" "$3" "$4"; }
+
 # The section of the pack's CHANGELOG for the version being released, so the notes on the
-# release and the notes in the repository cannot drift apart.
+# release and the notes in the repository cannot drift apart. English matches by kind (and
+# steps over a language pack's heading that happens to share its version number); a language
+# matches its own release tag via packs.mjs changelog.
 changelog_for() {
   node -e '
     const { readFileSync } = require("fs");
     const [path, version, kind] = process.argv.slice(1);
     const lines = readFileSync(path, "utf8").split("\n");
-    const matches = (l) =>
-      l.startsWith(`## ${version}`) && (kind ? new RegExp(kind, "i").test(l) : true);
+    const language = /^## \S+ — [a-z]+(?:-[a-z]+)+-[a-z]{2}[A-Z]{2}(?:\s|$)/;
+    const matches = (l) => l.startsWith(`## ${version}`) && !language.test(l) &&
+      (kind ? new RegExp(kind, "i").test(l) : true);
     const start = lines.findIndex(matches);
     if (start === -1) {
       console.error(`no "## ${version}${kind ? ` ... ${kind}` : ""}" section in ${path}`);
@@ -132,26 +87,42 @@ failed=()
 released=()
 
 release_target() {
-  local target="$1"
-  local zip_name version zip_path tag title notes size
+  local section="$1" lang="$2" pack="$3"
+  local folder release title needs changelog_file version zip_path tag notes size kind
 
-  zip_name="$(target_zip "$target")"
-  version="$(sed -n 's/^## Version:[[:space:]]*//p' "$(target_toc "$target")" 2>/dev/null \
-    | head -1 | tr -d '\r')"
+  folder="$(field "$section" "$lang" "$pack" folder)"
+  release="$(field "$section" "$lang" "$pack" release)"
+  title="$(field "$section" "$lang" "$pack" name)"
+  needs="spoken-$section"
+  changelog_file="$REPO/docs/$section/CHANGELOG.md"
 
   echo
-  echo "=== $target ==="
+  echo "=== $release ==="
 
-  if [[ -z "$version" ]]; then
-    echo "error: no version for '$target' -- the pack has not been built on this machine." >&2
-    echo "       Run make <group>-package-audio first; a pack's version comes from the" >&2
-    echo "       module it produces, not from a committed .toc." >&2
-    return 1
+  if [[ "$lang" == enUS ]]; then
+    # A pack has no committed .toc: the build generates one and package-audio.sh passes the
+    # version in, so English reads it back out of the built module. Releasing a pack nobody
+    # built therefore fails here rather than uploading whatever stale zip is lying about.
+    local toc
+    if [[ "$section" == quests ]]; then
+      toc="$DIST/$folder/$folder.toc"
+    else
+      toc="$REPO/addons/$folder/$folder.toc"
+    fi
+    version="$(sed -n 's/^## Version:[[:space:]]*//p' "$toc" 2>/dev/null | head -1 | tr -d '\r')"
+    if [[ -z "$version" ]]; then
+      echo "error: no version for '$release' -- the pack has not been built on this machine." >&2
+      echo "       Run make <group>-package-audio first; a pack's version comes from the" >&2
+      echo "       module it produces, not from a committed .toc." >&2
+      return 1
+    fi
+  else
+    version="$(field "$section" "$lang" "$pack" version)"
   fi
 
-  zip_path="$DIST/$zip_name-$version.zip"
-  tag="$target/v$version"
-  title="$(target_title "$target") $version"
+  zip_path="$DIST/$folder-$version.zip"
+  tag="$release/v$version"
+  title="$title $version"
 
   if [[ ! -f "$zip_path" ]]; then
     echo "error: $zip_path does not exist -- run make <group>-package-audio first" >&2
@@ -159,8 +130,16 @@ release_target() {
   fi
 
   size="$(du -h "$zip_path" | cut -f1)"
-  notes="$(changelog_for "$(target_changelog "$target")" "$version" \
-    "$(target_changelog_kind "$target")")" || return 1
+  if [[ "$lang" == enUS ]]; then
+    case "$section" in
+      quests) kind="pack";;
+      zones)  kind="audio";;
+      books)  kind="";;
+    esac
+    notes="$(changelog_for "$changelog_file" "$version" "$kind")" || return 1
+  else
+    notes="$(node "$REPO/scripts/lib/packs.mjs" changelog "$changelog_file" "$version" "$release")" || return 1
+  fi
 
   echo "  file:    $zip_path ($size)"
   echo "  tag:     $tag on $TARGET_BRANCH"
@@ -183,7 +162,7 @@ release_target() {
       --title "$title" \
       --notes "$notes
 
-**This pack is data only.** It needs [$(target_needs "$target")](https://addons.wago.io/addons/$(target_needs "$target")), which plays it; installed alone it does nothing.
+**This pack is data only.** It needs [$needs](https://addons.wago.io/addons/$needs), which plays it; installed alone it does nothing.
 
 Released here because the pack is $size: CurseForge carries it too, and Wago's upload endpoint refuses a file this size." || return 1
   fi
@@ -191,12 +170,13 @@ Released here because the pack is $size: CurseForge carries it too, and Wago's u
   echo "  released -- $(gh release view "$tag" --json url -q .url)"
 }
 
-for target in "${targets[@]}"; do
-  if release_target "$target"; then
-    released+=("$target")
+for t in ${targets[@]+"${targets[@]}"}; do
+  read -r t_section t_lang t_pack <<<"$t"
+  if release_target "$t_section" "$t_lang" "$t_pack"; then
+    released+=("$t_section/$t_lang/$t_pack")
   else
-    failed+=("$target")
-    echo "  skipping $target and continuing" >&2
+    failed+=("$t_section/$t_lang/$t_pack")
+    echo "  skipping $t_section $t_lang $t_pack and continuing" >&2
   fi
 done
 
