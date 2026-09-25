@@ -197,6 +197,60 @@ def build_tables(corpus: dict, ignored=()) -> dict:
     }
 
 
+#: The tables a language's Gossip pack gets a client-locale copy of: the ones keyed by the
+#: NPC's words and its id. Quest ids come from the client itself on every supported release,
+#: names are only shown, and the name-keyed gossip tables are the fallback for a speaker with
+#: no GUID, which is rare enough to leave to the English text.
+LOCALE_TABLES = {
+    "creature": ("npc_gossip_file_lookups", "GossipLookupByNPCID"),
+    "gameobject": ("object_gossip_file_lookups", "GossipLookupByObjectID"),
+}
+
+
+def locale_tables(corpus: dict, rows: list, ignored=()) -> dict:
+    """One client locale's gossip tables, as {output filename: (lua table name, data)}.
+
+    Keyed by the locale's text and pointing at the English line's hash, which names the
+    file in every pack. A row is joined to the corpus on (lineId, originalText) -- the
+    English text is what a translated row is anchored to -- so it takes its speakers from
+    the corpus, and a row whose English has since changed is dropped.
+    """
+    texts = {}
+    for row in rows:
+        texts.setdefault((row["lineId"], row["originalText"]), []).append(row["localeText"])
+    tables = {kind: {} for kind in LOCALE_TABLES}
+    for line in corpus["lines"]:
+        if line["source"] != "gossip" or line["lineId"] in ignored:
+            continue
+        kind = line["npcType"]
+        if kind not in tables:
+            continue
+        for text in texts.get((line["lineId"], line["originalText"]), ()):
+            tables[kind].setdefault(line["npcId"], {})[escape_lua_string(text)] = \
+                gossip_hash_from_line_id(line["lineId"])
+    return {filename: (table_name, tables[kind])
+            for kind, (filename, table_name) in LOCALE_TABLES.items()}
+
+
+def write_locale_lua_table(path: str, module_name: str, lang: str, table_name: str,
+                           data) -> None:
+    """A table that exists only on a client in `lang`.
+
+    The pack is that language's, but a player on an English client may install it to hear
+    the language, and their client shows English: the English tables are the ones that
+    match there, so this one returns before it is built.
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(GUARD + "\n")
+        f.write("if not VoiceOver.Language or "
+                f'VoiceOver.Language:GetClientLanguage() ~= "{lang}" then return end\n')
+        f.write(f"{module_name}.ClientLocaleLookups = {module_name}.ClientLocaleLookups or {{}}\n")
+        f.write(f"{module_name}.ClientLocaleLookups.{table_name} = ")
+        f.write(lua.encode(data))
+        f.write("\n")
+
+
 def write_lua_table(path: str, module_name: str, table_name: str, data) -> None:
     with open(path, "w", encoding="utf-8") as f:
         f.write(GUARD + "\n")
@@ -225,7 +279,8 @@ def module_toc(module_name: str, generated_files: list, version: str = "1.0.1",
 def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
                  module_name: str = DEFAULT_MODULE_NAME, version: str = "1.0.1",
                  progress: bool = False, ignored=(), include=None,
-                 title: str = DEFAULT_TITLE, language: str = None) -> dict:
+                 title: str = DEFAULT_TITLE, language: str = None,
+                 locale_text: list = None) -> dict:
     """Assemble the data module. Returns a report.
 
     An ignored line's audio is left behind as well as its lookup entry, so a take made
@@ -238,7 +293,14 @@ def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
     they map text to ids and hashes rather than to files, they are the same in every pack,
     and an entry whose audio is in a pack the player did not install simply finds no length
     and stays quiet. See tts_cli/factions.py.
+
+    `locale_text` is `language`'s rows from tts_cli.locale_text, and adds that language's
+    gossip tables under generated/<language>/, loaded only on a client in it. Only a
+    language's Gossip pack is given them (cli-main.py refuses the rest). The English tables
+    are written either way: they are what matches on an English client.
     """
+    if locale_text is not None and (not language or language == "enUS"):
+        raise ValueError("locale text belongs to a language pack; pass its language")
     module_dir = os.path.join(dist_dir, module_name)
     generated_dir = os.path.join(module_dir, "generated")
     sounds_dir = os.path.join(generated_dir, "sounds")
@@ -273,6 +335,15 @@ def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
                         module_name, table_name, data)
         written.append(filename + ".lua")
 
+    locale_rows = {}
+    if locale_text is not None:
+        for filename, (table_name, data) in sorted(
+                locale_tables(corpus, locale_text, ignored).items()):
+            write_locale_lua_table(os.path.join(generated_dir, language, filename + ".lua"),
+                                   module_name, language, table_name, data)
+            written.append(f"{language}\\{filename}.lua")
+            locale_rows[f"{language}/{filename}"] = len(data)
+
     # Durations come from the copied files, so the table can never disagree with them.
     write_sound_length_table_lua(module_name, sounds_dir, generated_dir)
     written.append("sound_length_table.lua")
@@ -292,7 +363,7 @@ def build_module(corpus: dict, store_dir: str, dist_dir: str = DEFAULT_DIST_DIR,
         "audioFiles": len(audio),
         "audioFormat": extension,
         "tables": sorted(written),
-        "tableRows": {name: len(data) for name, (_, data) in tables.items()},
+        "tableRows": {**{name: len(data) for name, (_, data) in tables.items()}, **locale_rows},
         "language": language,
     }
 

@@ -12,5 +12,8 @@ import { buildLookup } from "./lib/lookup.mjs";
 await loadEnv("books");
 
 const lang = process.argv.find((arg) => arg.startsWith("--lang="))?.slice("--lang=".length) || "enUS";
-const { clips, path } = await buildLookup({ lang });
-console.log(`${clips} clips -> ${path}`);
+const { clips, pages, path } = await buildLookup({ lang });
+console.log(`${clips} clips${pages === null ? "" : `, ${pages} ${lang} pages indexed`} -> ${path}`);
+if (pages === 0) {
+  console.warn(`warning: no ${lang} pages imported (make books-import-locale LOCALE=${lang}), so a ${lang} client will find none`);
+}

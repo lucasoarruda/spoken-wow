@@ -279,6 +279,13 @@ LOCALE=esMX ./scripts/books/package-audio.sh  # dist/SpokenBooksAudio_esMX-<v>.z
 make books-release-audio LOCALE=esMX  # uploads it, CurseForge only
 ```
 
-Until a per-locale page index exists, a translated client is silent on books: the lookup a
-pack ships still keys every page off the English corpus, so a language's pack has nothing of
-its own for the reader to resolve a translated page against.
+The addon finds a page by its title and a checksum of its words, and a client in another
+locale shows neither in English. So a language's `Data/Sounds.lua` also carries that
+language's `index` and `loose`, in the shape of `SpokenBooks/Data/Books.lua`'s: every page
+the world database translates, under each name its owners have in that language, keyed on the
+text as the client shows it — the newest *extracted* version, not a correction made on the
+site. The reader asks it only on a client in the pack's language, before the English index.
+It is built from `book_line` and `entity_name`, so run `make books-import-locale LOCALE=esMX`
+first; `books-lookup` warns when it finds no pages. The checksum is exact: a page whose words
+on a live client differ from the world database's by one byte is not found, and is what the
+contribution button is for.

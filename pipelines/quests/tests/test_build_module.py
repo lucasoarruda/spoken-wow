@@ -200,3 +200,97 @@ def test_an_english_pack_is_unchanged(tmp_path):
     build_module(CORPUS, _store(tmp_path, "quests/5-accept.ogg"), str(tmp_path / "dist"), "Mod")
     assert "X-SpokenQuests-Language" not in _toc(tmp_path)
     assert "LookupLocale" not in _module_lua(tmp_path)
+
+
+MX_TEXT = [{"lineId": "g:abc123", "originalText": "Move along.", "localeText": "Circule."}]
+
+
+def _generated(tmp_path, *parts):
+    with open(tmp_path / "dist" / "Mod" / "generated" / os.path.join(*parts),
+              encoding="utf-8") as f:
+        return f.read()
+
+
+def test_a_language_s_gossip_pack_gets_its_client_s_gossip_table(tmp_path):
+    # Keyed by what a Spanish client shows, pointing at the English line's hash, which names
+    # the file in every pack.
+    store = _store(tmp_path, "gossip/abc123.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="esMX",
+                 locale_text=MX_TEXT)
+
+    table = _generated(tmp_path, "esMX", "npc_gossip_file_lookups.lua")
+    assert "Mod.ClientLocaleLookups.GossipLookupByNPCID = " in table
+    assert '"Circule."' in table and '"abc123"' in table
+    assert "Move along." not in table
+
+
+def test_a_locale_table_loads_only_on_its_own_client(tmp_path):
+    store = _store(tmp_path, "gossip/abc123.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="esMX",
+                 locale_text=MX_TEXT)
+
+    table = _generated(tmp_path, "esMX", "npc_gossip_file_lookups.lua")
+    assert ('if not VoiceOver.Language or VoiceOver.Language:GetClientLanguage() ~= "esMX" '
+            'then return end') in table
+    assert "generated\\esMX\\npc_gossip_file_lookups.lua" in _toc(tmp_path)
+    assert "generated\\esMX\\object_gossip_file_lookups.lua" in _toc(tmp_path)
+
+
+def test_the_english_tables_are_written_beside_it(tmp_path):
+    # They are what matches on an English client that installed the pack to hear Spanish.
+    store = _store(tmp_path, "gossip/abc123.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="esMX",
+                 locale_text=MX_TEXT)
+
+    assert '"Move along."' in _generated(tmp_path, "npc_gossip_file_lookups.lua")
+
+
+def test_both_variants_of_a_gendered_line_are_keys(tmp_path):
+    store = _store(tmp_path, "gossip/abc123.ogg")
+    rows = MX_TEXT + [{"lineId": "g:abc123", "originalText": "Move along.",
+                       "localeText": "Circule, amiga."}]
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="esMX",
+                 locale_text=rows)
+
+    table = _generated(tmp_path, "esMX", "npc_gossip_file_lookups.lua")
+    assert '"Circule."' in table and '"Circule, amiga."' in table
+
+
+def test_a_locale_row_whose_english_has_changed_is_dropped(tmp_path):
+    store = _store(tmp_path, "gossip/abc123.ogg")
+    stale = [{"lineId": "g:abc123", "originalText": "Keep moving.", "localeText": "Siga."}]
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="esMX",
+                 locale_text=stale)
+
+    assert "Siga." not in _generated(tmp_path, "esMX", "npc_gossip_file_lookups.lua")
+
+
+def test_an_ignored_line_has_no_locale_entry(tmp_path):
+    store = _store(tmp_path, "gossip/abc123.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", ignored={"g:abc123"},
+                 language="esMX", locale_text=MX_TEXT)
+
+    assert "Circule." not in _generated(tmp_path, "esMX", "npc_gossip_file_lookups.lua")
+
+
+def test_locale_text_without_a_language_is_refused(tmp_path):
+    store = _store(tmp_path, "gossip/abc123.ogg")
+
+    with pytest.raises(ValueError):
+        build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", locale_text=MX_TEXT)
+
+
+def test_a_language_pack_without_locale_text_has_no_locale_tables(tmp_path):
+    # The faction packs of a language, and every English pack.
+    store = _store(tmp_path, "gossip/abc123.ogg")
+
+    build_module(CORPUS, store, str(tmp_path / "dist"), "Mod", language="esMX")
+
+    assert not os.path.exists(tmp_path / "dist" / "Mod" / "generated" / "esMX")
+    assert "ClientLocaleLookups" not in _toc(tmp_path)
