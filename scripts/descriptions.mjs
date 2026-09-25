@@ -37,6 +37,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
+import { loadPacks } from "./lib/packs.mjs";
 
 // The monorepo root, two levels up from scripts/.
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -229,6 +230,10 @@ function groupFilter() {
 }
 
 async function main() {
+  // The pack rules (scripts/lib/packs.mjs) are checked on every run, so `make lint` fails on a
+  // page that would send a pack to the wrong folder or tag.
+  loadPacks();
+
   const write = process.argv.includes("--write");
   const only = groupFilter();
   const all = await loadGroups();

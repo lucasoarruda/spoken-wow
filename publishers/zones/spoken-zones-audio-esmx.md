@@ -1,6 +1,9 @@
 ---
 curseforge: 1711067
 release: zones-audio-esMX
+section: zones
+lang: esMX
+version: 1.0.0
 slug: spoken-zones-audio-esmx
 name: Spoken Zones Audio: Spanish (AL)
 summary: The Latin American Spanish narration for Spoken Zones: every zone and subzone read aloud in Spanish (AL).
@@ -9,7 +12,6 @@ categories:
   - Miscellaneous
   - Roleplay
 license: MIT
-addonReadme: addons/SpokenZonesAudio_esMX/README.md
 ---
 
 Narrated zone lore for **[Spoken Zones](https://www.curseforge.com/wow/addons/spoken-zones)**, in Latin American Spanish. This addon is data only — it does nothing on its own.

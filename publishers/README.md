@@ -46,6 +46,14 @@ which is why there is one file per project here and not two.
 | `books/spoken-books.md` | Spoken Books | 1701514 | qGYZnRNg | `spoken-books` |
 | `books/spoken-books-audio.md` | Spoken Books Audio | 1701520 | qGZOrvNd | `spoken-books-audio` |
 
+**A sound pack's page is also its registry entry.** `section:` (quests, zones or books), `lang:`
+and, on a quests pack, `pack:` say which pack it is; a language other than English also carries
+`version:`, since its folder is staged at build time and has no committed `.toc`.
+`scripts/lib/packs.mjs` reads them, derives the folder (English's name, plus `_<lang>`) and the
+release tag (English's, plus `-<lang>`), and every build and release script asks it rather than
+keeping a table of its own. Adding a language's pack is its page -- one per pack, four for quests
+-- plus the CurseForge project it names.
+
 The slugs follow the projects' names, `-all` included: the meta addon is the "All" pack as far
 as a player is concerned, so it is the one project whose slug names a pack that holds no audio.
 

@@ -2,6 +2,8 @@
 curseforge: 1701520
 wago: qGZOrvNd
 release: books-audio
+section: books
+lang: enUS
 slug: spoken-books-audio
 name: Spoken Books Audio
 summary: The narration for Spoken Books: books, letters and notes read aloud. Data only — install it beside Spoken Books.

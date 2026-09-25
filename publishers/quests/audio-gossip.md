@@ -2,6 +2,9 @@
 curseforge: 1660202
 wago: XKqA45Ky
 release: quests-audio-gossip
+section: quests
+lang: enUS
+pack: gossip
 slug: spoken-quests-audio-gossip
 name: Spoken Quests Audio: Gossip
 summary: NPC gossip chatter, voiced. Optional extra for any of the quest packs. Needs Spoken Quests.

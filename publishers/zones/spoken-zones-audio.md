@@ -2,6 +2,8 @@
 curseforge: 1636532
 wago: b6mvD9KP
 release: zones-audio
+section: zones
+lang: enUS
 slug: spoken-zones-audio
 name: Spoken Zones Audio
 summary: Formerly ZoneLoreAudio. The narration for Spoken Zones: every zone and subzone read aloud.
