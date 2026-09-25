@@ -108,4 +108,6 @@ L.CMD_DEBUG = "  /spz debug      -- 맵 클릭 시 지역 이름 보고"
 L.CMD_VERIFY = "  /spz verify     -- 데이터 검증"
 L.CMD_DUMP = "  /spz dump       -- 맵 트리 열거(dev)"
 
+L.SUBZONE_COUNT_FMT = "%1$d개 하위 지역"
+
 SpokenZones:RegisterStrings("koKR", L)

@@ -108,4 +108,6 @@ L.CMD_DEBUG = "  /spz debug      -- meldet Gebietsnamen bei Kartenklick"
 L.CMD_VERIFY = "  /spz verify     -- prüft Daten gegen diesen Client"
 L.CMD_DUMP = "  /spz dump       -- listet den Kartenbaum auf (dev)"
 
+L.SUBZONE_COUNT_FMT = "%1$d Unterzonen"
+
 SpokenZones:RegisterStrings("deDE", L)
