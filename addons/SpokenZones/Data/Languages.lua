@@ -13,7 +13,7 @@ SpokenZones.Languages = {
 	{ code = "enUS", lore = { done = 856, total = 856 }, strings = { done = 91, total = 91 }, aliases = 0, audio = true, ready = true },
 	{ code = "deDE", lore = { done = 856, total = 856 }, strings = { done = 91, total = 91 }, aliases = 692, audio = false, ready = true },
 	{ code = "esES", lore = { done = 856, total = 856 }, strings = { done = 91, total = 91 }, aliases = 740, audio = false, ready = true },
-	{ code = "esMX", lore = { done = 856, total = 856 }, strings = { done = 0, total = 91 }, aliases = 730, audio = false, ready = true },
+	{ code = "esMX", lore = { done = 856, total = 856 }, strings = { done = 0, total = 91 }, aliases = 730, audio = true, ready = true },
 	{ code = "frFR", lore = { done = 856, total = 856 }, strings = { done = 91, total = 91 }, aliases = 735, audio = false, ready = true },
 	{ code = "ptBR", lore = { done = 856, total = 856 }, strings = { done = 91, total = 91 }, aliases = 732, audio = false, ready = true },
 	{ code = "ruRU", lore = { done = 856, total = 856 }, strings = { done = 91, total = 91 }, aliases = 780, audio = false, ready = true },

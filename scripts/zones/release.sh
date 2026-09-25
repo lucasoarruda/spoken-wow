@@ -5,7 +5,7 @@
 #   ./scripts/zones/release.sh                  # both projects, both stores
 #   ./scripts/zones/release.sh zones            # just the addon
 #   ./scripts/zones/release.sh audio            # just the sound pack
-#   ./scripts/zones/release.sh audio-esMX       # a language's sound pack; never uploaded by default
+#   ./scripts/zones/release.sh --lang=esMX audio # that language's sound pack instead
 #   ./scripts/zones/release.sh --store=wago     # one store only; --store=curseforge for the other
 #
 # TWO STORES, ONE RELEASE. The same zip goes to both by default: a file that exists on one
@@ -25,6 +25,12 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DIST="$REPO/dist"
+
+# The language whose sound pack `audio` means. English unless --lang says otherwise; the
+# addon itself has one language-independent project, so --lang is refused alongside `zones`.
+LANG_CODE=enUS
+pack_field() { node "$REPO/scripts/lib/packs.mjs" get zones "$LANG_CODE" - "$1"; }
+english() { [[ "$LANG_CODE" == enUS ]]; }
 
 # The Wago half, which is the same for every project and so lives in one file.
 # shellcheck source=../lib/wago.sh
@@ -54,44 +60,21 @@ GAME_VERSION_FOREVER="${GAME_VERSION_FOREVER:-1.60.1}"
 RELEASE_TYPE="${RELEASE_TYPE:-release}"
 
 # project key -> CurseForge project ID, addon folder the version is read from,
-# and the zip basename package*.sh produces.
-#
-# A language's pack is a project of its own and has to be created on CurseForge
-# by hand before it can be released. Until its id is written down here, releasing
-# it fails on the empty project id below -- which is the failure to want, because
-# the alternative is uploading a German pack over the English project.
-target_curseforge() { case "$1" in
-  zones)      echo "1636521";;
-  audio)      echo "1636532";;
-  audio-esMX) echo "1711067";;
-esac; }
+# and the zip basename package*.sh produces. `audio`'s come from LANG_CODE's page under
+# publishers/zones/ -- the registry a language's pack is created in by hand on CurseForge
+# before it can be released, so an unregistered language fails on the empty project id
+# below rather than uploading over the English project.
+target_curseforge() { case "$1" in zones) echo "1636521";; audio) pack_field curseforge;; esac; }
 # The Wago project id for the same project: eight alphanumeric characters, from the project's
 # entry in https://addons.wago.io/developers, and also in the page frontmatter under
 # publishers/zones/ where scripts/descriptions.mjs checks it.
-#
-# A language's pack has none: Wago refuses a file this size anyway (see full-release in
-# make/zones.mk), and its players get the pack from the GitHub release. Empty here means the
-# Wago upload is skipped for it rather than sent to another project.
-target_wago() { case "$1" in
-  zones)    echo "mNw7b5No";;
-  audio)    echo "b6mvD9KP";;
-esac; }
-# A language's pack is built into a folder named for its code (packFolder in
-# pipelines/zones/tools/lib/locales.mjs), and its version is that folder's .toc's.
-target_addon() { case "$1" in
-  zones)    echo "SpokenZones";;
-  audio)    echo "SpokenZonesAudio";;
-  audio-*)  echo "SpokenZonesAudio_${1#audio-}";;
-esac; }
-target_zip() { target_addon "$1"; }
+target_wago()       { case "$1" in zones) echo "mNw7b5No";; audio) pack_field wago;; esac; }
+target_addon()      { case "$1" in zones) echo "SpokenZones";; audio) pack_field folder;; esac; }
+target_zip()        { target_addon "$1"; }
 # The project's slug, which is neither the folder nor the zip name: the folders keep the names
 # they were published under and the slugs were changed with the rename. Used for the link
 # printed after an upload, so a wrong one here is a dead link and nothing worse.
-target_slug() { case "$1" in
-  zones)      echo "spoken-zones";;
-  audio)      echo "spoken-zones-audio";;
-  audio-esMX) echo "spoken-zones-audio-esmx";;
-esac; }
+target_slug()       { case "$1" in zones) echo "spoken-zones";; audio) pack_field slug;; esac; }
 # Which clients each file is offered to. Every zip built from 0.3.1 onwards carries
 # a .toc for both clients, so both are filed against both. Files uploaded
 # before that are Era-only and stay filed as they were -- a file offered to a
@@ -102,15 +85,8 @@ esac; }
 #
 # It also makes the pair upgrade together, which is what lets a pack register itself under one
 # name only - see the ONE REGISTRY note in tools/voice/build-lookup.mjs.
-target_dependencies() { case "$1" in
-  zones)    echo "spoken-player";;
-  audio*)   echo "spoken-zones";;
-esac; }
-
-target_game_versions() { case "$1" in
-  zones)    echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
-  audio*)   echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER";;
-esac; }
+target_dependencies()  { case "$1" in zones) echo "spoken-player";; audio) echo "spoken-zones";; esac; }
+target_game_versions() { echo "$GAME_VERSION_ERA $GAME_VERSION_ANNIVERSARY $GAME_VERSION_FOREVER"; }
 
 dry_run=""
 stores="curseforge wago"
@@ -121,10 +97,18 @@ for arg in "$@"; do
     --store=curseforge) stores="curseforge";;
     --store=wago)       stores="wago";;
     --dry-run|-n) dry_run=1;;
-    zones|audio|audio-esMX) targets+=("$arg");;
-    *) echo "error: unknown argument '$arg' (expected: zones, audio, audio-esMX, --store=..., --dry-run)" >&2; exit 1;;
+    --lang=*) LANG_CODE="${arg#--lang=}";;
+    zones|audio) targets+=("$arg");;
+    *) echo "error: unknown argument '$arg' (expected: zones, audio, --lang=..., --store=..., --dry-run)" >&2; exit 1;;
   esac
 done
+
+if ! english; then
+  for t in "${targets[@]}"; do
+    [[ "$t" == audio ]] || { echo "error: --lang=$LANG_CODE releases a sound pack; '$t' has one project for every language" >&2; exit 1; }
+  done
+  (( ${#targets[@]} > 0 )) || targets=("audio")
+fi
 
 # Asked once, answered at each of the places below that only concern one store.
 store_has() { [[ " $stores " == *" $1 "* ]]; }
@@ -201,22 +185,22 @@ fi
 # THE KIND IS HALF THE KEY. The addon and the pack read their own TOCs and have numbered
 # themselves independently since 2.0.0, so the same number belongs to both of them at
 # different times -- 2.0.1 is the addon's placeholder-folder fix and, separately, the pack's
-# new icon. A heading of `## <version> — audio` is the pack's, `## <version> — audio esMX` is
-# that language's pack's, and anything else at that number is the addon's, which is what keeps
-# one's notes off the other's upload.
+# new icon. A heading of `## <version> — audio` is the pack's and anything else at that
+# number is the addon's, which is what keeps one's notes off the other's upload. A language
+# pack's own heading names its release tag instead, and goes through packs.mjs changelog in
+# the upload loop below, not this function -- but its heading still has to be stepped over
+# here, since it can share a version number with the English pack.
 changelog_for() {
   node -e '
     const { readFileSync } = require("fs");
     const [path, version, target] = process.argv.slice(1);
     const text = readFileSync(path, "utf8");
     const lines = text.split("\n");
-    // "" for the addon, "audio" for the English pack, "audio esMX" for that language pack.
-    const kindOf = (l) => {
-      const m = l.match(/—\s*audio\b(?:\s+([a-z]{2}[A-Z]{2})\b)?/);
-      return m ? (m[1] ? `audio ${m[1]}` : "audio") : "";
-    };
-    const wanted = target === "zones" ? "" : target.replace("-", " ");
-    const matches = (l) => l.startsWith(`## ${version}`) && kindOf(l) === wanted;
+    // Restated from isLanguageHeading in scripts/lib/packs.mjs, because this is a node -e
+    // string and cannot import it -- keep the two in step.
+    const language = /^## \S+ — [a-z]+(?:-[a-z]+)+-[a-z]{2}[A-Z]{2}(?:\s|$)/;
+    const matches = (l) => l.startsWith(`## ${version}`) && !language.test(l) &&
+      /—\s*audio\b/.test(l) === (target === "audio");
     const start = lines.findIndex(matches);
     if (start === -1) {
       console.error(`no "## ${version}" section for ${target} in CHANGELOG.md`);
@@ -248,8 +232,12 @@ for target in "${targets[@]}"; do
     exit 1
   fi
 
-  toc="$REPO/addons/$addon/$addon.toc"
-  version="$(sed -n 's/^## Version:[[:space:]]*//p' "$toc" | head -1 | tr -d '\r')"
+  if [[ "$target" == audio ]] && ! english; then
+    version="$(pack_field version)"
+  else
+    toc="$REPO/addons/$addon/$addon.toc"
+    version="$(sed -n 's/^## Version:[[:space:]]*//p' "$toc" | head -1 | tr -d '\r')"
+  fi
   zip_path="$DIST/$zip_name-$version.zip"
 
   echo
@@ -260,7 +248,11 @@ for target in "${targets[@]}"; do
     exit 1
   fi
 
-  changelog="$(changelog_for "$version" "$target")"
+  if [[ "$target" == audio ]] && ! english; then
+    changelog="$(node "$REPO/scripts/lib/packs.mjs" changelog "$REPO/docs/zones/CHANGELOG.md" "$version" "$(pack_field release)")"
+  else
+    changelog="$(changelog_for "$version" "$target")"
+  fi
   size="$(du -h "$zip_path" | cut -f1)"
 
   echo "  file:      $zip_path ($size)"

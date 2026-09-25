@@ -6,7 +6,7 @@
         status remove clean voice voice-zones lookup export \
         pull-history pull-live history-status sounds ssh-check sync check-synced full-release \
         icon lore-import lore-import-names lore-export lore-check lore-rewrite aliases languages locale-check \
-        release release-dry release-wago release-curse
+        release release-dry release-wago release-curse release-audio release-audio-dry
 
 # The \# escapes are required: an unescaped # starts a make comment, even
 # inside a $(shell ...) call.
@@ -272,6 +272,14 @@ release-dry: ## Show what `make release` would upload to CurseForge and Wago
 release: ## Upload the built zips to CurseForge and Wago (needs both tokens)
 	@./scripts/zones/release.sh
 
+# One language's sound pack, to CurseForge (and Wago where its page has an id). English's is
+# `release` as always; LOCALE picks another language's page under publishers/zones/.
+release-audio-dry: ## Show what uploading the sound pack would send (LOCALE=xx for a language)
+	@./scripts/zones/release.sh --dry-run --lang=$(or $(LOCALE),enUS) audio
+
+release-audio: ## Upload the sound pack (LOCALE=xx for a language's)
+	@./scripts/zones/release.sh --lang=$(or $(LOCALE),enUS) audio
+
 # One store at a time, for the case a release half-landed: a zip CurseForge took and Wago
 # refused, or the other way round. Re-running `release` would upload the file twice to the
 # store that already has it, which each of them shows as a duplicate rather than ignoring.
@@ -288,13 +296,13 @@ release-curse: ## Upload the built zips to CurseForge only (needs CURSEFORGE_TOK
 # to docs/zones/CHANGELOG.md first; both uploads quote that section. The pack goes to
 # CurseForge only -- Wago answers 413 to a file this size (scripts/lib/wago.sh) -- and to
 # GitHub, which is where a Wago player gets it.
-full-release: require-droplet ## Sync, pull live takes, build and upload the sound pack
+full-release: require-droplet ## Sync, pull live takes, build and upload the sound pack (LOCALE=xx for a language's)
 	@$(MAKE) --no-print-directory -f make/zones.mk sync
-	@$(MAKE) --no-print-directory -f make/zones.mk pull-live
-	@$(MAKE) --no-print-directory -f make/zones.mk package-audio
-	@./scripts/zones/release.sh --dry-run --store=curseforge audio
-	@./scripts/audio-github-release.sh --dry-run zones-audio
+	@$(MAKE) --no-print-directory -f make/zones.mk pull-live LOCALE=$(LOCALE)
+	@$(MAKE) --no-print-directory -f make/zones.mk package-audio LOCALE=$(LOCALE)
+	@./scripts/zones/release.sh --dry-run --store=curseforge --lang=$(or $(LOCALE),enUS) audio
+	@./scripts/audio-github-release.sh --dry-run zones $(or $(LOCALE),enUS)
 	@printf 'Upload the zones pack to CurseForge and GitHub? [y/N] '; \
 	  read -r answer; [ "$$answer" = y ] || { echo aborted; exit 1; }
-	@./scripts/zones/release.sh --store=curseforge audio
-	@./scripts/audio-github-release.sh zones-audio
+	@./scripts/zones/release.sh --store=curseforge --lang=$(or $(LOCALE),enUS) audio
+	@./scripts/audio-github-release.sh zones $(or $(LOCALE),enUS)
