@@ -247,7 +247,7 @@ async function recordQueued(
 }
 
 export async function GET(request: NextRequest) {
-  const { denied } = await requireAnyRegenerate();
+  const { session, denied } = await requireAnyRegenerate();
   if (denied) return denied;
 
   // The poll is what resumes a batch after a deploy: Explorer calls this every fifteen
@@ -265,5 +265,5 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return NextResponse.json(await snapshot(rawSince));
+  return NextResponse.json(await snapshot(rawSince, { viewerId: session.user.id }));
 }

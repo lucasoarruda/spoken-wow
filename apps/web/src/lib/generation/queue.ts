@@ -22,6 +22,8 @@ import { recordActivities } from "@/lib/activity/store";
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
+import { maxActiveFrom } from "./concurrency";
+import type { QueueLine } from "./queue-line";
 import type { Provider } from "./speakers/speaker";
 
 export type JobState = "pending" | "running" | "done" | "failed" | "cancelled";
@@ -58,7 +60,27 @@ export type QueueJob = {
   createdBy: string | null;
   /** Fixed when the job was queued: the provider its estimate was shown for. */
   provider: Provider;
+  /**
+   * Whose queue the job is in: the batch's owner, copied onto the job when it was queued.
+   * Unlike `createdBy` it survives the owner's account being deleted, which keeps their
+   * remaining jobs together as one queue.
+   */
+  owner: string | null;
 };
+
+/**
+ * One owner's work for one provider.
+ *
+ * The unit the worker sizes and cools down, because it is exactly one API key: every job is
+ * spent from its owner's own key for the provider it was queued with. An owner with batches
+ * on both providers has two lanes and still one queue.
+ */
+export type Lane = { owner: string | null; provider: Provider };
+
+/** A lane as a map key. The empty string stands for jobs nobody owns any more. */
+export function laneKey(lane: Lane): string {
+  return `${lane.owner ?? ""}:${lane.provider}`;
+}
 
 export type QueueSnapshot = {
   /** Whether anything is pending or running, which is what drives the poll interval. */
@@ -80,6 +102,11 @@ export type QueueSnapshot = {
    * would put yesterday's stop reason on today's clean run.
    */
   latestBatch: { cancelled: number; stoppedBecause: string | null } | null;
+  /**
+   * Each owner's queue, in the order they drain: the first QUEUE_MAX_ACTIVE are active, the
+   * rest wait. Ranked exactly as activeLanes ranks them, so the panel says what the worker does.
+   */
+  queues: QueueLine[];
   /**
    * Jobs that reached `done` after the cursor, for the page to adopt.
    *
@@ -154,8 +181,10 @@ export async function enqueue(
 
   const { rowCount } = await db().query(
     `insert into "regeneration_job"
-       ("batchId", "source", "lang", "provider", "lineId", "file", "npcName", "preview", "characters")
-     select $1, $2, $8, $9, * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
+       ("batchId", "source", "lang", "provider", "owner", "lineId", "file", "npcName", "preview", "characters")
+     select $1, $2, $8, $9,
+            (select "createdBy" from "regeneration_batch" where "id" = $1),
+            * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
      on conflict ("source", "lang", "file") where "state" in ('pending', 'running') do nothing`,
     [
       batchId,
@@ -175,16 +204,67 @@ export async function enqueue(
 }
 
 /**
- * Take the next due job, or null.
+ * The lanes of the queues allowed to drain now: the first `max` owners, ranked by their oldest
+ * unfinished job.
+ *
+ * Derived from the rows rather than stored, so it needs no upkeep and survives a deploy or a
+ * leader handover as it stands. It is sticky by construction: while an owner has any
+ * unfinished job, their oldest one is older than anything queued after them, so a queue that
+ * started keeps its place until its older work is done. A job backing off after a 429 is still
+ * pending, so it keeps its owner's place too.
+ */
+export async function activeLanes(max: number): Promise<Lane[]> {
+  // One grouped pass over the lane index rather than a self-join on the owner: the join had
+  // to match a null owner to a null owner with `is not distinct from`, which no index serves.
+  // Each lane carries its owner's oldest job as `first`, and dense_rank over it gives both
+  // lanes of one owner the same place, so `rank <= $1` keeps the first `max` owners whole.
+  const { rows } = await db().query<Lane>(
+    `with lanes as (
+       select "owner", "provider", min(min("id")) over (partition by "owner") as first
+         from "regeneration_job"
+        where "state" in ('pending', 'running')
+        group by "owner", "provider"
+     ),
+     ranked as (
+       select "owner", "provider", first, dense_rank() over (order by first) as rank
+         from lanes
+     )
+     select "owner", "provider" from ranked
+      where rank <= $1
+      order by first, "provider"`,
+    [max],
+  );
+  return rows;
+}
+
+/**
+ * Take the next due job, or null. Within one lane when given one.
  *
  * One statement, because dequeuing and reclaiming an abandoned job are the same operation
  * seen from two sides. SKIP LOCKED is not strictly required under a single leader, but it
  * costs nothing and it is what keeps this correct during the seconds when a heartbeat has
  * stood one process down and another has not yet stood up.
  *
+ * The lane is optional so that "anything due" stays expressible; the worker always passes one.
+ *
  * A negative `leaseMs` is how the tests produce an already-expired lease.
  */
-export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<QueueJob | null> {
+export async function claimNext(
+  leaseMs: number = DEFAULT_LEASE_MS,
+  lane?: Lane,
+): Promise<QueueJob | null> {
+  // Spelled out per case rather than `"owner" is not distinct from $2`, which reads the same
+  // but cannot use regeneration_job_lane: Postgres only matches an index on `=` or `is null`,
+  // and would walk the primary key filtering every row instead.
+  let inLane = "";
+  const params: unknown[] = [leaseMs / 1000];
+  if (lane && lane.owner === null) {
+    inLane = `and "owner" is null and "provider" = $2`;
+    params.push(lane.provider);
+  } else if (lane) {
+    inLane = `and "owner" = $2 and "provider" = $3`;
+    params.push(lane.owner, lane.provider);
+  }
   const { rows } = await db().query<QueueJob>(
     `update "regeneration_job" as j set
         "state"      = 'running',
@@ -193,17 +273,18 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
         "startedAt"  = coalesce(j."startedAt", now())
       where j."id" = (
         select "id" from "regeneration_job"
-         where ("state" = 'pending' and "notBefore" <= now())
-            or ("state" = 'running' and "leaseUntil" < now())
+         where (("state" = 'pending' and "notBefore" <= now())
+            or ("state" = 'running' and "leaseUntil" < now()))
+           ${inLane}
          order by "id"
          for update skip locked
          limit 1
       )
       returning j."id"::text, j."batchId", j."source", j."lang", j."lineId", j."file", j."npcName",
-                j."preview", j."characters", j."attempts", j."provider",
+                j."preview", j."characters", j."attempts", j."provider", j."owner",
                 (select b."createdBy" from "regeneration_batch" b where b."id" = j."batchId")
                   as "createdBy"`,
-    [leaseMs / 1000],
+    params,
   );
   return rows[0] ?? null;
 }
@@ -334,6 +415,7 @@ type JobAggregateRow = {
   unpriced: string;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
+  queues: { owner: string | null; name: string; pending: number; running: number; rank: number }[];
   finished: { id: string; source: Source; lang: Lang; lineId: string; file: string; version: number }[];
   cursor: string | null;
 };
@@ -369,7 +451,12 @@ export async function dismissThrough(jobId: string, userId: string | null): Prom
   );
 }
 
-export async function snapshot(since: string | null): Promise<QueueSnapshot> {
+export async function snapshot(
+  since: string | null,
+  options: { viewerId?: string | null; maxActive?: number } = {},
+): Promise<QueueSnapshot> {
+  const maxActive = options.maxActive ?? maxActiveFrom(process.env.QUEUE_MAX_ACTIVE);
+  const viewerId = options.viewerId ?? null;
   // Live work first, then whatever finished recently: the two halves of what the panel is
   // for. Never just the age, for the reason WINDOW records.
   //
@@ -418,12 +505,27 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
        terminal as (
          select max("id")::text as max from "regeneration_job"
           where "state" in ('done', 'failed') and "id" > (select through from dismissal)
+       ),
+       queue_owners as (
+         select "owner", min("id") as first,
+                count(*) filter (where "state" = 'pending')::int as pending,
+                count(*) filter (where "state" = 'running')::int as running
+           from "regeneration_job"
+          where "state" in ('pending', 'running')
+          group by "owner"
+       ),
+       ranked_queues as (
+         select q."owner", coalesce(u."name", 'Deleted account') as name, q.pending, q.running,
+                (row_number() over (order by q.first) - 1)::int as rank
+           from queue_owners q
+           left join "user" u on u."id" = q."owner"
        )
        select
          jc.*,
          coalesce((select json_agg(r) from running_jobs r), '[]') as running,
          coalesce((select json_agg(f) from recent_failures f), '[]') as failures,
          coalesce((select json_agg(p) from finished_page p), '[]') as finished,
+         coalesce((select json_agg(r order by r.rank) from ranked_queues r), '[]') as queues,
          (select max from terminal) as cursor
        from job_counts jc`,
       [since],
@@ -459,6 +561,15 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
           stoppedBecause: latest.rows[0].stoppedBecause,
         }
       : null,
+    queues: row.queues.map((queue) => ({
+      owner: queue.owner,
+      name: queue.name,
+      pending: queue.pending,
+      running: queue.running,
+      status: queue.rank < maxActive ? "active" : "waiting",
+      ahead: queue.rank < maxActive ? 0 : queue.rank,
+      mine: viewerId !== null && queue.owner === viewerId,
+    })),
     finished,
     // Normally the high-water mark of *all* terminal jobs, not just the page returned, so a
     // cursor never sticks behind a job that failed rather than finished. But a full page

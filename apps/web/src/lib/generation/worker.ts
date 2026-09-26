@@ -2,8 +2,8 @@
  * The drain loop.
  *
  * What Explorer.runBatch used to be, moved to the server and no longer sequential: while
- * this process leads, it keeps up to the plan's budget of regenerations in flight, claiming
- * another whenever one settles.
+ * this process leads, it keeps each owner's lanes at their own key's budget, at most
+ * QUEUE_MAX_ACTIVE owners at a time, claiming another job whenever one settles.
  *
  * The single call that costs money is injectable for the reason tts.ts injects fetch: no
  * test may need an ElevenLabs account, and none may ever spend credits. Everything else here
@@ -12,8 +12,19 @@
 import { readApiKey } from "@/lib/api-key";
 import { POOL_MAX } from "@/lib/db";
 
-import { budgetFor, afterRateLimit, clampToPool } from "./concurrency";
-import { batchStopped, cancelPending, claimNext, failJob, finishJob, retryJob, type QueueJob } from "./queue";
+import { afterRateLimit, budgetFor, clampToPool, maxActiveFrom, pickLane } from "./concurrency";
+import {
+  activeLanes,
+  batchStopped,
+  cancelPending,
+  claimNext,
+  failJob,
+  finishJob,
+  laneKey,
+  retryJob,
+  type Lane,
+  type QueueJob,
+} from "./queue";
 import { regenerateLine, type RegenerateResult } from "./regenerate";
 import { regenerateBookLine } from "@/lib/books/regenerate";
 import { regenerateZoneLine } from "@/lib/zones/regenerate";
@@ -21,7 +32,7 @@ import { generationStatus } from "./status";
 import type { Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
 import { fishConcurrency, getWallet } from "@/lib/voices/fish";
-import { defaultElevenLabs, readGenerationSettings, type Preference } from "./preference";
+import { readGenerationSettings, type Preference } from "./preference";
 import { speakerFrom } from "./speakers/for";
 import type { Provider, Speaker } from "./speakers/speaker";
 import { PROVIDER_NAME } from "./providers";
@@ -53,10 +64,8 @@ export function backoffFor(attempts: number, random: () => number = Math.random)
  * must not be able to raise this past the number of connections available to spend it, which
  * is a deadlock rather than a slow batch.
  *
- * The key says whose plan. Every job is generated with its own owner's credentials now, so
- * there is no one account to ask about - the caller passes the last one it claimed for. With
- * none, budgetFor's floor of one applies, which is the right answer before the first claim:
- * one job is enough to learn who is next.
+ * The key says whose plan. Every job is generated with its own owner's credentials, so the
+ * worker asks this once per lane - one owner, one provider, one key - and caches the answer.
  */
 export async function currentBudget(
   apiKey: string | null,
@@ -65,8 +74,8 @@ export async function currentBudget(
 ): Promise<number> {
   if (provider === "fish" && apiKey) return clampToPool(await fishBudget(apiKey), POOL_MAX);
   const status = await generationStatus(apiKey ? { apiKey } : {});
-  // The model of whoever's job was claimed last: the flash and turbo families have their own
-  // concurrency, and the model is the collaborator's choice now, not the site's.
+  // The model the lane's owner has chosen for this provider, as it stands now: the flash and
+  // turbo families have their own concurrency, and the model is the owner's choice, not the site's.
   const plan = budgetFor(status.subscription?.tier ?? null, modelId);
   return clampToPool(plan, POOL_MAX);
 }
@@ -90,6 +99,27 @@ async function fishBudget(apiKey: string): Promise<number> {
   fishBudgets.set(apiKey, { at: Date.now(), value });
   return value;
 }
+
+/** How long a lane's width is trusted before its owner's plan is read again. */
+const LANE_WIDTH_TTL_MS = 60_000;
+
+/**
+ * What the worker keeps about one lane.
+ *
+ * Its own in-flight count, width and cool-down, because a lane is one API key: one owner's
+ * 429 is about their plan, and halving everyone else for it was the old single-queue bug.
+ */
+type LaneState = {
+  running: number;
+  rateLimitedAt: number | null;
+  /**
+   * The lane's width and when it was read. `known` is the settled number once there is one,
+   * which is what lets a stale width keep being served while its refresh is in flight.
+   */
+  width: { at: number; value: Promise<number>; known: number | null } | null;
+  /** Whether a refresh of a stale width is in flight, so a burst of pumps starts only one. */
+  refreshing: boolean;
+};
 
 /**
  * How one job is generated.
@@ -120,6 +150,8 @@ export type WorkerOptions = {
   leaseMs?: number;
   /** How long to wait before looking again when the queue was empty. */
   idleMs?: number;
+  /** How many owners' queues drain at once. Defaults to QUEUE_MAX_ACTIVE, else three. */
+  maxActive?: number;
 };
 
 export type Worker = {
@@ -146,29 +178,86 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
   const preferenceFor = options.preferenceFor ?? readGenerationSettings;
   const backoff = options.backoffMs ?? backoffFor;
   const idleMs = options.idleMs ?? 2_000;
+  const maxActive = options.maxActive ?? maxActiveFrom(process.env.QUEUE_MAX_ACTIVE);
+  /** The whole worker's ceiling, whatever the lanes' keys would allow: see clampToPool. */
+  const cap = clampToPool(Number.MAX_SAFE_INTEGER, POOL_MAX);
 
   const running = new Set<Promise<void>>();
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
   let pumping = false;
-  /** When a 429 was last seen, which halves the budget for the cool-down. */
-  let rateLimitedAt: number | null = null;
-  /**
-   * The key, provider and model the last claimed job was generated with, for sizing the next
-   * pump.
-   *
-   * The budget belongs to a plan, and which plan depends on whose key. Reading it per pump
-   * from the job most recently claimed is close enough: a queue holding two people's batches
-   * is rare, and the cost of guessing the wrong one is a batch that runs at the other's
-   * width for a tick.
-   */
-  let last: { key: string | null; provider: Provider; model: string } = {
-    key: null,
-    provider: "elevenlabs",
-    model: defaultElevenLabs().modelId,
-  };
 
-  async function run(job: QueueJob): Promise<void> {
+  const lanes = new Map<string, LaneState>();
+
+  function stateOf(key: string): LaneState {
+    let state = lanes.get(key);
+    if (!state) {
+      state = { running: 0, rateLimitedAt: null, width: null, refreshing: false };
+      lanes.set(key, state);
+    }
+    return state;
+  }
+
+  /**
+   * Forget lanes with nothing in flight that are no longer active, so the map does not grow
+   * with every owner who ever queued anything. A lane with jobs in flight is kept: those jobs
+   * hold its state and will decrement it when they settle.
+   */
+  function forgetIdle(active: ReadonlySet<string>): void {
+    for (const [key, state] of lanes) {
+      if (state.running === 0 && !active.has(key)) lanes.delete(key);
+    }
+  }
+
+  /**
+   * What the lane's owner's plan allows, read at most once a minute.
+   *
+   * A key or settings that cannot be read is a width of one rather than an error: the one job
+   * that is then claimed fails as `auth` in run() and cancels its batch, which is the answer
+   * the owner needs to see.
+   *
+   * STALE WHILE REVALIDATE. pump() waits for every active lane's width before claiming
+   * anything, and reading a plan is a network call with no timeout of its own. Awaited on
+   * every expiry, one owner's slow plan read would stall every lane, everyone's queue waiting
+   * on someone else's provider. So only a lane's very first read is awaited; after that an
+   * expired width is refreshed in the background and the last one served meanwhile. A refresh
+   * that fails keeps the width the lane already had - a blip is no reason to drop a working
+   * lane to one - and is tried again a minute later rather than on every pump.
+   */
+  function widthOf(lane: Lane, state: LaneState): Promise<number> {
+    const cached = state.width;
+    if (cached && Date.now() - cached.at < LANE_WIDTH_TTL_MS) return cached.value;
+
+    const owner = lane.owner ?? "";
+    const read = async () => {
+      const apiKey = await apiKeyFor(owner, lane.provider);
+      if (!apiKey) return 1;
+      const speaker = speakerFrom(lane.provider, apiKey, await preferenceFor(owner));
+      return budget(apiKey, lane.provider, speaker.modelId);
+    };
+
+    if (cached && cached.known !== null) {
+      if (!state.refreshing) {
+        state.refreshing = true;
+        const previous = cached.known;
+        read()
+          .then(
+            (value) => (state.width = { at: Date.now(), value: Promise.resolve(value), known: value }),
+            () => (state.width = { at: Date.now(), value: Promise.resolve(previous), known: previous }),
+          )
+          .finally(() => (state.refreshing = false));
+      }
+      return cached.value;
+    }
+
+    const value = read().catch(() => 1);
+    const entry: NonNullable<LaneState["width"]> = { at: Date.now(), value, known: null };
+    state.width = entry;
+    void value.then((width) => (entry.known = width));
+    return value;
+  }
+
+  async function run(job: QueueJob, lane: LaneState): Promise<void> {
     // Whose credits this line is spent from. A batch is enqueued by someone who had a key at
     // the time, so reaching here without one means it was cleared or the master key changed
     // underneath it - and every remaining job in the batch would fail identically.
@@ -208,8 +297,6 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       );
       return;
     }
-    last = { key: apiKey, provider: job.provider, model: speaker.modelId };
-
     const generate = generators[job.source];
     if (!generate) {
       const message = `no generator for ${job.source} jobs in this build`;
@@ -258,7 +345,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
       const { kind, message, fatal } = result.failure;
 
       if (kind === "rate-limit") {
-        rateLimitedAt = Date.now();
+        lane.rateLimitedAt = Date.now();
         // A retry puts the row back to `pending`, where it would be claimed and paid for
         // after an admin pressed Stop - and where it would flip the queue back to active, so
         // the panel returns to "Regenerating" having just said "Stopped". Stop means stop.
@@ -286,7 +373,10 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
   }
 
   /**
-   * Fill the free slots, then arrange to be called again.
+   * Fill the free slots lane by lane, then arrange to be called again.
+   *
+   * Which lanes may run is the queue's answer (activeLanes); how many each gets is its own
+   * key's width, less while it is cooling down, shared under the pool cap by pickLane.
    *
    * Guarded by `pumping` because a job settling calls this at the same time as the idle
    * timer, and two pumps interleaving would claim past the budget.
@@ -297,15 +387,33 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     try {
       if (!isLeader()) return;
 
-      const allowed = afterRateLimit(
-        await budget(last.key, last.provider, last.model),
-        rateLimitedAt,
-        Date.now(),
+      const now = Date.now();
+      const open = await Promise.all(
+        (await activeLanes(maxActive)).map(async (lane) => {
+          const key = laneKey(lane);
+          const state = stateOf(key);
+          const width = afterRateLimit(await widthOf(lane, state), state.rateLimitedAt, now);
+          return { lane, key, state, width };
+        }),
       );
+      forgetIdle(new Set(open.map((entry) => entry.key)));
 
-      while (!stopped && isLeader() && running.size < allowed) {
-        const job = await claimNext(options.leaseMs);
-        if (!job) return;
+      while (!stopped && isLeader()) {
+        const key = pickLane(
+          open.map((entry) => ({ key: entry.key, running: entry.state.running, width: entry.width })),
+          running.size,
+          cap,
+        );
+        if (!key) return;
+        const chosen = open.find((entry) => entry.key === key)!;
+
+        const job = await claimNext(options.leaseMs, chosen.lane);
+        if (!job) {
+          // Everything left in this lane is backing off. Dropped for this pump only; the idle
+          // tick asks again, and the other lanes keep their slots meanwhile.
+          open.splice(open.indexOf(chosen), 1);
+          continue;
+        }
 
         if (stopped) {
           // A stop landed while this claim's round trip was in flight. claimNext already
@@ -317,8 +425,11 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
           return;
         }
 
-        const work = run(job).finally(() => {
+        const state = chosen.state;
+        state.running += 1;
+        const work = run(job, state).finally(() => {
           running.delete(work);
+          state.running -= 1;
           // Settling frees a slot, so look for the next job immediately rather than waiting
           // out an idle tick - that wait is what would make this only nominally parallel.
           if (!stopped) void pump();

@@ -10,9 +10,10 @@
  */
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { closeDb, db } from "@/lib/db";
+import { closeDb, db, POOL_MAX } from "@/lib/db";
 import * as queue from "./queue";
 import { createBatch, enqueue, type QueueEntry } from "./queue";
+import { clampToPool } from "./concurrency";
 import type { RegenerateResult } from "./regenerate";
 import { backoffFor, startWorker } from "./worker";
 import type { Source } from "@/lib/sections";
@@ -58,6 +59,36 @@ async function seed(
   return id;
 }
 
+const users: string[] = [];
+
+/** A real user row, because regeneration_batch."createdBy" references one. */
+async function newUser(): Promise<string> {
+  const id = `test-owner-${Math.random().toString(36).slice(2, 10)}`;
+  await db().query(
+    `insert into "user" ("id", "name", "email", "emailVerified") values ($1, $2, $3, false)`,
+    [id, `Owner ${id}`, `${id}@example.invalid`],
+  );
+  users.push(id);
+  return id;
+}
+
+/** Numbers files from 1000 up, so several owners' batches in one test never share a file. */
+let nextLine = 1000;
+
+async function seedFor(
+  owner: string | null,
+  count: number,
+  provider: "elevenlabs" | "fish" = "elevenlabs",
+): Promise<string> {
+  const id = await createBatch("test", owner, "quests");
+  batches.push(id);
+  const lines = Array.from({ length: count }, () => line(nextLine++));
+  await enqueue(id, lines, "quests", "enUS", provider);
+  return id;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function statesOf(batchId: string): Promise<Record<string, number>> {
   const { rows } = await db().query<{ state: string; n: string }>(
     `select "state", count(*)::text as n from "regeneration_job"
@@ -86,6 +117,10 @@ afterEach(async () => {
   if (batches.length) {
     await db().query(`delete from "regeneration_batch" where "id" = any($1::uuid[])`, [batches]);
     batches.length = 0;
+  }
+  if (users.length) {
+    await db().query(`delete from "user" where "id" = any($1::text[])`, [users]);
+    users.length = 0;
   }
 });
 
@@ -372,6 +407,215 @@ describe("startWorker", () => {
   });
 });
 
+describe("per-owner queues", () => {
+  /** Counts what each owner has in flight, and the most they ever had, from inside a generator. */
+  function tracker() {
+    const live = new Map<string, number>();
+    const peak = new Map<string, number>();
+    return {
+      live,
+      peak,
+      enter(user: string) {
+        live.set(user, (live.get(user) ?? 0) + 1);
+        peak.set(user, Math.max(peak.get(user) ?? 0, live.get(user)!));
+      },
+      leave(user: string) {
+        live.set(user, live.get(user)! - 1);
+      },
+    };
+  }
+
+  it("runs each owner's lane at the width of that owner's own key", async () => {
+    const [small, large] = [await newUser(), await newUser()];
+    const a = await seedFor(small, 6);
+    const b = await seedFor(large, 6);
+    const track = tracker();
+
+    const worker = startWorker(() => true, {
+      apiKeyFor: async (user) => `key-${user}`,
+      budget: async (key) => (key === `key-${small}` ? 1 : 3),
+      regenerate: {
+        quests: async (_line, user) => {
+          track.enter(user);
+          await sleep(30);
+          track.leave(user);
+          return OK;
+        },
+      },
+    });
+    await until(async () => (await statesOf(a)).done === 6 && (await statesOf(b)).done === 6);
+    await worker.stop();
+
+    expect(track.peak.get(small)).toBe(1);
+    expect(track.peak.get(large)).toBe(3);
+  });
+
+  it("keeps a fourth owner waiting until one of the first three queues drains", async () => {
+    const owners = [await newUser(), await newUser(), await newUser(), await newUser()];
+    for (const owner of owners) await seedFor(owner, 2);
+    const started: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+
+    const worker = startWorker(() => true, {
+      maxActive: 3,
+      apiKeyFor: KEYED,
+      budget: async () => 1,
+      regenerate: {
+        quests: async (_line, user) => {
+          started.push(user);
+          await gate;
+          return OK;
+        },
+      },
+    });
+    await until(async () => started.length === 3);
+    await sleep(200);
+    expect(started).not.toContain(owners[3]);
+
+    release();
+    await until(async () => started.filter((user) => user === owners[3]).length === 2);
+    await worker.stop();
+
+    // The fourth owner started only after some other owner had started both of their jobs.
+    expect(started.indexOf(owners[3])).toBeGreaterThanOrEqual(4);
+  });
+
+  it("halves only the lane that met a rate limit", async () => {
+    const [limited, other] = [await newUser(), await newUser()];
+    const a = await seedFor(limited, 12);
+    const b = await seedFor(other, 16);
+    let limitedAt: number | null = null;
+    const track = tracker();
+
+    const worker = startWorker(() => true, {
+      apiKeyFor: KEYED,
+      budget: async () => 4,
+      backoffMs: () => 0,
+      regenerate: {
+        quests: async (_line, user) => {
+          if (user === limited && limitedAt === null) {
+            limitedAt = Date.now();
+            return {
+              ok: false,
+              failure: { kind: "rate-limit", message: "429", status: 429, fatal: false },
+            };
+          }
+          // Measured once everything started before the 429 has settled (jobs take 40 ms, and
+          // 100 leaves room for a slow claim), so the peak is what the worker chose after it,
+          // not what was already in flight.
+          const settled = limitedAt !== null && Date.now() - limitedAt > 100;
+          if (settled) track.enter(user);
+          await sleep(40);
+          if (settled) track.leave(user);
+          return OK;
+        },
+      },
+    });
+    await until(async () => (await statesOf(a)).done === 12 && (await statesOf(b)).done === 16);
+    await worker.stop();
+
+    expect(track.peak.get(limited)).toBeLessThanOrEqual(2);
+    expect(track.peak.get(other)).toBe(4);
+  });
+
+  /**
+   * A lane's width expires after a minute, and re-reading it is its owner's plan over the
+   * network. The refresh here never answers: were it awaited, the pump would wait on it and
+   * the rest of the queue would never be claimed. The clock is moved past the minute by
+   * skewing Date.now rather than waiting, so nothing here depends on timing.
+   */
+  it("keeps draining on a lane's last width while its expired width is re-read", async () => {
+    const owner = await newUser();
+    const id = await seedFor(owner, 4);
+    const realNow = Date.now.bind(Date);
+    let skew = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + skew);
+    let reads = 0;
+    const started: number[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+
+    const worker = startWorker(() => true, {
+      idleMs: 20,
+      apiKeyFor: KEYED,
+      budget: () => (++reads === 1 ? Promise.resolve(2) : new Promise<number>(() => {})),
+      regenerate: {
+        quests: async () => {
+          started.push(started.length);
+          await gate;
+          return OK;
+        },
+      },
+    });
+    // The first two hold the lane open, so its width is cached rather than forgotten.
+    await until(async () => started.length === 2);
+    skew = 61_000;
+    release();
+    await until(async () => (await statesOf(id)).done === 4);
+    await worker.stop();
+
+    // One refresh started, however many pumps found the width stale while it hung.
+    expect(reads).toBe(2);
+  });
+
+  it("never runs more than the pool can serve, however many lanes could use more", async () => {
+    const owners = [await newUser(), await newUser(), await newUser(), await newUser()];
+    const ids: string[] = [];
+    for (const owner of owners) ids.push(await seedFor(owner, 10));
+    let live = 0;
+    let peak = 0;
+
+    const worker = startWorker(() => true, {
+      maxActive: 4,
+      apiKeyFor: KEYED,
+      budget: async () => 9,
+      regenerate: {
+        quests: async () => {
+          live += 1;
+          peak = Math.max(peak, live);
+          await sleep(20);
+          live -= 1;
+          return OK;
+        },
+      },
+    });
+    await until(async () => {
+      for (const id of ids) if ((await statesOf(id)).done !== 10) return false;
+      return true;
+    });
+    await worker.stop();
+
+    expect(peak).toBeLessThanOrEqual(clampToPool(Number.MAX_SAFE_INTEGER, POOL_MAX));
+    expect(peak).toBeGreaterThan(9);
+  });
+
+  it("drains other queues while an active owner's only job is backing off", async () => {
+    const [waiting, other] = [await newUser(), await newUser()];
+    await seedFor(waiting, 1);
+    const b = await seedFor(other, 3);
+    const backedOff = await queue.claimNext(undefined, { owner: waiting, provider: "elevenlabs" });
+    await queue.retryJob(backedOff!.id, 60_000);
+    const seen: string[] = [];
+
+    const worker = startWorker(() => true, {
+      maxActive: 2,
+      apiKeyFor: KEYED,
+      budget: async () => 2,
+      regenerate: {
+        quests: async (_line, user) => {
+          seen.push(user);
+          return OK;
+        },
+      },
+    });
+    await until(async () => (await statesOf(b)).done === 3);
+    await worker.stop();
+
+    expect(seen).not.toContain(waiting);
+  });
+});
+
 describe("stop()", () => {
   it("hands a claim already in flight back to the queue rather than starting it", async () => {
     const batch = await seed(1);
@@ -494,7 +738,10 @@ describe("a fish.audio batch", () => {
     await until(async () => (await statesOf(batch)).done === 1);
     await worker.stop();
 
-    expect(asked).toEqual(["fish"]);
+    // Twice, not once: the lane's width is read once (apiKeyFor, cached 60s per lane) before
+    // the claim, and run() reads its own job's key again to generate with - two calls that
+    // happen to ask the same lane's key here because there is only one job.
+    expect(asked).toEqual(["fish", "fish"]);
     expect(seen).toEqual(["fish"]);
     const { rows } = await db().query(`select "costUsd"::float8 as usd from "regeneration_job" where "batchId" = $1`, [batch]);
     expect(rows[0].usd).toBeCloseTo(0.001);
@@ -518,7 +765,7 @@ describe("a fish.audio batch", () => {
     expect((await statesOf(batch)).cancelled).toBe(1);
   });
 
-  it("sizes itself by the provider and model of the job it last claimed", async () => {
+  it("sizes a lane by its owner's provider and model", async () => {
     const batch = await seed(2, "quests", "fish");
     const budgets: string[] = [];
     const worker = startWorker(() => true, {
@@ -535,6 +782,36 @@ describe("a fish.audio batch", () => {
 
     expect(budgets).toContain("fish:s2.1-pro-free");
   });
+
+  it("runs one owner's ElevenLabs and fish.audio lanes together, as one queue", async () => {
+    const [alice, bob] = [await newUser(), await newUser()];
+    await seedFor(alice, 2, "elevenlabs");
+    await seedFor(alice, 2, "fish");
+    await seedFor(bob, 2, "elevenlabs");
+    const started: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+
+    const worker = startWorker(() => true, {
+      maxActive: 1,
+      apiKeyFor: async (_user, provider) => `${provider}-key`,
+      preferenceFor: async () => ({ fish: SETTINGS, elevenlabs: ELEVEN }),
+      budget: async () => 1,
+      regenerate: {
+        quests: async (_line, user, options) => {
+          started.push(`${user}:${options.speaker.provider}`);
+          await gate;
+          return OK;
+        },
+      },
+    });
+    await until(async () => started.length === 2);
+    await sleep(200);
+    release();
+    await worker.stop();
+
+    expect(started.slice(0, 2).sort()).toEqual([`${alice}:elevenlabs`, `${alice}:fish`]);
+  });
 });
 
 describe("a settings read that fails", () => {
@@ -545,7 +822,9 @@ describe("a settings read that fails", () => {
       apiKeyFor: async () => "eleven-key",
       preferenceFor: async () => {
         calls += 1;
-        if (calls === 1) throw new Error("connection terminated");
+        // The first call is the lane's own width read (cached 60s), not a job's; the second
+        // is the first job's, and that is the one this test means to fail.
+        if (calls === 2) throw new Error("connection terminated");
         return {
           elevenlabs: {
             modelId: "eleven_v3",

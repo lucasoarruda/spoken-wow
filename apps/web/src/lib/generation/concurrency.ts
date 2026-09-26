@@ -104,3 +104,47 @@ export function afterRateLimit(
   if (rateLimitedAt === null || now - rateLimitedAt > COOL_DOWN_MS) return budget;
   return Math.max(1, Math.floor(budget / 2));
 }
+
+/** A lane as pickLane sees it: what it has in flight, and what its key allows. */
+export type LaneLoad = { key: string; running: number; width: number };
+
+/**
+ * Which lane gets the next free slot, or null for none.
+ *
+ * The lane least full for its own width, so lanes that could all use more share the pool cap
+ * evenly, and ties go to the lane listed first, which is the queue that has waited longest.
+ * A lane at its width gets nothing more even when the cap has room: past its width a key
+ * only earns 429s, so an empty slot is the cheaper outcome.
+ */
+export function pickLane(lanes: readonly LaneLoad[], inFlight: number, cap: number): string | null {
+  if (inFlight >= cap) return null;
+  let best: LaneLoad | null = null;
+  for (const lane of lanes) {
+    if (lane.running >= lane.width) continue;
+    if (!best || lane.running / lane.width < best.running / best.width) best = lane;
+  }
+  return best?.key ?? null;
+}
+
+/**
+ * How many owners' queues drain at once when nothing says otherwise.
+ *
+ * Three because the pool cap of twelve then leaves each of them four, which is a creator
+ * plan's whole budget; more queues than that would spread the cap too thin to keep any key
+ * busy.
+ */
+export const DEFAULT_MAX_ACTIVE = 3;
+
+/**
+ * QUEUE_MAX_ACTIVE, read strictly.
+ *
+ * Takes the raw string rather than reading the environment itself, so this module stays pure.
+ * Anything but a whole number of at least one is the default: a typo in app.env must not be
+ * the thing that stops every queue, or lets them all run at once.
+ */
+export function maxActiveFrom(raw: string | undefined): number {
+  const text = raw?.trim() ?? "";
+  if (!/^\d+$/.test(text)) return DEFAULT_MAX_ACTIVE;
+  const value = Number(text);
+  return value >= 1 ? value : DEFAULT_MAX_ACTIVE;
+}
