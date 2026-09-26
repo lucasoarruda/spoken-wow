@@ -30,8 +30,21 @@ function line(n: number): QueueEntry {
   };
 }
 
-async function newBatch(source: Source = "quests"): Promise<string> {
-  const id = await createBatch("test batch", null, source);
+const users: string[] = [];
+
+/** A real user row, because regeneration_batch."createdBy" references one. */
+async function newUser(): Promise<string> {
+  const id = `test-owner-${Math.random().toString(36).slice(2, 10)}`;
+  await db().query(
+    `insert into "user" ("id", "name", "email", "emailVerified") values ($1, $2, $3, false)`,
+    [id, `Owner ${id}`, `${id}@example.invalid`],
+  );
+  users.push(id);
+  return id;
+}
+
+async function newBatch(source: Source = "quests", createdBy: string | null = null): Promise<string> {
+  const id = await createBatch("test batch", createdBy, source);
   batches.push(id);
   return id;
 }
@@ -45,6 +58,10 @@ afterEach(async () => {
   if (batches.length) {
     await db().query(`delete from "regeneration_batch" where "id" = any($1::uuid[])`, [batches]);
     batches.length = 0;
+  }
+  if (users.length) {
+    await db().query(`delete from "user" where "id" = any($1::text[])`, [users]);
+    users.length = 0;
   }
 });
 
@@ -121,6 +138,28 @@ describe("the language a job is in", () => {
     batches.push(id);
     await enqueue(id, [line(1)], "quests", "ptBR");
     expect((await claimJobOfThisRun())?.lang).toBe("ptBR");
+  });
+});
+
+describe("the owner of a job", () => {
+  it("is copied from the batch onto every job, and rides to the claim", async () => {
+    const alice = await newUser();
+    const batch = await newBatch("quests", alice);
+    await enqueue(batch, [line(1), line(2)], "quests");
+
+    const { rows } = await db().query<{ owner: string | null }>(
+      `select "owner" from "regeneration_job" where "batchId" = $1`,
+      [batch],
+    );
+    expect(rows).toEqual([{ owner: alice }, { owner: alice }]);
+    expect((await claimNext())!.owner).toBe(alice);
+  });
+
+  it("is null for a batch nobody owns", async () => {
+    const batch = await newBatch("quests", null);
+    await enqueue(batch, [line(1)], "quests");
+
+    expect((await claimNext())!.owner).toBeNull();
   });
 });
 

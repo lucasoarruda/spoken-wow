@@ -57,6 +57,12 @@ export type QueueJob = {
   createdBy: string | null;
   /** Fixed when the job was queued: the provider its estimate was shown for. */
   provider: Provider;
+  /**
+   * Whose queue the job is in: the batch's owner, copied onto the job when it was queued.
+   * Unlike `createdBy` it survives the owner's account being deleted, which keeps their
+   * remaining jobs together as one queue.
+   */
+  owner: string | null;
 };
 
 export type QueueSnapshot = {
@@ -153,8 +159,10 @@ export async function enqueue(
 
   const { rowCount } = await db().query(
     `insert into "regeneration_job"
-       ("batchId", "source", "lang", "provider", "lineId", "file", "npcName", "preview", "characters")
-     select $1, $2, $8, $9, * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
+       ("batchId", "source", "lang", "provider", "owner", "lineId", "file", "npcName", "preview", "characters")
+     select $1, $2, $8, $9,
+            (select "createdBy" from "regeneration_batch" where "id" = $1),
+            * from unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::int[])
      on conflict ("source", "lang", "file") where "state" in ('pending', 'running') do nothing`,
     [
       batchId,
@@ -199,7 +207,7 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
          limit 1
       )
       returning j."id"::text, j."batchId", j."source", j."lang", j."lineId", j."file", j."npcName",
-                j."preview", j."characters", j."attempts", j."provider",
+                j."preview", j."characters", j."attempts", j."provider", j."owner",
                 (select b."createdBy" from "regeneration_batch" b where b."id" = j."batchId")
                   as "createdBy"`,
     [leaseMs / 1000],
