@@ -70,5 +70,18 @@ local envelope = Z:CaptureContribution(1537, nil)
 Expect("D. the locale is the client's", envelope:match("\nlocale=enUS\n") ~= nil, true)
 Expect("D. ...and the language narration plays in goes beside it", envelope:match("\npack=deDE\n") ~= nil, true)
 
+---------------------------------------------------------------- E. pack labels
+-- One pack per language now, so a pack is named by the language it narrates, the one
+-- being read included; bitrate only tells apart two packs in the same language.
+Z = Install({ ENGLISH, GERMAN })
+Expect("E. the pack in the language being read is named too", Z:GetAudioPackLabel(ENGLISH), "English")
+Expect("E. another language by its own name", Z:GetAudioPackLabel(GERMAN), "Deutsch")
+local RETIRED = Pack("ZoneLoreAudio64", "enUS", {})
+RETIRED.bitrate = 64
+Z = Install({ ENGLISH, RETIRED, GERMAN })
+Expect("E. two packs in one language are told apart by bitrate", Z:GetAudioPackLabel(ENGLISH), "English (128 kbps)")
+Expect("E. ...both of them", Z:GetAudioPackLabel(RETIRED), "English (64 kbps)")
+Expect("E. a language with one pack still needs no bitrate", Z:GetAudioPackLabel(GERMAN), "Deutsch")
+
 if Failures() > 0 then print(string.format("\n%d failure(s)", Failures())); os.exit(1) end
 print("\nAll zones language tests passed")

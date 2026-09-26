@@ -145,7 +145,7 @@ function SpokenZones:SetupOptions()
 		elseif #packs > 1 then
 			packNote:SetText(string.format(L.OPT_PACK_MULTI_FMT, active.addon, #packs))
 		else
-			packNote:SetText(string.format(L.OPT_PACK_SINGLE_FMT, active.addon))
+			packNote:SetText(active.addon)
 		end
 	end
 	layout:Dropdown(L.OPT_SOUND_PACK, L.OPT_SOUND_PACK_TIP,

@@ -113,8 +113,7 @@ L.OPT_AUTOPLAY_SUB_TIP = "Most discoveries are subzones -- a walk across Elwynn 
 L.OPT_AUTOPLAY_EXPLORED = "Also narrate areas you explored before installing"
 L.OPT_AUTOPLAY_EXPLORED_TIP = "The game announces a discovery once per character, ever -- so a character who already explored Azeroth is never narrated anything. Tick this and Spoken Zones keeps its own record instead, still one clip per area per character. /spz forget clears it."
 L.OPT_PACK_NONE = "Nothing is narrated. Install Spoken Zones Audio to hear the lore read aloud."
-L.OPT_PACK_MULTI_FMT = "%1$s. %2$d installed; the higher quality one is used unless you choose otherwise."
-L.OPT_PACK_SINGLE_FMT = "%1$s. Install another pack to switch quality."
+L.OPT_PACK_MULTI_FMT = "%1$s. %2$d installed; the one in the language you are reading plays unless you choose another."
 L.OPT_SOUND_PACK = "Sound pack"
 L.OPT_SOUND_PACK_TIP = "Which installed pack narrates the lore."
 L.OPT_SECTION_LANGUAGE = "Language"
@@ -166,8 +165,6 @@ L.MAP_SUBZONE_MORE = "click a subzone on the map for more"
 -- the interface language rather than each language's own endonym.
 --------------------------------------------------------------------------------
 
-L.PACK_QUALITY_HIGH = "High"
-L.PACK_QUALITY_STANDARD = "Standard"
 L.OPT_PACK_NONE_INSTALLED = "none installed"
 
 SpokenZones:RegisterStrings("enUS", L)

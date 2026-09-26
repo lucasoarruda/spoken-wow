@@ -10,10 +10,11 @@
 -- there is nothing to play, so the Play button does not appear and autoplay stays
 -- quiet.
 --
--- More than one pack can be installed at a time -- they differ in bitrate, and
--- now in language. Each registers itself into SpokenZonesAudioPacks (and, while packs
--- built for the old name are still in circulation, ZoneLoreAudioPacks) under its own
--- folder name; this file picks which one to play from.
+-- More than one pack can be installed at a time -- one per language, plus the
+-- retired 64 kbps English pack for anyone who kept it. Each registers itself into
+-- SpokenZonesAudioPacks (and, while packs built for the old name are still in
+-- circulation, ZoneLoreAudioPacks) under its own folder name; this file picks which
+-- one to play from.
 --
 -- Every pack has the same structure and the same keys, so any installed pack is
 -- playable regardless of the language being read: a player reading German with
@@ -390,29 +391,28 @@ function SpokenZones:SetActiveAudioPack(name)
 	return false
 end
 
--- "high (128 kbps)" -- for the options dropdown and /spz audio. Quality words come
--- from the packs, so only the known ones translate; anything else keeps its own
--- word rather than a wrong one. The language is named only when it is not the one
--- being read, which is the case worth pointing at: a pack that is installed but
--- will never play. A pack in a language this client cannot draw keeps its ASCII
--- code, which every client can draw, instead of boxes.
+-- "Deutsch" -- for the options dropdown and /spz audio. A pack is named by the
+-- language it narrates, the one being read included: there is one pack per language,
+-- so that is what tells them apart. Bitrate is added only when two installed packs
+-- share a language, which now means someone kept the retired 64 kbps pack beside the
+-- current one. A pack in a language this client cannot draw keeps its ASCII code,
+-- which every client can draw, instead of boxes.
 function SpokenZones:GetAudioPackLabel(pack)
 	if not pack then
 		return "none"
 	end
-	local qualityLabels = { high = L.PACK_QUALITY_HIGH, standard = L.PACK_QUALITY_STANDARD }
-	local quality = pack.quality or "standard"
-	local label = qualityLabels[quality] or quality
-	if pack.bitrate and pack.bitrate > 0 then
-		label = ("%s (%d kbps)"):format(label, pack.bitrate)
-	end
 	local language = pack.language
-	if language ~= self:GetLanguage() then
-		if self:CanRenderLanguage(language) then
-			local info = self:GetLocaleInfo(language)
-			language = (info and info.native) or language
+	local label = language
+	if self:CanRenderLanguage(language) then
+		local info = self:GetLocaleInfo(language)
+		label = (info and info.native) or language
+	end
+	if pack.bitrate and pack.bitrate > 0 then
+		for _, other in ipairs(self:GetAudioPacks(language)) do
+			if other ~= pack and other.language == language then
+				return ("%s (%d kbps)"):format(label, pack.bitrate)
+			end
 		end
-		label = ("%s, %s"):format(label, language)
 	end
 	return label
 end
