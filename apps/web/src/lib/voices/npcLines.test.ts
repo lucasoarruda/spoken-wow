@@ -48,9 +48,19 @@ describe("npcLineClips", () => {
   });
 
   // narrator-male is a pseudo-race for gameobjects; the game has no voice sets for it.
-  it("is empty for a slot with no flavor", async () => {
+  it("is empty for a slot with no flavor and nothing on disk", async () => {
     const { npcLineClips } = await import("./npcLines");
     expect(await npcLineClips("narrator-male")).toEqual([]);
+  });
+
+  it("reads a slot with no flavor from the files in its race-gender directory", async () => {
+    const target = path.join(dir, "bloodelf-female");
+    await fs.mkdir(path.join(target, "stray-flavor"), { recursive: true });
+    await fs.writeFile(path.join(target, "greeting-556851.ogg"), "audio");
+    await fs.writeFile(path.join(target, "stray-flavor", "greeting-1.ogg"), "audio");
+    const { npcLineClips } = await import("./npcLines");
+
+    expect(await npcLineClips("bloodelf-female")).toEqual([path.join(target, "greeting-556851.ogg")]);
   });
 
   it("skips dotfiles, so a partial write is never cloned", async () => {

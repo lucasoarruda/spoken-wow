@@ -21,7 +21,8 @@ export type Gender = "male" | "female";
 export type Voice = { race: string; gender: Gender; flavor: string | null };
 
 const ROSTER: Record<`${string}-${Gender}`, readonly (string | null)[]> = {
-  // One line, spoken by a model from a later expansion; no NPC voice sets.
+  // Sylvanas and Hanaa Nightwind, on a blood elf model. The game has military, noble and
+  // standard sets; one voice is enough, seeded from the noble set.
   "bloodelf-female": [null],
   // A client-guessed NPC, Elatrell Featherlight. The game has military, noble and standard
   // sets for it; none are extracted yet.

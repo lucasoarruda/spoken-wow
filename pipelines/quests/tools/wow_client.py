@@ -13,6 +13,9 @@ Usage:
     client = Client("wow_classic_beta")            # a Product from .build.info
     rows = client.table("CreatureDisplayInfo")      # {id: {column: value}}
     data = client.read(7744795)                     # a file's bytes
+
+    cdn = CDNClient("wow_classic_beta")             # the same, every language, from the CDN
+    by_locale = cdn.localized({7744795})            # {fdid: {locale flags: content key}}
 """
 
 from __future__ import annotations
@@ -130,33 +133,10 @@ class Client:
         return out
 
     def _parse_root(self, raw: bytes) -> dict[int, bytes]:
-        assert raw[:4] == b"TSFM", "not a WoW root file"
-        header_size, version = struct.unpack_from("<II", raw, 4)
-        if header_size in (0x18,) or version in (1, 2):
-            pos = header_size
-        else:
-            version, pos = 1, 12
         out: dict[int, bytes] = {}
-        while pos < len(raw):
-            if version == 2:
-                count, locale, flags1, flags2 = struct.unpack_from("<IIII", raw, pos)
-                content = flags1 | flags2 | (raw[pos + 16] << 17)
-                pos += 17
-            else:
-                count, content, locale = struct.unpack_from("<III", raw, pos)
-                pos += 12
-            deltas = struct.unpack_from(f"<{count}i", raw, pos)
-            pos += 4 * count
-            ckeys = [raw[pos + 16 * i : pos + 16 * i + 16] for i in range(count)]
-            pos += 16 * count
-            if not content & 0x10000000:  # name hashes follow unless the block has none
-                pos += 8 * count
-            english = locale & 0x2 or locale == 0xFFFFFFFF
-            fid = -1
-            for delta, ckey in zip(deltas, ckeys):
-                fid += delta + 1
-                if english or fid not in out:
-                    out[fid] = ckey
+        for locale, fid, ckey in root_entries(raw):
+            if locale & LOCALES["enUS"] or fid not in out:
+                out[fid] = ckey
         return out
 
     def read(self, fdid: int) -> bytes:
@@ -206,6 +186,171 @@ class Client:
         build = ".".join(self.version.split(".")[:4])
         definition = cached(DBD_URL.format(name), f"dbd/{name}.dbd").read_text()
         return read_wdc(self.read(TABLES[name]), dbd_columns(definition, build))
+
+
+class CDNClient(Client):
+    """The same product read from Blizzard's CDN instead of the install, in every language.
+
+    An install carries only the languages it was set to, but the root it is built from lists
+    every client's copy of a file: a line recorded in French has its own content key under
+    the French locale flag. The CDN serves all of them, so this is how another language's
+    audio is read without reinstalling the game in that language.
+
+    Only the transport differs from Client. Configs, encoding and root come from the CDN, and
+    a file body is a byte range of one of the CDN's archives, found through that archive's
+    index. Indexes are cached under CACHE/cdn, or taken from wow.export's cache when it has
+    them. The build is whatever the CDN currently serves for the product.
+    """
+
+    def __init__(self, product: str, region: str = "us"):
+        version = _cdn_version(product, region)
+        self.version = version["VersionsName"]
+        self.build = _cdn_config(version["BuildConfig"])
+        self.archives = _cdn_config(version["CDNConfig"])["archives"]
+        self.keys = _load_keys()
+        self.located: dict[bytes, tuple[str, int, int]] = {}
+        self.encoding = self._parse_encoding(self._blte(_cdn_get(_cdn_path(self.build["encoding"][1], "data"))))
+        root_ekey = self.encoding[bytes.fromhex(self.build["root"][0])]
+        self.root_raw = self._blte(_cdn_get(_cdn_path(root_ekey, "data")))
+        self.root = self._parse_root(self.root_raw)
+
+    def localized(self, fdids: set[int]) -> dict[int, dict[int, bytes]]:
+        """Each file's content key by locale flags, for the files asked for."""
+        out: dict[int, dict[int, bytes]] = {}
+        for locale, fid, ckey in root_entries(self.root_raw):
+            if fid in fdids:
+                out.setdefault(fid, {})[locale] = ckey
+        return out
+
+    def locate(self, ckeys: set[bytes]) -> None:
+        """Find which archive holds each file, before reading them. One pass over the indexes."""
+        wanted = {bytes.fromhex(self.encoding[c]) for c in ckeys if c in self.encoding} - set(self.located)
+        for archive in self.archives:
+            if not wanted:
+                break
+            found = _scan_index(_cdn_index(archive), wanted)
+            for ekey, (offset, size) in found.items():
+                self.located[ekey] = (archive, offset, size)
+            wanted -= set(found)
+
+    def read_ckey(self, ckey: bytes) -> bytes:
+        ekey = self.encoding[ckey]
+        where = self.located.get(bytes.fromhex(ekey))
+        if where is None:  # a loose file, stored outside the archives
+            return self._blte(_cdn_get(_cdn_path(ekey, "data")))
+        archive, offset, size = where
+        return self._blte(_cdn_get(_cdn_path(archive, "data"), (offset, size)))
+
+    def read(self, fdid: int) -> bytes:
+        self.locate({self.root[fdid]})
+        return self.read_ckey(self.root[fdid])
+
+
+# The root's locale flags, by client language.
+LOCALES = {
+    "enUS": 0x2, "koKR": 0x4, "frFR": 0x10, "deDE": 0x20, "zhCN": 0x40, "esES": 0x80,
+    "zhTW": 0x100, "enGB": 0x200, "esMX": 0x1000, "ruRU": 0x2000, "ptBR": 0x4000, "itIT": 0x8000,
+}
+ALL_LOCALES = 0xFFFFFFFF
+
+
+def root_entries(raw: bytes):
+    """Every (locale flags, FileDataID, content key) in a root file, in file order."""
+    assert raw[:4] == b"TSFM", "not a WoW root file"
+    header_size, version = struct.unpack_from("<II", raw, 4)
+    if header_size in (0x18,) or version in (1, 2):
+        pos = header_size
+    else:
+        version, pos = 1, 12
+    while pos < len(raw):
+        if version == 2:
+            count, locale, flags1, flags2 = struct.unpack_from("<IIII", raw, pos)
+            content = flags1 | flags2 | (raw[pos + 16] << 17)
+            pos += 17
+        else:
+            count, content, locale = struct.unpack_from("<III", raw, pos)
+            pos += 12
+        deltas = struct.unpack_from(f"<{count}i", raw, pos)
+        pos += 4 * count
+        ckeys = [raw[pos + 16 * i : pos + 16 * i + 16] for i in range(count)]
+        pos += 16 * count
+        if not content & 0x10000000:  # name hashes follow unless the block has none
+            pos += 8 * count
+        fid = -1
+        for delta, ckey in zip(deltas, ckeys):
+            fid += delta + 1
+            yield locale, fid, ckey
+
+
+CDN_HOST = "http://level3.blizzard.com/tpr/wow"
+PATCH_HOST = "http://us.patch.battle.net:1119"
+WOWEXPORT_INDICES = Path.home() / "Library/Application Support/wow.export/Default/casc/indices"
+
+
+def _cdn_path(key: str, kind: str) -> str:
+    return f"{kind}/{key[:2]}/{key[2:4]}/{key}"
+
+
+def _cdn_get(path: str, byte_range: tuple[int, int] | None = None) -> bytes:
+    """A CDN file, cached whole; a byte range of an archive is fetched each time, uncached."""
+    local = CACHE / "cdn" / path
+    if byte_range is None and local.exists():
+        return local.read_bytes()
+    request = urllib.request.Request(f"{CDN_HOST}/{path}", headers={"User-Agent": "spoken-wow-client"})
+    if byte_range:
+        request.add_header("Range", f"bytes={byte_range[0]}-{byte_range[0] + byte_range[1] - 1}")
+    with urllib.request.urlopen(request, timeout=300) as response:
+        data = response.read()
+    if byte_range is None:
+        local.parent.mkdir(parents=True, exist_ok=True)
+        local.write_bytes(data)
+    return data
+
+
+def _cdn_config(key: str) -> dict[str, list[str]]:
+    out = {}
+    for line in _cdn_get(_cdn_path(key, "config")).decode().splitlines():
+        if " = " in line:
+            name, value = line.split(" = ", 1)
+            out[name] = value.split()
+    return out
+
+
+def _cdn_version(product: str, region: str) -> dict[str, str]:
+    with urllib.request.urlopen(f"{PATCH_HOST}/{product}/versions", timeout=60) as response:
+        lines = response.read().decode().splitlines()
+    head = [h.split("!")[0] for h in lines[0].split("|")]
+    for line in lines[1:]:
+        row = dict(zip(head, line.split("|")))
+        if row.get("Region") == region:
+            return row
+    raise KeyError(f"the CDN serves no {product} build for region {region}")
+
+
+def _cdn_index(archive: str) -> bytes:
+    exported = WOWEXPORT_INDICES / f"{archive}.index"
+    if exported.exists():
+        return exported.read_bytes()
+    return _cdn_get(_cdn_path(archive, "data") + ".index")
+
+
+def _scan_index(raw: bytes, wanted: set[bytes]) -> dict[bytes, tuple[int, int]]:
+    """(offset, size) in the archive of each wanted encoding key this index lists."""
+    footer = raw[-28:]
+    block_size = footer[11] * 1024
+    offset_bytes, size_bytes, key_bytes, checksum_bytes = footer[12], footer[13], footer[14], footer[15]
+    entry = key_bytes + size_bytes + offset_bytes
+    blocks = (len(raw) - 28) // (block_size + key_bytes + checksum_bytes)
+    out = {}
+    for block in range(blocks):
+        base = block * block_size
+        for q in range(base, base + block_size - entry + 1, entry):
+            key = raw[q : q + key_bytes]
+            if key in wanted:
+                size = int.from_bytes(raw[q + key_bytes : q + key_bytes + size_bytes], "big")
+                offset = int.from_bytes(raw[q + key_bytes + size_bytes : q + entry], "big")
+                out[key] = (offset, size)
+    return out
 
 
 def _load_keys() -> dict[int, bytes]:
