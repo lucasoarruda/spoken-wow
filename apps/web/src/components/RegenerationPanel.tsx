@@ -5,6 +5,7 @@ import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { QueueSnapshot } from "@/lib/generation/client";
 import { usd } from "@/lib/generation/money";
+import { queueStatus } from "@/lib/generation/queue-line";
 
 function n(value: number): string {
   return value.toLocaleString();
@@ -16,9 +17,8 @@ function n(value: number): string {
  * Sits above the player rather than replacing it, because a batch takes minutes and the
  * point of watching is to play the lines as they land.
  *
- * It shows the whole queue, not this tab's work: there is one ElevenLabs account and one
- * budget, so a batch another admin started is spending the same money and Stop had better
- * reach it.
+ * It shows the whole queue, not this tab's work: Stop reaches every batch the viewer may
+ * stop, and each person's queue is listed so a waiting batch says why it has not started.
  *
  * The cost shown is the real one, summed from what ElevenLabs charged each line, not the
  * estimate the dialog offered - so an estimate that was wrong is visible rather than quietly
@@ -120,6 +120,21 @@ export default function RegenerationPanel({
           <div className="text-muted-foreground mt-1.5 truncate text-xs">
             {snapshot.running.map((job) => `${job.npcName} — ${job.preview}`).join(" · ")}
           </div>
+        )}
+
+        {/* One row per person's queue once there is more than one: who is running, who is
+            waiting and behind how many. The viewer's own is picked out. */}
+        {active && snapshot.queues.length > 1 && (
+          <ul className="text-muted-foreground mt-1.5 space-y-0.5 text-xs">
+            {snapshot.queues.map((queue) => (
+              <li
+                key={queue.owner ?? "deleted"}
+                className={queue.mine ? "text-foreground font-medium" : undefined}
+              >
+                {queue.name} — {queueStatus(queue)}
+              </li>
+            ))}
+          </ul>
         )}
 
         {stopped && snapshot.latestBatch?.stoppedBecause && (

@@ -468,6 +468,38 @@ describe("snapshot", () => {
       message: "no line q:1:accept",
     });
   });
+
+  it("lists each owner's queue, active or waiting, in the order they drain", async () => {
+    const owners = [await newUser(), await newUser(), await newUser(), await newUser()];
+    for (const [i, owner] of owners.entries()) {
+      await enqueue(await newBatch("quests", owner), [line(i * 10 + 1), line(i * 10 + 2)], "quests");
+    }
+
+    const { queues } = await snapshot(null, { viewerId: owners[3], maxActive: 3 });
+
+    expect(queues.map((queue) => queue.owner)).toEqual(owners);
+    expect(queues.map((queue) => [queue.status, queue.ahead])).toEqual([
+      ["active", 0],
+      ["active", 0],
+      ["active", 0],
+      ["waiting", 3],
+    ]);
+    expect(queues.map((queue) => queue.mine)).toEqual([false, false, false, true]);
+    expect(queues[0]).toMatchObject({ name: `Owner ${owners[0]}`, pending: 2, running: 0 });
+  });
+
+  it("names a queue whose owner is gone, and keeps it one queue", async () => {
+    const gone = await newUser();
+    await enqueue(await newBatch("quests", gone), [line(1), line(2)], "quests");
+    await db().query(`delete from "user" where "id" = $1`, [gone]);
+    await enqueue(await newBatch("quests", null), [line(3)], "quests");
+
+    const { queues } = await snapshot(null);
+
+    expect(queues).toHaveLength(2);
+    expect(queues[0]).toMatchObject({ owner: gone, name: "Deleted account", pending: 2 });
+    expect(queues[1]).toMatchObject({ owner: null, name: "Deleted account", pending: 1 });
+  });
 });
 
 /** Claim, but only accept a job this test run created. Other suites share the database. */

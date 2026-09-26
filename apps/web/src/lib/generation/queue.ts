@@ -21,6 +21,8 @@
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
+import { maxActiveFrom } from "./concurrency";
+import type { QueueLine } from "./queue-line";
 import type { Provider } from "./speakers/speaker";
 
 export type JobState = "pending" | "running" | "done" | "failed" | "cancelled";
@@ -99,6 +101,11 @@ export type QueueSnapshot = {
    * would put yesterday's stop reason on today's clean run.
    */
   latestBatch: { cancelled: number; stoppedBecause: string | null } | null;
+  /**
+   * Each owner's queue, in the order they drain: the first QUEUE_MAX_ACTIVE are active, the
+   * rest wait. Ranked exactly as activeLanes ranks them, so the panel says what the worker does.
+   */
+  queues: QueueLine[];
   /**
    * Jobs that reached `done` after the cursor, for the page to adopt.
    *
@@ -372,6 +379,7 @@ type JobAggregateRow = {
   unpriced: string;
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
+  queues: { owner: string | null; name: string; pending: number; running: number; rank: number }[];
   finished: { id: string; source: Source; lang: Lang; lineId: string; file: string; version: number }[];
   cursor: string | null;
 };
@@ -407,7 +415,12 @@ export async function dismissThrough(jobId: string, userId: string | null): Prom
   );
 }
 
-export async function snapshot(since: string | null): Promise<QueueSnapshot> {
+export async function snapshot(
+  since: string | null,
+  options: { viewerId?: string | null; maxActive?: number } = {},
+): Promise<QueueSnapshot> {
+  const maxActive = options.maxActive ?? maxActiveFrom(process.env.QUEUE_MAX_ACTIVE);
+  const viewerId = options.viewerId ?? null;
   // Live work first, then whatever finished recently: the two halves of what the panel is
   // for. Never just the age, for the reason WINDOW records.
   //
@@ -456,12 +469,27 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
        terminal as (
          select max("id")::text as max from "regeneration_job"
           where "state" in ('done', 'failed') and "id" > (select through from dismissal)
+       ),
+       queue_owners as (
+         select "owner", min("id") as first,
+                count(*) filter (where "state" = 'pending')::int as pending,
+                count(*) filter (where "state" = 'running')::int as running
+           from "regeneration_job"
+          where "state" in ('pending', 'running')
+          group by "owner"
+       ),
+       ranked_queues as (
+         select q."owner", coalesce(u."name", 'Deleted account') as name, q.pending, q.running,
+                (row_number() over (order by q.first) - 1)::int as rank
+           from queue_owners q
+           left join "user" u on u."id" = q."owner"
        )
        select
          jc.*,
          coalesce((select json_agg(r) from running_jobs r), '[]') as running,
          coalesce((select json_agg(f) from recent_failures f), '[]') as failures,
          coalesce((select json_agg(p) from finished_page p), '[]') as finished,
+         coalesce((select json_agg(r order by r.rank) from ranked_queues r), '[]') as queues,
          (select max from terminal) as cursor
        from job_counts jc`,
       [since],
@@ -497,6 +525,15 @@ export async function snapshot(since: string | null): Promise<QueueSnapshot> {
           stoppedBecause: latest.rows[0].stoppedBecause,
         }
       : null,
+    queues: row.queues.map((queue) => ({
+      owner: queue.owner,
+      name: queue.name,
+      pending: queue.pending,
+      running: queue.running,
+      status: queue.rank < maxActive ? "active" : "waiting",
+      ahead: queue.rank < maxActive ? 0 : queue.rank,
+      mine: viewerId !== null && queue.owner === viewerId,
+    })),
     finished,
     // Normally the high-water mark of *all* terminal jobs, not just the page returned, so a
     // cursor never sticks behind a job that failed rather than finished. But a full page

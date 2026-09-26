@@ -12,6 +12,7 @@ import { noApiKeyMessage } from "@/lib/no-api-key";
 import type { Source } from "@/lib/sections";
 import type { Rate } from "./billing";
 import type { Provider } from "./providers";
+import type { QueueLine } from "./queue-line";
 
 
 export type FailureKind =
@@ -186,6 +187,8 @@ export type QueueSnapshot = {
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
   latestBatch: { cancelled: number; stoppedBecause: string | null } | null;
+  /** Each owner's queue in drain order. Mirrors QueueSnapshot["queues"] in queue.ts. */
+  queues: QueueLine[];
   /**
    * Carries the source because two explorers poll one queue, and each may only adopt its
    * own: a quests page told that a zones file is now at version 3 would look for a line it
