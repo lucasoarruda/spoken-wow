@@ -55,10 +55,11 @@ describe("the payload", () => {
     expect(payload).not.toHaveProperty("reference_id");
   });
 
-  it("carries several speakers' as a list per speaker, paired with ids by position", () => {
+  it("carries several speakers' as a list per speaker, still with no reference_id", () => {
+    // fish.audio resolves any reference_id as a saved model: ["0", "1"] is a 400.
     const payload = buildFishPayload(DIALOGUE);
     expect(payload.references).toEqual([[NPC], [NARRATOR]]);
-    expect(payload.reference_id).toEqual(["0", "1"]);
+    expect(payload).not.toHaveProperty("reference_id");
   });
 
   it("asks for the format ElevenLabs returns, at quality latency", () => {
