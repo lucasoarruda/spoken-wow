@@ -52,10 +52,10 @@ export function buildFishPayload(request: FishSpeechRequest): Record<string, unk
   const single = request.references.length === 1;
   return {
     text: fishText(request),
-    // fish.audio takes a list of clips for one speaker and a list of lists for several, which
-    // it pairs with reference_id by position. The ids themselves may be anything for zero-shot.
+    // fish.audio takes a list of clips for one speaker and a list of lists for several, the
+    // outer index being the N of `<|speaker:N|>`. No reference_id: fish.audio looks every id
+    // up as a saved model and answers 400 "Reference not found" for anything else.
     references: single ? request.references : request.references.map((clip) => [clip]),
-    ...(single ? {} : { reference_id: request.references.map((_, index) => String(index)) }),
     temperature: settings.temperature,
     top_p: settings.topP,
     prosody: { speed: settings.speed },
