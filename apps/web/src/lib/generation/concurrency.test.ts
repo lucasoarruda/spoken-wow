@@ -138,8 +138,8 @@ describe("pickLane", () => {
     expect(fill({ a: 4 }, 12)).toEqual({ a: 4 });
   });
 
-  it("fills narrow lanes to their width and gives the rest to the wide one", () => {
-    expect(fill({ a: 1, b: 2, c: 20 }, 12)).toEqual({ a: 1, b: 2, c: 9 });
+  it("shares the cap by each lane's share of its own width", () => {
+    expect(fill({ a: 1, b: 2, c: 20 }, 12)).toEqual({ a: 1, b: 1, c: 10 });
   });
 
   it("prefers the lane least full for its width, and the earlier one on a tie", () => {
