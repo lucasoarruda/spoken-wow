@@ -71,6 +71,10 @@ local function Build(canvas)
         function() return cfg().LockFrame end, function(v) cfg().LockFrame = v end, refresh)
     layout:Checkbox(L.OPT_HIDE_PORTRAIT, L.OPT_HIDE_PORTRAIT_TIP,
         function() return cfg().HidePortrait end, function(v) cfg().HidePortrait = v end, refresh)
+    if Version.IsCamelot then
+        layout:Checkbox(L.OPT_BRONZE_TINT, L.OPT_BRONZE_TINT_TIP,
+            function() return cfg().BronzeTint end, function(v) cfg().BronzeTint = v end, refresh)
+    end
     -- One row per action an addon declared optional, named by that addon. The player is
     -- not told what any of them do.
     for _, optional in ipairs(Actions.optional) do

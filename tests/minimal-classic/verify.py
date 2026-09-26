@@ -213,6 +213,29 @@ assert(not P.badge:IsShown() and P.badgeBackground:IsShown())
 assert(getn(E.Callbacks.errors)==0,table.concat(E.Callbacks.errors,"\\n"))
 print("PASS: quest, gossip, book and zone badges, bounded portrait cache, opaque centred badge, panel corners concealed inside portrait")
 ''')
+# The Forever tint is read from Version as the file loads, so the Forever half reloads it.
+lua.execute('''
+local E=SpokenEnv
+local function tint(P) return string.format("%.2f %.2f %.2f",unpack(P.panel.borderColor)).."|"..string.format("%.2f %.2f %.2f",unpack(P.ring.color)).."|"..string.format("%.2f %.2f %.2f",unpack(P.trim.color)) end
+local white="1.00 1.00 1.00|1.00 1.00 1.00|1.00 1.00 1.00"
+assert(tint(E.MinimalPlayer)==white,"another client keeps the metal's own colour: "..tint(E.MinimalPlayer))
+E.Version.IsCamelot=true
+''')
+load('UI/MinimalPlayer.lua')
+lua.execute('''
+local E=SpokenEnv
+local A=E.Addon
+local function tint(P) return string.format("%.2f %.2f %.2f",unpack(P.panel.borderColor)).."|"..string.format("%.2f %.2f %.2f",unpack(P.ring.color)).."|"..string.format("%.2f %.2f %.2f",unpack(P.trim.color)) end
+E.PlayerFrame:RefreshConfig()
+local bronze="0.95 0.68 0.35|0.95 0.68 0.35|0.95 0.68 0.35"
+assert(tint(E.MinimalPlayer)==bronze,"Forever tints the metal bronze: "..tint(E.MinimalPlayer))
+A.db.profile.Frame.BronzeTint=false;E.PlayerFrame:RefreshConfig()
+assert(tint(E.MinimalPlayer)=="1.00 1.00 1.00|1.00 1.00 1.00|1.00 1.00 1.00","the setting takes the tint off: "..tint(E.MinimalPlayer))
+A.db.profile.Frame.BronzeTint=true;E.PlayerFrame:RefreshConfig()
+assert(tint(E.MinimalPlayer)==bronze,"and puts it back")
+E.Version.IsCamelot=nil
+print("PASS: Forever bronze tint on border, bar trim and portrait ring, behind its setting; other clients untouched")
+''')
 for path in (addon/'Textures').glob('Minimal*.tga'):
     image=Image.open(path)
     assert all(n>0 and n&(n-1)==0 for n in image.size),(path,image.size)
