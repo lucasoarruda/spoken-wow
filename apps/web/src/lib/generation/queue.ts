@@ -118,6 +118,15 @@ export type QueueSnapshot = {
   finished: { id: string; source: Source; lang: Lang; lineId: string; file: string; version: number }[];
   /** Pass back as `since` on the next poll. */
   cursor: string;
+  /**
+   * The newest job the counts include that can no longer change, or null when there is none:
+   * what the panel's X hands to dismissThrough.
+   *
+   * Not the cursor. The cursor skips cancelled jobs, which have no take to adopt, and stops
+   * at a page boundary when a run finished more lines than one poll carries - so dismissing
+   * through it left a stopped run's cancellations, or most of a long run, on screen.
+   */
+  through: string | null;
 };
 
 export const DEFAULT_LEASE_MS = 5 * 60_000;
@@ -418,6 +427,7 @@ type JobAggregateRow = {
   queues: { owner: string | null; name: string; pending: number; running: number; rank: number }[];
   finished: { id: string; source: Source; lang: Lang; lineId: string; file: string; version: number }[];
   cursor: string | null;
+  through: string | null;
 };
 
 /**
@@ -519,6 +529,10 @@ export async function snapshot(
                 (row_number() over (order by q.first) - 1)::int as rank
            from queue_owners q
            left join "user" u on u."id" = q."owner"
+       ),
+       shown as (
+         select max("id")::text as max from "regeneration_job"
+          where "state" in ('done', 'failed', 'cancelled') and ${window}
        )
        select
          jc.*,
@@ -526,7 +540,8 @@ export async function snapshot(
          coalesce((select json_agg(f) from recent_failures f), '[]') as failures,
          coalesce((select json_agg(p) from finished_page p), '[]') as finished,
          coalesce((select json_agg(r order by r.rank) from ranked_queues r), '[]') as queues,
-         (select max from terminal) as cursor
+         (select max from terminal) as cursor,
+         (select max from shown) as through
        from job_counts jc`,
       [since],
     ),
@@ -578,5 +593,6 @@ export async function snapshot(
     // therefore ends at its own last row, and the next poll picks up from there.
     cursor:
       finished.length === FINISHED_PAGE ? finished[finished.length - 1].id : (row.cursor ?? since ?? "0"),
+    through: row.through,
   };
 }

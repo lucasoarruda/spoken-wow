@@ -21,7 +21,6 @@ import ReportDialog from "@/components/ReportDialog";
 import { SearchBar } from "@/components/zones/SearchBar";
 import { totals as estimateTotals, LIST_RATE, type Estimate } from "@/lib/generation/billing";
 import {
-  dismissQueue,
   fetchGenerationStatus,
   fetchQueue,
   queueBatch,
@@ -109,7 +108,6 @@ export function Explorer({ zones }: { zones: ZoneFacet[] }) {
   // the same plan's credits, so it belongs on this screen too.
   const [queue, setQueue] = useState<QueueSnapshot | null>(null);
   const [queueNote, setQueueNote] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState(false);
   const cursor = useRef<string | null>(null);
   const [status, setStatus] = useState<GenerationStatusResponse | null>(null);
   // A refusal for want of a key, which is not a failure of the line and does not belong
@@ -396,7 +394,6 @@ export function Explorer({ zones }: { zones: ZoneFacet[] }) {
     if (!pendingBatch) return;
     const { lineIds } = pendingBatch;
     setPendingBatch(null);
-    setDismissed(false);
     setQueueNote(null);
 
     const queued = await queueBatch({ source: "zones", lineIds }, pendingBatch.label, lang);
@@ -458,7 +455,6 @@ export function Explorer({ zones }: { zones: ZoneFacet[] }) {
           });
           refetch();
         }
-        if (snapshot.active) setDismissed(false);
       }
 
       timer = setTimeout(poll, active ? 2_000 : 15_000);
@@ -728,15 +724,9 @@ export function Explorer({ zones }: { zones: ZoneFacet[] }) {
       <div className="fixed inset-x-0 bottom-0 z-30">
         <RegenerationPanel
           queue={queue}
-          note={dismissed ? null : queueNote}
+          note={queueNote}
           onStop={() => void stopQueue()}
-          onDismiss={() => {
-            setDismissed(true);
-            setQueueNote(null);
-            // Only what the panel was showing is dismissed: the cursor is the high-water
-            // mark of what this page has seen, so work that lands afterwards reappears.
-            if (cursor.current) void dismissQueue(cursor.current);
-          }}
+          onDismiss={() => setQueueNote(null)}
         />
         <Player
           line={current}

@@ -6,8 +6,8 @@
  * server for the same reason the panel does: it is a statement about the queue, not about one
  * tab's opinion of it.
  *
- * It never touches pending or running work. Stopping a queue is /stop's job, and a button
- * labelled with a cross must not be able to cancel anything.
+ * It never touches pending or running work. Stopping a queue is /stop's job: the same X asks
+ * for it on a live queue, but only after a confirmation, and never through this route.
  *
  * Anybody who regenerates in any language may press it, since everybody watches the one
  * panel: it hides news, it never stops or undoes work, so there is nothing to scope.

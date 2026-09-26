@@ -24,7 +24,6 @@ import type { Facets } from "@/lib/facets";
 import { NARRATOR_VOICE } from "@/lib/generation/narration";
 import { PROVIDER_NAME } from "@/lib/generation/providers";
 import {
-  dismissQueue,
   fetchBatchJobs,
   fetchGenerationStatus,
   fetchQueue,
@@ -210,7 +209,6 @@ export default function Explorer({ facets }: { facets: Facets }) {
   } | null>(null);
   // The queue, as the server sees it. Null until the first poll answers.
   const [queue, setQueue] = useState<QueueSnapshot | null>(null);
-  const [dismissed, setDismissed] = useState(false);
   // What the enqueue request itself answered, as opposed to what the queue is doing: a
   // `null` result or a nonzero `skipped` count is information about the click, not about the
   // batch, and the snapshot the poll returns has no room for it.
@@ -522,7 +520,6 @@ export default function Explorer({ facets }: { facets: Facets }) {
           if (job.source !== "quests" || job.lang !== lang) continue;
           applySuccess(job.file, job.version, job.lineId);
         }
-        if (snapshot.active) setDismissed(false);
       }
 
       timer = setTimeout(poll, active ? 2_000 : 15_000);
@@ -615,7 +612,6 @@ export default function Explorer({ facets }: { facets: Facets }) {
   const startBatch = useCallback(async () => {
     if (!pendingBatch) return;
     setPendingBatch(null);
-    setDismissed(false);
     setQueueNote(null);
 
     const result = await queueBatch(
@@ -923,18 +919,10 @@ export default function Explorer({ facets }: { facets: Facets }) {
           the player, whatever height the player happens to be. */}
       <div className="fixed inset-x-0 bottom-0 z-40">
         <RegenerationPanel
-          queue={dismissed ? null : queue}
-          note={dismissed ? null : queueNote}
+          queue={queue}
+          note={queueNote}
           onStop={() => void stopQueue()}
-          onDismiss={() => {
-            setDismissed(true);
-            setQueueNote(null);
-            // Also on the server, or the panel returns on the next navigation with the same
-            // finished run. Only what the panel was showing is dismissed: `cursor` is the
-            // highest terminal job it had seen, so anything that finishes after this click
-            // still reports itself.
-            if (cursor.current) void dismissQueue(cursor.current);
-          }}
+          onDismiss={() => setQueueNote(null)}
         />
 
         <Player

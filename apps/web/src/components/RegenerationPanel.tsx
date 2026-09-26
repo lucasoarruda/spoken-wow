@@ -1,9 +1,18 @@
 "use client";
 
 import { Loader2, X } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { QueueSnapshot } from "@/lib/generation/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { dismissQueue, type QueueSnapshot } from "@/lib/generation/client";
 import { usd } from "@/lib/generation/money";
 import { queueStatus } from "@/lib/generation/queue-line";
 
@@ -28,6 +37,12 @@ function n(value: number): string {
  * reported (refused outright, or queued fewer files than quoted because another admin had
  * already claimed some) - information the server snapshot has no field for, since it is
  * about one request rather than the queue's ongoing state.
+ *
+ * The X means "I am done with this". On a live queue that is a request to stop it, which spends
+ * nobody's money but throws away a run someone may be waiting on, so it asks first. On a
+ * settled one it closes the panel and dismisses the run on the server, so the next reload does
+ * not bring it back. The panel does both itself rather than leaving them to each explorer:
+ * three copies of the dismissal had drifted into three different bugs.
  */
 export default function RegenerationPanel({
   queue,
@@ -38,9 +53,17 @@ export default function RegenerationPanel({
   queue: QueueSnapshot | null;
   note: string | null;
   onStop: () => void;
+  /** Called when the panel is closed, so the page can drop its own note. */
   onDismiss: () => void;
 }) {
-  const counts = queue?.counts;
+  const [confirming, setConfirming] = useState(false);
+  // The run this tab closed, hidden at once rather than on the next poll: at the idle pace
+  // that is up to fifteen seconds of an X that seems to do nothing. Keyed by the run's newest
+  // job, so anything that settles afterwards shows itself again.
+  const [closed, setClosed] = useState<string | null>(null);
+
+  const hidden = !!queue && !queue.active && queue.through !== null && queue.through === closed;
+  const counts = hidden ? undefined : queue?.counts;
   const total = counts
     ? counts.pending + counts.running + counts.done + counts.failed + counts.cancelled
     : 0;
@@ -99,15 +122,22 @@ export default function RegenerationPanel({
             {snapshot.unpriced > 0 && ` · ${n(snapshot.unpriced)} unpriced`}
           </span>
 
-          {active ? (
-            <Button size="xs" variant="secondary" onClick={onStop}>
-              Stop
-            </Button>
-          ) : (
-            <Button size="icon-xs" variant="ghost" onClick={onDismiss} aria-label="Dismiss">
-              <X />
-            </Button>
-          )}
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={active ? "Stop the queue" : "Dismiss"}
+            onClick={() => {
+              if (active) {
+                setConfirming(true);
+                return;
+              }
+              setClosed(snapshot.through);
+              onDismiss();
+              if (snapshot.through) void dismissQueue(snapshot.through);
+            }}
+          >
+            <X />
+          </Button>
         </div>
 
         <div className="bg-muted mt-2 h-1 overflow-hidden rounded-full">
@@ -158,6 +188,36 @@ export default function RegenerationPanel({
           </ul>
         )}
       </div>
+
+      {/* Held open only while there is still something to stop: a queue that drains while the
+          question is up has nothing left to cancel, and the X then closes it as usual. */}
+      <Dialog open={confirming && active} onOpenChange={setConfirming}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Stop the queue?</DialogTitle>
+            <DialogDescription>
+              {/* No count: Stop reaches only the languages the caller regenerates in, so
+                  the queue's pending total can be more than this cancels. */}
+              Lines still waiting are cancelled. Any already generating will finish, since
+              they are billed either way.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirming(false)}>
+              Keep going
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setConfirming(false);
+                onStop();
+              }}
+            >
+              Stop queue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

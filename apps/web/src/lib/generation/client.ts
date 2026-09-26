@@ -202,6 +202,8 @@ export type QueueSnapshot = {
    */
   finished: { id: string; source: Source; lang: Lang; lineId: string; file: string; version: number }[];
   cursor: string;
+  /** The newest settled job the panel is showing: what its X dismisses through. */
+  through: string | null;
 };
 
 export type QueuedBatch = { batchId: string; queued: number; skipped: number };
@@ -265,7 +267,7 @@ export async function fetchQueue(
   }
 }
 
-/** Wave away finished work up to `through`, the cursor the panel was showing. */
+/** Wave away finished work up to `through`, the newest settled job the panel was showing. */
 export async function dismissQueue(through: string): Promise<void> {
   await fetch("/api/regenerate/queue/dismiss", {
     method: "POST",

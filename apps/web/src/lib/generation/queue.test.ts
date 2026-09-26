@@ -563,7 +563,7 @@ describe("dismissing finished work", () => {
     const before = await snapshot(null);
     expect(before.counts.done).toBeGreaterThan(0);
 
-    await dismissThrough(before.cursor, null);
+    await dismissThrough(before.through!, null);
 
     const after = await snapshot(null);
     expect(after.counts.done).toBe(0);
@@ -577,6 +577,27 @@ describe("dismissing finished work", () => {
     expect((await snapshot(null)).counts.done).toBe(1);
   });
 
+  it("hides a stopped run's cancelled jobs along with its finished ones", async () => {
+    const batch = await createBatch("dismiss-stopped", null, "quests");
+    batches.push(batch);
+    await enqueue(batch, [line(5), line(6)], "quests");
+
+    const done = await claimNext();
+    await finishJob(done!.id, { version: 1, credits: 10 });
+    await cancelPending("stopped", { batchId: batch });
+
+    // The cancelled job has the higher id, so a watermark that only counted done and failed
+    // jobs would leave it - and the whole panel - standing after the X.
+    const before = await snapshot(null);
+    expect(before.counts.cancelled).toBe(1);
+
+    await dismissThrough(before.through!, null);
+    const after = await snapshot(null);
+
+    expect(after.counts).toEqual({ pending: 0, running: 0, done: 0, failed: 0, cancelled: 0 });
+    expect(after.through).toBeNull();
+  });
+
   it("never hides work that is still running or pending", async () => {
     const batch = await createBatch("dismiss-live", null, "quests");
     batches.push(batch);
@@ -587,7 +608,7 @@ describe("dismissing finished work", () => {
     await enqueue(batch, [line(4)], "quests");
 
     // Dismissing the finished job must leave the pending one - and the Stop button - alone.
-    await dismissThrough((await snapshot(null)).cursor, null);
+    await dismissThrough((await snapshot(null)).through!, null);
     const after = await snapshot(null);
 
     expect(after.counts.pending + after.counts.running).toBe(1);
