@@ -13,7 +13,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 
 import { closeDb, db } from "@/lib/db";
 
-import { cancelPending, dismissThrough, claimNext, createBatch, enqueue, failJob, finishJob, retryJob, snapshot, type QueueEntry } from "./queue";
+import { activeLanes, cancelPending, dismissThrough, claimNext, createBatch, enqueue, failJob, finishJob, laneKey, retryJob, snapshot, type QueueEntry } from "./queue";
 import type { Source } from "@/lib/sections";
 
 /** A file prefix no other run collides with, so tests share one database safely. */
@@ -201,6 +201,94 @@ describe("claimNext", () => {
     await retryJob(claimed!.id, 60_000);
 
     expect(await claimJobOfThisRun()).toBeNull();
+  });
+});
+
+describe("activeLanes", () => {
+  it("ranks owners by their oldest unfinished job and takes the first `max`", async () => {
+    const [alice, bob, carol] = [await newUser(), await newUser(), await newUser()];
+    await enqueue(await newBatch("quests", alice), [line(1)], "quests");
+    await enqueue(await newBatch("quests", bob), [line(2)], "quests");
+    await enqueue(await newBatch("quests", carol), [line(3)], "quests");
+
+    expect(await activeLanes(2)).toEqual([
+      { owner: alice, provider: "elevenlabs" },
+      { owner: bob, provider: "elevenlabs" },
+    ]);
+  });
+
+  it("gives one owner with both providers two lanes and one place", async () => {
+    const [alice, bob] = [await newUser(), await newUser()];
+    await enqueue(await newBatch("quests", alice), [line(1)], "quests", "enUS", "elevenlabs");
+    await enqueue(await newBatch("quests", alice), [line(2)], "quests", "enUS", "fish");
+    await enqueue(await newBatch("quests", bob), [line(3)], "quests");
+
+    const lanes = await activeLanes(1);
+    expect(lanes.map(laneKey).sort()).toEqual([`${alice}:elevenlabs`, `${alice}:fish`]);
+  });
+
+  it("keeps an owner's place while their older work lasts, then ranks the rest by its own ids", async () => {
+    const [alice, bob] = [await newUser(), await newUser()];
+    await enqueue(await newBatch("quests", alice), [line(1)], "quests");
+    await enqueue(await newBatch("quests", bob), [line(2)], "quests");
+    // Alice queues more while her first batch is still unfinished.
+    await enqueue(await newBatch("quests", alice), [line(3)], "quests");
+
+    expect((await activeLanes(1))[0].owner).toBe(alice);
+
+    const first = await claimNext(undefined, { owner: alice, provider: "elevenlabs" });
+    expect(first!.file).toBe(`${prefix}/1.mp3`);
+    await finishJob(first!.id, { version: 1, credits: 1 });
+
+    // Her remaining job is newer than Bob's, so Bob, who was waiting, goes first.
+    expect((await activeLanes(1))[0].owner).toBe(bob);
+  });
+
+  it("keeps the place of an owner whose job is backing off", async () => {
+    const [alice, bob] = [await newUser(), await newUser()];
+    await enqueue(await newBatch("quests", alice), [line(1)], "quests");
+    await enqueue(await newBatch("quests", bob), [line(2)], "quests");
+    const claimed = await claimNext(undefined, { owner: alice, provider: "elevenlabs" });
+    await retryJob(claimed!.id, 60_000);
+
+    expect((await activeLanes(1))[0].owner).toBe(alice);
+  });
+
+  it("treats jobs nobody owns as one queue", async () => {
+    await enqueue(await newBatch("quests", null), [line(1)], "quests");
+    await enqueue(await newBatch("quests", null), [line(2)], "quests");
+
+    expect(await activeLanes(5)).toEqual([{ owner: null, provider: "elevenlabs" }]);
+  });
+});
+
+describe("claimNext within a lane", () => {
+  it("claims only that lane's jobs, even when another's are older", async () => {
+    const [alice, bob] = [await newUser(), await newUser()];
+    await enqueue(await newBatch("quests", alice), [line(1)], "quests");
+    await enqueue(await newBatch("quests", bob), [line(2)], "quests");
+
+    const job = await claimNext(undefined, { owner: bob, provider: "elevenlabs" });
+    expect(job!.owner).toBe(bob);
+    expect(await claimNext(undefined, { owner: bob, provider: "fish" })).toBeNull();
+  });
+
+  it("claims in the lane of jobs nobody owns", async () => {
+    await enqueue(await newBatch("quests", null), [line(1)], "quests");
+
+    expect(await claimNext(undefined, { owner: null, provider: "elevenlabs" })).not.toBeNull();
+  });
+
+  it("reclaims an expired lease in its own lane and not in another", async () => {
+    const [alice, bob] = [await newUser(), await newUser()];
+    await enqueue(await newBatch("quests", alice), [line(1)], "quests");
+    const aliceLane = { owner: alice, provider: "elevenlabs" as const };
+    const first = await claimNext(-1000, aliceLane); // a lease that expired a second ago
+
+    expect(await claimNext(undefined, { owner: bob, provider: "elevenlabs" })).toBeNull();
+    const again = await claimNext(undefined, aliceLane);
+    expect(again!.id).toBe(first!.id);
+    expect(again!.attempts).toBe(2);
   });
 });
 

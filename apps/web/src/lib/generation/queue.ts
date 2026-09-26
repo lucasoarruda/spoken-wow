@@ -65,6 +65,20 @@ export type QueueJob = {
   owner: string | null;
 };
 
+/**
+ * One owner's work for one provider.
+ *
+ * The unit the worker sizes and cools down, because it is exactly one API key: every job is
+ * spent from its owner's own key for the provider it was queued with. An owner with batches
+ * on both providers has two lanes and still one queue.
+ */
+export type Lane = { owner: string | null; provider: Provider };
+
+/** A lane as a map key. The empty string stands for jobs nobody owns any more. */
+export function laneKey(lane: Lane): string {
+  return `${lane.owner ?? ""}:${lane.provider}`;
+}
+
 export type QueueSnapshot = {
   /** Whether anything is pending or running, which is what drives the poll interval. */
   active: boolean;
@@ -182,16 +196,54 @@ export async function enqueue(
 }
 
 /**
- * Take the next due job, or null.
+ * The lanes of the queues allowed to drain now: the first `max` owners, ranked by their oldest
+ * unfinished job.
+ *
+ * Derived from the rows rather than stored, so it needs no upkeep and survives a deploy or a
+ * leader handover as it stands. It is sticky by construction: while an owner has any
+ * unfinished job, their oldest one is older than anything queued after them, so a queue that
+ * started keeps its place until its older work is done. A job backing off after a 429 is still
+ * pending, so it keeps its owner's place too.
+ */
+export async function activeLanes(max: number): Promise<Lane[]> {
+  const { rows } = await db().query<Lane>(
+    `with owners as (
+       select "owner", min("id") as first
+         from "regeneration_job"
+        where "state" in ('pending', 'running')
+        group by "owner"
+        order by first
+        limit $1
+     )
+     select j."owner", j."provider"
+       from "regeneration_job" j
+       join owners o on o."owner" is not distinct from j."owner"
+      where j."state" in ('pending', 'running')
+      group by j."owner", j."provider", o.first
+      order by o.first, j."provider"`,
+    [max],
+  );
+  return rows;
+}
+
+/**
+ * Take the next due job, or null. Within one lane when given one.
  *
  * One statement, because dequeuing and reclaiming an abandoned job are the same operation
  * seen from two sides. SKIP LOCKED is not strictly required under a single leader, but it
  * costs nothing and it is what keeps this correct during the seconds when a heartbeat has
  * stood one process down and another has not yet stood up.
  *
+ * The lane is optional so that "anything due" stays expressible; the worker always passes one.
+ *
  * A negative `leaseMs` is how the tests produce an already-expired lease.
  */
-export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<QueueJob | null> {
+export async function claimNext(
+  leaseMs: number = DEFAULT_LEASE_MS,
+  lane?: Lane,
+): Promise<QueueJob | null> {
+  const inLane = lane ? `and "owner" is not distinct from $2::text and "provider" = $3` : "";
+  const params: unknown[] = lane ? [leaseMs / 1000, lane.owner, lane.provider] : [leaseMs / 1000];
   const { rows } = await db().query<QueueJob>(
     `update "regeneration_job" as j set
         "state"      = 'running',
@@ -200,8 +252,9 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
         "startedAt"  = coalesce(j."startedAt", now())
       where j."id" = (
         select "id" from "regeneration_job"
-         where ("state" = 'pending' and "notBefore" <= now())
-            or ("state" = 'running' and "leaseUntil" < now())
+         where (("state" = 'pending' and "notBefore" <= now())
+            or ("state" = 'running' and "leaseUntil" < now()))
+           ${inLane}
          order by "id"
          for update skip locked
          limit 1
@@ -210,7 +263,7 @@ export async function claimNext(leaseMs: number = DEFAULT_LEASE_MS): Promise<Que
                 j."preview", j."characters", j."attempts", j."provider", j."owner",
                 (select b."createdBy" from "regeneration_batch" b where b."id" = j."batchId")
                   as "createdBy"`,
-    [leaseMs / 1000],
+    params,
   );
   return rows[0] ?? null;
 }
