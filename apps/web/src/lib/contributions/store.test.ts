@@ -80,6 +80,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await db().query(
+    `delete from "activity" where "kind" like 'contribution.%'
+        and "subject" in (select "id"::text from "contribution" where "ip" = $1)`,
+    [ip],
+  );
   await db().query(`delete from "contribution" where "ip" = $1`, [ip]);
   await db().query(`delete from "contribution_hit" where "ip" = $1`, [ip]);
 });
@@ -153,7 +158,7 @@ describe("setContributionNpcKind", () => {
   it("records a kind for a kind-less envelope", async () => {
     await createContribution(submission());
     const [row] = ours(await listContributions("new"));
-    expect(await setContributionNpcKind(row.id, "gameobject")).toBe(true);
+    expect(await setContributionNpcKind(row.id, "gameobject", RESOLVER)).toBe(true);
     const [after] = ours(await listContributions("new"));
     expect(after.npcKind).toBe("gameobject");
     expect(observationMeta(after).kind).toBe("gameobject");
@@ -162,7 +167,7 @@ describe("setContributionNpcKind", () => {
   it("refuses to override the kind the client's own envelope carried", async () => {
     await createContribution(submission({ meta: { npc: "12345 X", kind: "creature" } }));
     const [row] = ours(await listContributions("new"));
-    expect(await setContributionNpcKind(row.id, "gameobject")).toBe(false);
+    expect(await setContributionNpcKind(row.id, "gameobject", RESOLVER)).toBe(false);
     expect(observationMeta(row).kind).toBe("creature");
   });
 });
@@ -171,7 +176,7 @@ describe("setContributionNpc", () => {
   it("names the NPC of an envelope that named none", async () => {
     await createContribution(submission({ meta: {} }));
     const [row] = ours(await listContributions("new"));
-    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" })).toMatchObject({
+    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" }, RESOLVER)).toMatchObject({
       npcId: 240,
       npcName: "Marshal Dughan",
     });
@@ -183,7 +188,7 @@ describe("setContributionNpc", () => {
   it("refuses to override the NPC the client's own envelope named", async () => {
     await createContribution(submission());
     const [row] = ours(await listContributions("new"));
-    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" })).toBe(null);
+    expect(await setContributionNpc(row.id, { npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" }, RESOLVER)).toBe(null);
     expect(observationMeta(ours(await listContributions("new"))[0]).npc).toBe("12345 X");
   });
 });

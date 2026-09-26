@@ -7,6 +7,7 @@
 
 import "server-only";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db, query } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { makeShort } from "./tools";
@@ -222,6 +223,18 @@ export async function saveLore(args: {
         lang,
       ],
     );
+    await recordActivity(
+      {
+        kind: "text.edited",
+        lang,
+        actorId: args.editedBy,
+        source: "zones",
+        subject: args.lineId,
+        lineId: args.lineId,
+        detail: { version, text: full, short, note: args.note?.trim() || null },
+      },
+      client,
+    );
 
     await client.query("commit");
     return toVersion(inserted[0]);
@@ -243,11 +256,14 @@ export async function saveLore(args: {
  * Which is the one change that moves no id and inserts no row, and so the reason the
  * catalogue's stamp counts the live ids rather than just the rows. See the note on the
  * memo in catalogue.ts.
+ *
+ * `by` is who asked, for the activity log: moving the flag writes nothing that names them.
  */
 export async function restoreLore(
   lineId: string,
   version: number,
-  lang: Lang = BASE_LANG,
+  lang: Lang,
+  by: string | null,
 ): Promise<LoreVersion> {
   const client = await db().connect();
   try {
@@ -260,9 +276,10 @@ export async function restoreLore(
     );
     if (!rows[0]) throw new LoreMissing(`${lineId} has no version ${version}`);
 
-    await client.query(
+    const { rows: was } = await client.query<{ version: number }>(
       `update "lore_line" set "isCurrent" = false
-        where "lineId" = $1 and "lang" = $2 and "isCurrent"`,
+        where "lineId" = $1 and "lang" = $2 and "isCurrent"
+        returning "version"`,
       [lineId, lang],
     );
     const { rows: restored } = await client.query<Row>(
@@ -270,6 +287,18 @@ export async function restoreLore(
         where "lineId" = $1 and "lang" = $3 and "version" = $2
         returning ${COLUMNS}`,
       [lineId, version, lang],
+    );
+    await recordActivity(
+      {
+        kind: "text.restored",
+        lang,
+        actorId: by,
+        source: "zones",
+        subject: lineId,
+        lineId,
+        detail: { version, from: was[0]?.version ?? null },
+      },
+      client,
     );
 
     await client.query("commit");

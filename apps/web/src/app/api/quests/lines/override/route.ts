@@ -38,7 +38,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { denied } = await requireRegenerate();
+  const { session, denied } = await requireRegenerate();
   if (denied) return denied;
 
   const file = new URL(request.url).searchParams.get("file");
@@ -48,5 +48,5 @@ export async function DELETE(request: Request) {
 
   // Answering 200 for a file that had no override: the caller asked for it to be gone and it
   // is gone, and a 404 would make "revert" fail on a second click.
-  return Response.json({ removed: await clearOverride(file) });
+  return Response.json({ removed: await clearOverride(file, session.user.id) });
 }

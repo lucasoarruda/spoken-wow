@@ -10,6 +10,7 @@
  * rather than the read path on purpose: a value already in the database is a fact, and
  * refusing to read it would take the settings page down exactly when it is needed to fix it.
  */
+import { recordActivity } from "@/lib/activity/store";
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 
@@ -257,6 +258,7 @@ export async function writeRaceTags(
     // in force -- English's, for a language nobody has configured.
     const current = (await readSettings(lang)).config;
     await upsertLanguage(lang, { ...current, raceTags: tags }, updatedBy, ["raceTags"]);
+    await recordRaceTags(lang, updatedBy);
     return;
   }
   const defaults = fileDefaults().config;
@@ -276,4 +278,19 @@ export async function writeRaceTags(
       updatedBy,
     ],
   );
+  await recordRaceTags(lang, updatedBy);
+}
+
+/**
+ * Logged against the language even when the row written is English's generation_setting:
+ * the other languages read that row only for its model and sliders, never its tags (see
+ * readLanguageSettings), so a tag edit there changes English alone.
+ */
+async function recordRaceTags(lang: Lang, by: string | null): Promise<void> {
+  await recordActivity({
+    kind: "setting.changed",
+    lang,
+    actorId: by,
+    detail: { setting: "raceTags" },
+  });
 }

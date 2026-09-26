@@ -94,7 +94,7 @@ export async function PUT(request: Request) {
 
 /** Puts an earlier version of the text back. */
 export async function POST(request: Request) {
-  const { lang, denied } = await requireIn(request, "edit");
+  const { session, lang, denied } = await requireIn(request, "edit");
   if (denied) return denied;
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const version = await restoreBookText(body.lineId, body.version as number, lang);
+    const version = await restoreBookText(body.lineId, body.version as number, lang, session.user.id);
     return Response.json({ lineId: body.lineId, version });
   } catch (error) {
     return failed(error);

@@ -27,6 +27,7 @@ import type { PoolClient } from "pg";
 
 import { normaliseText } from "@books-tools/lib/text.mjs";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db } from "@/lib/db";
 import { observedFrom } from "@/lib/npc/resolve";
 import { getResolution, getResolutionsById, type NpcKind } from "@/lib/npc/store";
@@ -419,6 +420,20 @@ export async function resolveContribution(
         where "id" = $1
         returning ${COLUMNS}`,
       [id, status, userId],
+    );
+    // In the transaction, so a resolve that rolls back is never logged. A row sent from a
+    // client in a language the site does not have is logged under every language rather
+    // than dropped: somebody still resolved it.
+    await recordActivity(
+      {
+        kind: "contribution.resolved",
+        lang: isLang(contribution.locale) ? contribution.locale : null,
+        source: contribution.source,
+        subject: String(id),
+        actorId: userId,
+        detail: { status, key: contribution.key },
+      },
+      client,
     );
 
     await client.query("commit");

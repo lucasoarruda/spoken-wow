@@ -15,6 +15,7 @@
  */
 import "server-only";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db, query } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { skipReasonFor } from "@/lib/text-gate";
@@ -171,6 +172,18 @@ export async function saveQuestText(args: {
         current ? current.version : english.version,
       ],
     );
+    await recordActivity(
+      {
+        kind: "text.edited",
+        lang: args.lang,
+        actorId: args.editedBy,
+        source: "quests",
+        subject: args.lineId,
+        lineId: args.lineId,
+        detail: { version, text, note: args.note?.trim() || null, variant: args.variant },
+      },
+      client,
+    );
 
     await client.query("commit");
     return toVersion(inserted[0]);
@@ -182,12 +195,18 @@ export async function saveQuestText(args: {
   }
 }
 
-/** Put an earlier version back, by moving the live flag. No new row: see restoreBookText. */
+/**
+ * Put an earlier version back, by moving the live flag. No new row: see restoreBookText.
+ *
+ * `by` is who asked, for the activity log: moving the flag writes nothing that names them,
+ * so the log is the only record of who put an old text back.
+ */
 export async function restoreQuestText(
   lineId: string,
   variant: number,
   lang: Lang,
   version: number,
+  by: string | null,
 ): Promise<QuestTextVersion> {
   refuseEnglish(lang);
   const client = await db().connect();
@@ -199,9 +218,10 @@ export async function restoreQuestText(
       [lineId, variant, lang, version],
     );
     if (!rows[0]) throw new QuestTextMissing(`${lineId} has no version ${version} in ${lang}`);
-    await client.query(
+    const { rows: was } = await client.query<{ version: number }>(
       `update "quest_line" set "isCurrent" = false
-        where "lineId" = $1 and "variant" = $2 and "lang" = $3 and "isCurrent"`,
+        where "lineId" = $1 and "variant" = $2 and "lang" = $3 and "isCurrent"
+        returning "version"`,
       [lineId, variant, lang],
     );
     const { rows: restored } = await client.query<Row>(
@@ -209,6 +229,18 @@ export async function restoreQuestText(
         where "lineId" = $1 and "variant" = $2 and "lang" = $3 and "version" = $4
        returning ${COLUMNS}`,
       [lineId, variant, lang, version],
+    );
+    await recordActivity(
+      {
+        kind: "text.restored",
+        lang,
+        actorId: by,
+        source: "quests",
+        subject: lineId,
+        lineId,
+        detail: { version, from: was[0]?.version ?? null },
+      },
+      client,
     );
     await client.query("commit");
     return toVersion(restored[0]);

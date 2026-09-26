@@ -6,13 +6,14 @@
  * response works in Chrome and silently fails in Safari. Same reasoning, and the same
  * parseRange, as the take audio.
  */
+import { recordActivity } from "@/lib/activity/store";
 import { cloneName } from "@/lib/voices/clone-name";
 import { langParam } from "@/lib/lang-server";
 import fs from "node:fs";
 
 import { parseRange } from "@/lib/range";
 import { streamOf } from "@/lib/stream";
-import { denyVoiceRequest, requireVoiceViewer } from "@/lib/voices/authz";
+import { requireVoiceManager, requireVoiceViewer } from "@/lib/voices/authz";
 import { deleteSample, isStoredSampleName, samplePath } from "@/lib/voices/samples";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +86,7 @@ export async function GET(request: Request, context: Context) {
 
 export async function DELETE(request: Request, context: Context) {
   const { voice, file } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  const { session, denied } = await requireVoiceManager(voice);
   if (denied) return denied;
   // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
   const { lang, denied: noLang } = await langParam(request);
@@ -96,5 +97,13 @@ export async function DELETE(request: Request, context: Context) {
   if (!(await deleteSample(clone, file))) {
     return Response.json({ error: "no such clip" }, { status: 404 });
   }
+  // The file is gone for good, so this row is the only trace it was ever there.
+  await recordActivity({
+    kind: "sample.deleted",
+    lang,
+    actorId: session.user.id,
+    subject: voice,
+    detail: { files: [file] },
+  });
   return Response.json({ voice, deleted: file });
 }

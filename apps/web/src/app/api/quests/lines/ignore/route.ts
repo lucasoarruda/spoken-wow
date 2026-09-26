@@ -71,7 +71,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { lang, denied } = await guard(request);
+  const { lang, userId, denied } = await guard(request);
   if (denied) return denied;
 
   const lineId = new URL(request.url).searchParams.get("lineId");
@@ -81,5 +81,5 @@ export async function DELETE(request: Request) {
 
   // 200 for a line that was not ignored, as the override route does: the caller asked for it
   // to be gone and it is gone, and a 404 would make a second click look like a failure.
-  return Response.json({ removed: await clearIgnore(lineId, lang) });
+  return Response.json({ removed: await clearIgnore(lineId, lang, userId) });
 }

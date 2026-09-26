@@ -20,6 +20,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db } from "@/lib/db";
 import type { Lang } from "@/lib/lang";
 import { VOICE_REFERENCES_DIR } from "@/lib/paths";
@@ -256,6 +257,15 @@ export async function saveReference(input: SaveReference): Promise<Reference> {
     ],
   );
   lists.delete(input.lang);
+  // Cutting one changes what every fish.audio line in the language is spoken from, so who
+  // cut it and from which clip is worth a row; after the upsert, which has no transaction.
+  await recordActivity({
+    kind: "reference.set",
+    lang: input.lang,
+    actorId: input.userId,
+    subject: input.voice,
+    detail: { sample: input.sample, transcript },
+  });
   return (await readReference(input.voice, input.lang))!;
 }
 
@@ -278,15 +288,31 @@ export async function saveTranscript(
     [voice, lang, text, clipHash(audio, text), userId],
   );
   lists.delete(lang);
-  return rowCount ? readReference(voice, lang) : null;
+  if (!rowCount) return null;
+  await recordActivity({
+    kind: "reference.edited",
+    lang,
+    actorId: userId,
+    subject: voice,
+    detail: { transcript: text },
+  });
+  return readReference(voice, lang);
 }
 
-/** The row and the cut clip. The sample it was cut from stays. */
-export async function deleteReference(voice: string, lang: Lang): Promise<void> {
-  await db().query(`delete from "fish_reference" where "voice" = $1 and "lang" = $2`, [
+/**
+ * The row and the cut clip. The sample it was cut from stays.
+ *
+ * `by` is who removed it, for the activity log: the delete leaves nothing else behind.
+ */
+export async function deleteReference(voice: string, lang: Lang, by: string | null): Promise<void> {
+  const { rowCount } = await db().query(`delete from "fish_reference" where "voice" = $1 and "lang" = $2`, [
     voice,
     lang,
   ]);
   await fs.rm(referencePath(voice, lang), { force: true });
   lists.delete(lang);
+  // Only when there was a row, so deleting nothing is not logged as a delete.
+  if (rowCount) {
+    await recordActivity({ kind: "reference.deleted", lang, actorId: by, subject: voice, detail: {} });
+  }
 }

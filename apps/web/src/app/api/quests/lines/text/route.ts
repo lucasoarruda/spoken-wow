@@ -91,7 +91,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { lang, denied } = await requireIn(request, "edit");
+  const { session, lang, denied } = await requireIn(request, "edit");
   if (denied) return denied;
   if (lang === BASE_LANG) return englishRefused();
 
@@ -105,7 +105,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "lineId, variant and version are required" }, { status: 400 });
   }
   try {
-    const version = await restoreQuestText(body.lineId, variant, lang, body.version as number);
+    const version = await restoreQuestText(
+      body.lineId,
+      variant,
+      lang,
+      body.version as number,
+      session.user.id,
+    );
     return Response.json({ lineId: body.lineId, version });
   } catch (error) {
     return failed(error);

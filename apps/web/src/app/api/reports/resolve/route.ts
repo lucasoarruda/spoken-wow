@@ -41,6 +41,5 @@ export async function POST(request: Request) {
   if (!report) {
     return Response.json({ error: "unknown report" }, { status: 404 });
   }
-
   return Response.json({ report });
 }

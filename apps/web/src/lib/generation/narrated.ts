@@ -55,7 +55,7 @@ export async function regenerateNarrated(
   source: "zones" | "books",
   line: NarratedLine,
   createdBy: string,
-  options: { speaker: Speaker; lang?: Lang },
+  options: { speaker: Speaker; lang?: Lang; batchId?: string },
 ): Promise<RegenerateResult> {
   const lang = options.lang ?? BASE_LANG;
   const { speaker } = options;
@@ -121,7 +121,7 @@ export async function regenerateNarrated(
           leadInSec: speech.leadInSec,
           createdBy,
         },
-        { lang, measure: durationOf },
+        { lang, measure: durationOf, batchId: options.batchId },
       );
 
       return {

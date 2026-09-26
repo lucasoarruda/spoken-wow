@@ -32,6 +32,11 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await db().query(
+    `delete from "activity" where "kind" like 'contribution.%'
+        and "subject" in (select "id"::text from "contribution" where "ip" = $1)`,
+    [ip],
+  );
   await db().query(`delete from "contribution" where "ip" = $1`, [ip]);
   await db().query(`delete from "npc_resolution" where "npcId" = $1`, [npcId]);
 });
@@ -149,7 +154,7 @@ describe("GET /api/contributions/export", () => {
     await answer("creature", "tauren", "moderator");
     await answer("gameobject", "human", "corpus");
     const id = await acceptedRow(`chosen:${npcId}`, { npc: `${npcId} Some Guard` });
-    expect(await setContributionNpcKind(id, "gameobject")).toBe(true);
+    expect(await setContributionNpcKind(id, "gameobject", RESOLVER)).toBe(true);
 
     const row = (await exported()).find((r) => r.key === `chosen:${npcId}`);
     expect(row).toMatchObject({ race: "human", npcKind: "gameobject", npcConflict: false });

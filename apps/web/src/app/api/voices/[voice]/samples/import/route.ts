@@ -10,12 +10,13 @@
  * clone reads whatever is in the folder - so the steady state has to be the one merged file
  * that cloning actually wants.
  */
+import { recordActivities } from "@/lib/activity/store";
 import { cloneName } from "@/lib/voices/clone-name";
 import { langParam } from "@/lib/lang-server";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { requireVoiceManager } from "@/lib/voices/authz";
 import { DEFAULT_PAUSE_SECONDS, mergeSamples } from "@/lib/voices/merge";
 import { npcLineClips } from "@/lib/voices/npcLines";
 import { deleteSample, listSamples, storeSample } from "@/lib/voices/samples";
@@ -26,7 +27,7 @@ type Context = { params: Promise<{ voice: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { voice } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  const { session, denied } = await requireVoiceManager(voice);
   if (denied) return denied;
   // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
   const { lang, denied: noLang } = await langParam(request);
@@ -86,6 +87,16 @@ export async function POST(request: Request, context: Context) {
     }
     for (const sample of stored) await deleteSample(clone, sample.file);
   }
+
+  // Replacing threw away clips somebody uploaded, which is worth its own row.
+  const act = { lang, actorId: session.user.id, subject: voice };
+  await recordActivities([
+    ...(existing.length
+      ? [{ ...act, kind: "sample.deleted" as const, detail: { files: existing.map((s) => s.file) } }]
+      : []),
+    // The one clip the import leaves behind, not the game clips it was joined from.
+    { ...act, kind: "sample.imported" as const, detail: { files: [merged.file] } },
+  ]);
 
   return Response.json(
     { voice, imported: stored.length, merged, samples: await listSamples(clone) },

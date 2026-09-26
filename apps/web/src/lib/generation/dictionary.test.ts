@@ -74,10 +74,17 @@ const OPTIONS = (fetchImpl: typeof globalThis.fetch) => ({
  */
 let snapshot: Record<string, unknown> | undefined;
 
+/**
+ * When this run began, by the database's clock: the activity case looks for its row after
+ * it. The rows every save here logs, as nobody's, are dropped by vitest.activity.ts.
+ */
+let startedAt: string;
+
 beforeAll(async () => {
   try {
     const { rows } = await db().query("select * from pronunciation_lexicon where id");
     snapshot = rows[0];
+    startedAt = (await db().query<{ now: string }>(`select now()::text as "now"`)).rows[0].now;
   } catch (error) {
     throw new Error(
       "dictionary.test.ts needs a migrated database. Run:\n" +
@@ -242,6 +249,24 @@ describe("writeLexicon", () => {
     expect(lexicon.entries).toEqual(edited);
     expect(lexicon.locator).toEqual({ dictionaryId: "dict-abc", versionId: "ver-1" });
     expect(await currentLocator()).toEqual({ dictionaryId: "dict-abc", versionId: "ver-1" });
+  });
+});
+
+describe("the activity log", () => {
+  it("records a word's rule before and after, as a person would read it", async () => {
+    await writeLexicon(ENTRIES, null as unknown as string, OPTIONS(accepts().fetchImpl));
+    const edited = [{ ...ENTRIES[0], ipa: "ɡnoʊmˈɹɛɡən" }];
+    await writeLexicon(edited, null as unknown as string, OPTIONS(accepts().fetchImpl));
+
+    const { rows } = await db().query<{ kind: string; detail: unknown }>(
+      `select "kind", "detail" from "activity"
+        where "subject" = 'Gnomeregan' and "lang" = 'enUS' and "at" >= $1::timestamptz
+        order by "id" desc limit 1`,
+      [startedAt],
+    );
+    expect(rows).toEqual([
+      { kind: "lexicon.edited", detail: { before: "/ˈnoʊmɹəɡæn/", after: "/ɡnoʊmˈɹɛɡən/" } },
+    ]);
   });
 });
 

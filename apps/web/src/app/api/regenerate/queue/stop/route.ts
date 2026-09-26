@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   const cancelled = await cancelPending(`Stopped by ${session.user.name ?? "an admin"}`, {
     batchId,
     langs,
+    by: session.user.id,
   });
   return NextResponse.json({ cancelled });
 }

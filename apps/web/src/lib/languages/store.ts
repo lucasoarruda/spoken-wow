@@ -12,6 +12,7 @@
  */
 import "server-only";
 
+import { recordActivity } from "@/lib/activity/store";
 import { query } from "@/lib/db";
 import { BASE_LANG, CODES, isLang, type Lang } from "@/lib/lang";
 
@@ -35,14 +36,25 @@ export async function isEnabled(lang: Lang): Promise<boolean> {
   return rows[0]?.enabled === true;
 }
 
+/**
+ * Recorded in the activity log only when the state actually flips. The admin page sends the
+ * whole switch's value, so a second click on a stale page, or a retry, would otherwise log a
+ * language being turned on that was already on.
+ */
 export async function setEnabled(lang: string, enabled: boolean, userId: string): Promise<void> {
   if (!isLang(lang)) throw new Error(`${lang} is not a language this site knows`);
   if (lang === BASE_LANG) throw new Error("English cannot be switched off");
-  await query(
-    `insert into "language" ("code", "enabled", "updatedAt", "updatedBy")
+  // The CTE reads the row as it was before this statement, so "was" is the previous state:
+  // null for a language never switched, which languageStates treats as off.
+  const [row] = await query<{ was: boolean | null }>(
+    `with "before" as (select "enabled" from "language" where "code" = $1)
+     insert into "language" ("code", "enabled", "updatedAt", "updatedBy")
      values ($1, $2, now(), $3)
      on conflict ("code") do update
-        set "enabled" = excluded."enabled", "updatedAt" = now(), "updatedBy" = excluded."updatedBy"`,
+        set "enabled" = excluded."enabled", "updatedAt" = now(), "updatedBy" = excluded."updatedBy"
+     returning (select "enabled" from "before") as "was"`,
     [lang, enabled, userId],
   );
+  if ((row?.was ?? false) === enabled) return;
+  await recordActivity({ kind: "language.toggled", lang, actorId: userId, detail: { enabled } });
 }

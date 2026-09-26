@@ -10,7 +10,10 @@ const { mergeSamples, storeSample } = vi.hoisted(() => ({
   storeSample: vi.fn(async (_clone: string, file: string) => ({ file })),
 }));
 
-vi.mock("@/lib/voices/authz", () => ({ denyVoiceRequest: async () => null }));
+vi.mock("@/lib/voices/authz", () => ({
+  requireVoiceManager: async () => ({ session: { user: { id: "admin" } }, denied: null }),
+}));
+vi.mock("@/lib/activity/store", () => ({ recordActivities: async () => {} }));
 vi.mock("@/lib/voices/npcLines", () => ({
   npcLineClips: async () => ["/clips/A01.ogg", "/clips/A02.ogg"],
 }));

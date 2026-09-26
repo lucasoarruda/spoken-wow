@@ -26,11 +26,10 @@ type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
 
 const FORBIDDEN = () => Response.json({ error: "not allowed" }, { status: 403 });
 
-export async function denyVoiceRequest(voice?: string): Promise<Response | null> {
-  return (await requireVoiceManager(voice)).denied;
-}
-
-/** The same check, keeping the session for a route that needs to know who is asking. */
+/**
+ * An admin of the voices, and the session saying which one: every change to a voice's
+ * sources is written to the activity log under whoever made it.
+ */
 export async function requireVoiceManager(
   voice?: string,
 ): Promise<{ session: Session; denied: null } | { session: null; denied: Response }> {

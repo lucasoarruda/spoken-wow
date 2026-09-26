@@ -33,6 +33,9 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await db().query(`delete from "npc_resolution" where "npcId" in ($1, 0)`, [npcId]);
+  await db().query(`delete from "activity" where "kind" = 'npc.resolved' and "actorId" = $1`, [
+    RESOLVER,
+  ]);
 });
 
 afterAll(async () => {
@@ -64,6 +67,11 @@ describe("POST /api/contributions/npc", () => {
     const row = await getResolution("creature", npcId);
     expect(row).toMatchObject({ flavor: "grim", provenance: "moderator", confirmed: true });
     expect(row?.resolvedBy).toBe(RESOLVER);
+    const { rows: logged } = await db().query(
+      `select "lang", "detail" from "activity" where "kind" = 'npc.resolved' and "subject" = $1`,
+      [`creature:${npcId}`],
+    );
+    expect(logged).toEqual([{ lang: "enUS", detail: expect.objectContaining({ flavor: "grim" }) }]);
   });
 
   it("refuses a kind it does not know", async () => {

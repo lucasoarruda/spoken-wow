@@ -8,9 +8,10 @@
  * Note nginx's client_max_body_size defaults to 1 MiB, which would reject every real clip
  * before it reached here — see deploy/nginx-voiceover.conf.
  */
+import { recordActivity } from "@/lib/activity/store";
 import { cloneName } from "@/lib/voices/clone-name";
 import { langParam } from "@/lib/lang-server";
-import { denyVoiceRequest, requireVoiceViewer } from "@/lib/voices/authz";
+import { requireVoiceManager, requireVoiceViewer } from "@/lib/voices/authz";
 import { listSamples, rejectUpload, storeSample } from "@/lib/voices/samples";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function GET(request: Request, context: Context) {
 
 export async function POST(request: Request, context: Context) {
   const { voice } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  const { session, denied } = await requireVoiceManager(voice);
   if (denied) return denied;
   // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
   const { lang, denied: noLang } = await langParam(request);
@@ -55,6 +56,13 @@ export async function POST(request: Request, context: Context) {
   for (const file of incoming) {
     stored.push(await storeSample(clone, file.name, Buffer.from(await file.arrayBuffer())));
   }
+  await recordActivity({
+    kind: "sample.added",
+    lang,
+    actorId: session.user.id,
+    subject: voice,
+    detail: { files: stored.map((sample) => sample.file) },
+  });
 
   return Response.json({ voice, stored, samples: await listSamples(clone) }, { status: 201 });
 }

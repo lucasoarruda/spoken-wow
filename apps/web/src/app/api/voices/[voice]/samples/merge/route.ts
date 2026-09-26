@@ -9,9 +9,10 @@
  * API keeps them unless asked, so a caller that has not thought about it does not lose the
  * only copies.
  */
+import { recordActivities } from "@/lib/activity/store";
 import { cloneName } from "@/lib/voices/clone-name";
 import { langParam } from "@/lib/lang-server";
-import { denyVoiceRequest } from "@/lib/voices/authz";
+import { requireVoiceManager } from "@/lib/voices/authz";
 import { DEFAULT_PAUSE_SECONDS, mergeSamples, rejectMerge } from "@/lib/voices/merge";
 import { deleteSample, isStoredSampleName, listSamples } from "@/lib/voices/samples";
 
@@ -21,7 +22,7 @@ type Context = { params: Promise<{ voice: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { voice } = await context.params;
-  const denied = await denyVoiceRequest(voice);
+  const { session, denied } = await requireVoiceManager(voice);
   if (denied) return denied;
   // A slot is shared; its clips and its clone are the language\'s own (clone-name.ts).
   const { lang, denied: noLang } = await langParam(request);
@@ -57,9 +58,16 @@ export async function POST(request: Request, context: Context) {
     );
   }
 
+  const deleted: string[] = [];
   if (body.deleteSources === true) {
-    for (const file of files) await deleteSample(clone, file);
+    for (const file of files) if (await deleteSample(clone, file)) deleted.push(file);
   }
+  // The sources' deletion is its own row: "merged" alone would read as if they were kept.
+  const act = { lang, actorId: session.user.id, subject: voice };
+  await recordActivities([
+    { ...act, kind: "sample.merged", detail: { files, into: merged.file } },
+    ...(deleted.length ? [{ ...act, kind: "sample.deleted" as const, detail: { files: deleted } }] : []),
+  ]);
 
   return Response.json({ voice, merged, samples: await listSamples(clone) }, { status: 201 });
 }

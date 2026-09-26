@@ -51,6 +51,7 @@ describe("POST /api/regenerate/queue/stop", () => {
     expect(cancelPending).toHaveBeenCalledWith("Stopped by Ana", {
       batchId: "b1",
       langs: ["ptBR"],
+      by: "u1",
     });
   });
 });

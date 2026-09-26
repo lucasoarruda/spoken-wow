@@ -125,7 +125,7 @@ async function fileFor(lineId: string): Promise<string> {
  * to assert on, and it must not be the thing that clears it permanently. So the fixtures'
  * rows are lifted out before each test and put back after.
  */
-const FIXTURE_LINES = [SOLO, SHARED, NEVER_VOICED, STAGE_DIRECTION, TEMPLATE_TOKEN];
+const FIXTURE_LINES = [SOLO, SHARED, NEVER_VOICED, STAGE_DIRECTION, TEMPLATE_TOKEN, DWARF];
 let displaced: Record<string, unknown>[] = [];
 
 async function fixtureFiles(): Promise<string[]> {
@@ -382,10 +382,10 @@ describe("when ElevenLabs refuses", () => {
  */
 describe("a line whose spoken text has been rewritten", () => {
   afterEach(async () => {
-    await clearOverride(await fileFor(SOLO));
-    await clearOverride(await fileFor(STAGE_DIRECTION));
-    await clearOverride(await fileFor(NEVER_VOICED));
-    await clearOverride(await fileFor(TEMPLATE_TOKEN));
+    await clearOverride(await fileFor(SOLO), null);
+    await clearOverride(await fileFor(STAGE_DIRECTION), null);
+    await clearOverride(await fileFor(NEVER_VOICED), null);
+    await clearOverride(await fileFor(TEMPLATE_TOKEN), null);
   });
 
   it("speaks the rewrite rather than what the corpus says", async () => {

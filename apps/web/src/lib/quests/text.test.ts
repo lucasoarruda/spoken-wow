@@ -32,6 +32,8 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  // Every write here is logged as this user's, so their rows are exactly the ones to drop.
+  await db().query(`delete from "activity" where "actorId" = $1`, [userId]);
   await db().query(`delete from "quest_line" where "lang" = $1`, [LANG]);
   await db().query(`delete from "entity_name" where "lang" = $1`, [LANG]);
   await db().query(`delete from "line_ignore" where "lineId" = $1`, ["q:0:ignore-test"]);
@@ -108,9 +110,19 @@ describe("a later translation", () => {
     const base = { lineId: english.lineId, variant: english.variant, lang: LANG as "koKR", editedBy: userId };
     await saveQuestText({ ...base, text: "Uno." });
     await saveQuestText({ ...base, text: "Due." });
-    await restoreQuestText(english.lineId, english.variant, LANG, 1);
+    await restoreQuestText(english.lineId, english.variant, LANG, 1, userId);
     const history = await questTextHistory(english.lineId, english.variant, LANG);
     expect(history.find((v) => v.isCurrent)?.text).toBe("Uno.");
+
+    // The flag moving writes no row that names anybody, so the log is the only record.
+    const logged = await query<{ lineId: string; source: string; detail: unknown }>(
+      `select "lineId", "source", "detail" from "activity"
+        where "actorId" = $1 and "lang" = $2 and "kind" = 'text.restored'`,
+      [userId, LANG],
+    );
+    expect(logged).toEqual([
+      { lineId: english.lineId, source: "quests", detail: { version: 1, from: 2 } },
+    ]);
   });
 
   it("is never English, which is rewritten through line_override", async () => {
@@ -139,7 +151,7 @@ describe("ignores at two levels", () => {
     await writeIgnore("q:0:ignore-test", "the Italian never says this", userId, LANG);
     expect((await readIgnores(LANG)).get("q:0:ignore-test")?.lang).toBe(LANG);
     expect((await readIgnores("enUS")).has("q:0:ignore-test")).toBe(false);
-    expect(await clearIgnore("q:0:ignore-test", LANG)).toBe(true);
+    expect(await clearIgnore("q:0:ignore-test", LANG, userId)).toBe(true);
   });
 
   it("counts a line ignored everywhere in every language", async () => {
@@ -153,7 +165,7 @@ describe("ignores at two levels", () => {
     await writeIgnore("q:0:ignore-test", "nobody voices this", userId);
     await writeIgnore("q:0:ignore-test", "nor the Italian", userId, LANG);
     expect((await readIgnores(LANG)).get("q:0:ignore-test")?.reason).toBe("nobody voices this");
-    expect(await clearIgnore("q:0:ignore-test")).toBe(true);
+    expect(await clearIgnore("q:0:ignore-test", null, userId)).toBe(true);
     expect((await readIgnores(LANG)).get("q:0:ignore-test")?.reason).toBe("nor the Italian");
   });
 });

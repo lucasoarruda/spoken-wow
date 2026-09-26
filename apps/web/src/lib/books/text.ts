@@ -23,6 +23,7 @@
  */
 import "server-only";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db, query } from "@/lib/db";
 
 import { BASE_LANG, type Lang } from "@/lib/lang";
@@ -172,6 +173,18 @@ export async function saveBookText(args: {
         source.version, source.lang, generatable, skipReason,
       ],
     );
+    await recordActivity(
+      {
+        kind: "text.edited",
+        lang,
+        actorId: args.editedBy,
+        source: "books",
+        subject: args.lineId,
+        lineId: args.lineId,
+        detail: { version, text, note: args.note?.trim() || null },
+      },
+      client,
+    );
 
     await client.query("commit");
     return toVersion(inserted[0]);
@@ -189,11 +202,14 @@ export async function saveBookText(args: {
  * Moves the live flag rather than inserting a copy, which is what `restore` means for a
  * lore version and for a take: the history is the set of texts this page has had, and
  * restoring is a statement about which of them is right, not a new one.
+ *
+ * `by` is who asked, for the activity log: moving the flag writes nothing that names them.
  */
 export async function restoreBookText(
   lineId: string,
   version: number,
-  lang: Lang = BASE_LANG,
+  lang: Lang,
+  by: string | null,
 ): Promise<BookVersion> {
   const client = await db().connect();
   try {
@@ -206,15 +222,28 @@ export async function restoreBookText(
     );
     if (!rows[0]) throw new BookMissing(`${lineId} has no version ${version}`);
 
-    await client.query(
+    const { rows: was } = await client.query<{ version: number }>(
       `update "book_line" set "isCurrent" = false
-        where "lineId" = $1 and "lang" = $2 and "isCurrent"`,
+        where "lineId" = $1 and "lang" = $2 and "isCurrent"
+        returning "version"`,
       [lineId, lang],
     );
     await client.query(
       `update "book_line" set "isCurrent" = true
         where "lineId" = $1 and "lang" = $2 and "version" = $3`,
       [lineId, lang, version],
+    );
+    await recordActivity(
+      {
+        kind: "text.restored",
+        lang,
+        actorId: by,
+        source: "books",
+        subject: lineId,
+        lineId,
+        detail: { version, from: was[0]?.version ?? null },
+      },
+      client,
     );
 
     await client.query("commit");

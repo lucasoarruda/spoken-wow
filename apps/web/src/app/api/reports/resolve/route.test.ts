@@ -4,7 +4,7 @@
  *
  * Needs DATABASE_URL and migrations applied.
  */
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { closeDb, db } from "@/lib/db";
 
@@ -13,6 +13,9 @@ const { authorise } = vi.hoisted(() => ({ authorise: vi.fn() }));
 vi.mock("@/lib/generation/authz", () => ({
   requireCapability: async (...args: unknown[]) => authorise(...args),
 }));
+
+/** resolvedBy has a foreign key, so resolving needs a user that exists. */
+const RESOLVER = "test-report-resolve-route";
 
 import { POST } from "./route";
 
@@ -24,7 +27,18 @@ function post(body: unknown): Request {
   });
 }
 
+beforeAll(async () => {
+  await db().query(
+    `insert into "user" ("id", "name", "email", "emailVerified")
+     values ($1, 'Test Resolver', $2, false)
+     on conflict ("id") do nothing`,
+    [RESOLVER, `${RESOLVER}@example.invalid`],
+  );
+});
+
 afterAll(async () => {
+  await db().query(`delete from "activity" where "actorId" = $1`, [RESOLVER]);
+  await db().query(`delete from "user" where "id" = $1`, [RESOLVER]);
   await closeDb();
 });
 
@@ -50,6 +64,33 @@ describe("POST /api/reports/resolve", () => {
       });
       expect((await POST(post({ id: rows[0].id, status: "fixed" }))).status).toBe(403);
       expect(authorise).toHaveBeenLastCalledWith("edit", "ptBR");
+    } finally {
+      await db().query(`delete from "report" where "id" = $1`, [rows[0].id]);
+    }
+  });
+
+  it("records the resolution in the activity log", async () => {
+    const { rows } = await db().query<{ id: number }>(
+      `insert into "report" ("source", "lang", "lineId", "target", "category", "body")
+       values ('quests', 'ptBR', 'q:1:accept', 'text', 'wrong_text', 'test') returning "id"`,
+    );
+    try {
+      authorise.mockResolvedValueOnce({ session: { user: { id: RESOLVER } }, denied: null });
+      expect((await POST(post({ id: rows[0].id, status: "fixed" }))).status).toBe(200);
+      const { rows: logged } = await db().query(
+        `select "lang", "source", "lineId", "actorId", "detail" from "activity"
+          where "kind" = 'report.resolved' and "subject" = $1`,
+        [String(rows[0].id)],
+      );
+      expect(logged).toEqual([
+        {
+          lang: "ptBR",
+          source: "quests",
+          lineId: "q:1:accept",
+          actorId: RESOLVER,
+          detail: { status: "fixed", category: "wrong_text" },
+        },
+      ]);
     } finally {
       await db().query(`delete from "report" where "id" = $1`, [rows[0].id]);
     }

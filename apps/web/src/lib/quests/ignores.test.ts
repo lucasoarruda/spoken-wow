@@ -15,6 +15,7 @@ import { clearIgnore, forgetIgnores, readIgnores, writeIgnore } from "./ignores"
 const LINE = `q:999999:accept:test-${process.pid}`;
 
 afterEach(async () => {
+  await db().query(`delete from "activity" where "subject" = $1 and "kind" like 'ignore.%'`, [LINE]);
   await db().query(`delete from "line_ignore" where "lineId" = $1`, [LINE]);
   forgetIgnores();
 });
@@ -52,13 +53,13 @@ describe("ignores", () => {
     await writeIgnore(LINE, "was broken", null);
     expect((await readIgnores()).has(LINE)).toBe(true);
 
-    expect(await clearIgnore(LINE)).toBe(true);
+    expect(await clearIgnore(LINE, null, null)).toBe(true);
     // The memo has to notice, which is why the stamp counts rows as well as timestamping
     // them: a delete leaves max(createdAt) exactly where it was.
     expect((await readIgnores()).has(LINE)).toBe(false);
   });
 
   it("reports nothing removed for a line that was not ignored", async () => {
-    expect(await clearIgnore(LINE)).toBe(false);
+    expect(await clearIgnore(LINE, null, null)).toBe(false);
   });
 });

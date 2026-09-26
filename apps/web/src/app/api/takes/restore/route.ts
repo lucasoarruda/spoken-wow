@@ -24,7 +24,7 @@ import { isSource } from "@/lib/sections";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const { lang, denied } = await requireIn(request, "regenerate");
+  const { lang, session, denied } = await requireIn(request, "regenerate");
   if (denied) return denied;
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
   const outcome = await withTakeLock(source, file, async () => {
     try {
-      await restoreTake(source, file, version, lang);
+      await restoreTake(source, file, version, lang, session.user.id);
       return { ok: true as const };
     } catch (error) {
       // restoreTake refuses a version that was never recorded, and one whose clip was not
