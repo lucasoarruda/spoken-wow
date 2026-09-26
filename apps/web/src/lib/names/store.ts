@@ -5,6 +5,7 @@
  */
 import "server-only";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db, query } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 
@@ -101,6 +102,16 @@ export async function saveName(args: {
          from "entity_name" where "kind" = $1 and "entityId" = $2 and "lang" = $3
        returning "version", "isCurrent", "origin", "name", "editedBy", "note", "createdAt"`,
       [args.kind, args.entityId, args.lang, name, args.editedBy, args.note?.trim() || null],
+    );
+    await recordActivity(
+      {
+        kind: "name.edited",
+        lang: args.lang,
+        actorId: args.editedBy,
+        subject: `${args.kind}:${args.entityId}`,
+        detail: { version: rows[0].version, name, note: rows[0].note },
+      },
+      client,
     );
     await client.query("commit");
     return { ...rows[0], createdAt: rows[0].createdAt.toISOString() };

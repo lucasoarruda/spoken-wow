@@ -18,6 +18,7 @@
  * Portuguese take of a file is a different recording from the English one, and queueing both
  * is two jobs rather than a duplicate. It is what the generator is asked to speak in.
  */
+import { recordActivities } from "@/lib/activity/store";
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import type { Source } from "@/lib/sections";
@@ -253,10 +254,13 @@ export async function retryJob(id: string, delayMs: number): Promise<void> {
  * `langs` is what the person pressing Stop may regenerate in: a Portuguese translator stops
  * the Portuguese queue and cannot stop anybody's English. Absent means every language,
  * which is the worker stopping a batch of its own.
+ *
+ * `by` is who pressed Stop, for the activity log; null when the worker stopped a batch
+ * itself.
  */
 export async function cancelPending(
   because: string,
-  scope: { batchId?: string; langs?: readonly Lang[] } = {},
+  scope: { batchId?: string; langs?: readonly Lang[]; by?: string | null } = {},
 ): Promise<number> {
   const batchId = scope.batchId ?? null;
   const langs = scope.langs ?? null;
@@ -271,15 +275,34 @@ export async function cancelPending(
   // Only batches that actually lost work are stamped. Stamping every unstopped batch would
   // put "Stopped by an admin" on ones that had already finished cleanly, and the panel reads
   // the most recent reason it can find.
-  await db().query(
+  const { rows: stopped } = await db().query<{
+    id: string;
+    label: string;
+    source: Source;
+    lang: Lang;
+    cancelled: number;
+  }>(
     `update "regeneration_batch" as b
         set "stoppedAt" = now(), "stoppedBecause" = $1
       where b."stoppedAt" is null
         and ($2::uuid is null or b."id" = $2)
         and ($3::text[] is null or b."lang" = any($3))
         and exists (select 1 from "regeneration_job" j
-                     where j."batchId" = b."id" and j."state" = 'cancelled')`,
+                     where j."batchId" = b."id" and j."state" = 'cancelled')
+      returning b."id", b."label", b."source", b."lang",
+                (select count(*)::int from "regeneration_job" j
+                  where j."batchId" = b."id" and j."state" = 'cancelled') as "cancelled"`,
     [because, batchId, langs],
+  );
+  await recordActivities(
+    stopped.map((batch) => ({
+      kind: "batch.stopped" as const,
+      lang: batch.lang,
+      source: batch.source,
+      subject: batch.id,
+      actorId: scope.by ?? null,
+      detail: { batchId: batch.id, label: batch.label, reason: because, cancelled: batch.cancelled },
+    })),
   );
 
   return rowCount ?? 0;

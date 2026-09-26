@@ -127,22 +127,26 @@ describe("soundChanges", () => {
   const tauren = { grapheme: "Tauren", ipa: "ˈtɔːɹən", confidence: "check" as const };
 
   it("reports an entry that is new", () => {
-    expect(soundChanges([], [tauren])).toEqual([{ grapheme: "Tauren", kind: "added" }]);
+    expect(soundChanges([], [tauren])).toEqual([
+      { grapheme: "Tauren", kind: "added", after: "/ˈtɔːɹən/" },
+    ]);
   });
 
   it("reports an entry that is gone", () => {
     // A removal changes how the word sounds as much as an addition does: takes made while
     // the rule stood no longer match what would be spoken today.
-    expect(soundChanges([tauren], [])).toEqual([{ grapheme: "Tauren", kind: "removed" }]);
+    expect(soundChanges([tauren], [])).toEqual([
+      { grapheme: "Tauren", kind: "removed", before: "/ˈtɔːɹən/" },
+    ]);
   });
 
   it("reports a respelling, and a switch between IPA and alias", () => {
     expect(soundChanges([tauren], [{ ...tauren, ipa: "ˈtaʊɹən" }])).toEqual([
-      { grapheme: "Tauren", kind: "edited" },
+      { grapheme: "Tauren", kind: "edited", before: "/ˈtɔːɹən/", after: "/ˈtaʊɹən/" },
     ]);
     expect(
       soundChanges([tauren], [{ grapheme: "Tauren", alias: "toren", confidence: "check" }]),
-    ).toEqual([{ grapheme: "Tauren", kind: "edited" }]);
+    ).toEqual([{ grapheme: "Tauren", kind: "edited", before: "/ˈtɔːɹən/", after: "toren" }]);
   });
 
   it("says nothing about a note or a confidence, which nothing hears", () => {

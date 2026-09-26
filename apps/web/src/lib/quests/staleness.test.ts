@@ -81,7 +81,7 @@ afterEach(async () => {
       deposed,
     ]);
   }
-  await clearOverride(file);
+  await clearOverride(file, null);
 });
 
 afterAll(async () => {

@@ -127,7 +127,7 @@ describe("moving the live flag", () => {
     await record(1);
     await record(2, true);
 
-    await setLiveTake("quests", file, 1);
+    await setLiveTake("quests", file, 1, "enUS", null);
 
     const live = (await listTakes("quests", file)).filter((take) => take.isCurrent);
     expect(live.map((take) => take.version)).toEqual([1]);
@@ -137,7 +137,7 @@ describe("moving the live flag", () => {
     await record(1);
     await record(2, true);
 
-    await setLiveTake("quests", file, 1);
+    await setLiveTake("quests", file, 1, "enUS", null);
 
     expect(await listTakes("quests", file)).toHaveLength(2);
   });
@@ -145,7 +145,7 @@ describe("moving the live flag", () => {
   it("refuses a version that was never recorded, and leaves the live one alone", async () => {
     await record(1, true);
 
-    await expect(setLiveTake("quests", file, 9)).rejects.toThrow(/no version 9/);
+    await expect(setLiveTake("quests", file, 9, "enUS", null)).rejects.toThrow(/no version 9/);
 
     const live = (await listTakes("quests", file)).filter((take) => take.isCurrent);
     expect(live.map((take) => take.version)).toEqual([1]);

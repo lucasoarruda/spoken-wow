@@ -102,7 +102,7 @@ async function fishBudget(apiKey: string): Promise<number> {
 export type Generator = (
   lineId: string,
   userId: string,
-  options: { speaker: Speaker; lang: Lang },
+  options: { speaker: Speaker; lang: Lang; batchId?: string },
 ) => Promise<RegenerateResult>;
 
 export type WorkerOptions = {
@@ -227,6 +227,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
     const result = await generate(job.lineId, job.createdBy ?? "", {
       speaker,
       lang: job.lang,
+      batchId: job.batchId,
     }).catch(
       (error: unknown): RegenerateResult => ({
         ok: false,

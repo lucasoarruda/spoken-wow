@@ -39,7 +39,7 @@ async function entryFor(lineId: string, lang: Lang): Promise<CatalogueEntry | un
 export async function regenerateZoneLine(
   lineId: string,
   createdBy: string,
-  options: { speaker: Speaker; lang?: Lang },
+  options: { speaker: Speaker; lang?: Lang; batchId?: string },
 ): Promise<RegenerateResult> {
   const entry = await entryFor(lineId, options.lang ?? BASE_LANG);
   if (!entry) {

@@ -7,7 +7,7 @@
  * Needs DATABASE_URL and migrations applied:
  *   deploy/web/bin/migrate.sh "$PWD/apps/web"
  */
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const { closeDb, db } = await import("@/lib/db");
 const { BookConflict, bookHistory, restoreBookText, saveBookText } = await import("./text");
@@ -36,15 +36,32 @@ async function voiceable(lang: string) {
   return rows[0];
 }
 
+/**
+ * A real account to edit as: a save is logged in the activity table, whose actor is a
+ * foreign key onto "user", and the site only ever saves as somebody signed in.
+ */
+let editor: string;
+
+beforeAll(async () => {
+  editor = `test-${Math.random().toString(36).slice(2, 10)}`;
+  await db().query(
+    `insert into "user" ("id", "name", "email", "emailVerified", "createdAt", "updatedAt")
+     values ($1, 'Editor', $1 || '@test', false, now(), now())`,
+    [editor],
+  );
+});
+
 beforeEach(() => {
   lineId = `b:test-${Math.random().toString(16).slice(2)}`;
 });
 
 afterEach(async () => {
+  await db().query(`delete from "activity" where "lineId" = $1`, [lineId]);
   await db().query(`delete from "book_line" where "lineId" = $1`, [lineId]);
 });
 
 afterAll(async () => {
+  await db().query(`delete from "user" where "id" = $1`, [editor]);
   await closeDb();
 });
 
@@ -55,7 +72,7 @@ describe("rewriting a page", () => {
     const saved = await saveBookText({
       lineId,
       text: "The original text.",
-      editedBy: "someone",
+      editedBy: editor,
       expectedVersion: 1,
     });
 
@@ -69,7 +86,7 @@ describe("rewriting a page", () => {
     // Which book a page belongs to and what opens it are facts about the dump. An API that
     // let a text edit move them would be one bad request from a page the addon cannot find.
     await seed("Before.");
-    await saveBookText({ lineId, text: "After.", editedBy: "someone" });
+    await saveBookText({ lineId, text: "After.", editedBy: editor });
 
     const { rows } = await db().query<{ title: string; pageCount: number }>(
       `select "title", "pageCount" from "book_line" where "lineId" = $1 and "isCurrent"`,
@@ -81,18 +98,18 @@ describe("rewriting a page", () => {
   it("spends no version on a save that changes nothing", async () => {
     // The history is a record of what the page has said, not of who opened the dialog.
     await seed("Unchanged.");
-    await saveBookText({ lineId, text: "Unchanged.", editedBy: "someone" });
+    await saveBookText({ lineId, text: "Unchanged.", editedBy: editor });
 
     expect(await bookHistory(lineId)).toHaveLength(1);
   });
 
   it("refuses an edit that started from a version somebody has since replaced", async () => {
     await seed("First.");
-    await saveBookText({ lineId, text: "Second.", editedBy: "a" });
+    await saveBookText({ lineId, text: "Second.", editedBy: editor });
 
     // Still holding v1, as a dialog opened before the other save would be.
     await expect(
-      saveBookText({ lineId, text: "Third.", editedBy: "b", expectedVersion: 1 }),
+      saveBookText({ lineId, text: "Third.", editedBy: editor, expectedVersion: 1 }),
     ).rejects.toThrow(BookConflict);
 
     const live = (await bookHistory(lineId)).find((v) => v.isCurrent);
@@ -101,7 +118,7 @@ describe("rewriting a page", () => {
 
   it("refuses empty text rather than shipping a silent page", async () => {
     await seed("Something.");
-    await expect(saveBookText({ lineId, text: "   ", editedBy: "a" })).rejects.toThrow(/empty/);
+    await expect(saveBookText({ lineId, text: "   ", editedBy: editor })).rejects.toThrow(/empty/);
   });
 });
 
@@ -109,22 +126,22 @@ describe("whether a page can be voiced", () => {
   it("is decided per language, from that language's own text", async () => {
     await seed("Greetings, $N.", "substitution");
 
-    await saveBookText({ lineId, text: "Saudações, viajante.", editedBy: "a", lang: "ptBR" });
+    await saveBookText({ lineId, text: "Saudações, viajante.", editedBy: editor, lang: "ptBR" });
     expect(await voiceable("ptBR")).toEqual({ generatable: true, skipReason: null });
     // The English row is not the Portuguese one's to judge.
     expect(await voiceable("enUS")).toEqual({ generatable: false, skipReason: "substitution" });
 
     // A $N is spoken as the language's word (player-words.ts); a token nothing speaks is not.
-    await saveBookText({ lineId, text: "Saudações, $N.", editedBy: "a", lang: "ptBR" });
+    await saveBookText({ lineId, text: "Saudações, $N.", editedBy: editor, lang: "ptBR" });
     expect(await voiceable("ptBR")).toEqual({ generatable: true, skipReason: null });
-    await saveBookText({ lineId, text: "Saudações, $Nama.", editedBy: "a", lang: "ptBR" });
+    await saveBookText({ lineId, text: "Saudações, $Nama.", editedBy: editor, lang: "ptBR" });
     expect(await voiceable("ptBR")).toEqual({ generatable: false, skipReason: "substitution" });
   });
 
   it("unblocks an English page once its edit removes the token", async () => {
     await seed("Greetings, $N.", "substitution");
 
-    await saveBookText({ lineId, text: "Greetings, traveller.", editedBy: "a" });
+    await saveBookText({ lineId, text: "Greetings, traveller.", editedBy: editor });
 
     expect(await voiceable("enUS")).toEqual({ generatable: true, skipReason: null });
   });
@@ -135,9 +152,9 @@ describe("putting an earlier version back", () => {
     // The same thing restore means for a lore version and for a take: a statement about
     // which of these texts is right, not a new one.
     await seed("First.");
-    await saveBookText({ lineId, text: "Second.", editedBy: "a" });
+    await saveBookText({ lineId, text: "Second.", editedBy: editor });
 
-    await restoreBookText(lineId, 1);
+    await restoreBookText(lineId, 1, "enUS", editor);
 
     const history = await bookHistory(lineId);
     expect(history).toHaveLength(2);

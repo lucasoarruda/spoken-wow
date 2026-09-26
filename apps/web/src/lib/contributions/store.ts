@@ -10,7 +10,9 @@
  * It is a separate count from the reports one: a person filing ten reports and pasting ten
  * envelopes has done two different things, and neither should silence the other.
  */
+import { recordActivity } from "@/lib/activity/store";
 import { db } from "@/lib/db";
+import { isLang } from "@/lib/lang";
 import type { NpcKind } from "@/lib/npc/npc";
 
 import type { ContributionStatus, Submission } from "./contributions";
@@ -66,10 +68,13 @@ export function observationMeta(
  * Record which NPC speaks a quest contribution whose envelope named none. A no-op, returning
  * null, for a row whose envelope already named one -- the client's own observation stands -- and
  * for a zones or books row, which never has an NPC to name. Returns the updated row.
+ *
+ * `by` is who answered, for the activity log: the row keeps the answer but not whose it was.
  */
 export async function setContributionNpc(
   id: number,
   npc: { npcKind: NpcKind; npcId: number; npcName: string },
+  by: string | null,
 ): Promise<Contribution | null> {
   const { rows } = await db().query<Contribution>(
     `update "contribution"
@@ -79,20 +84,48 @@ export async function setContributionNpc(
       returning ${COLUMNS}`,
     [id, npc.npcKind, npc.npcId, npc.npcName],
   );
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  // The kind as stored, not as asked: the update keeps an envelope's own kind over the answer's.
+  await recordActivity({
+    kind: "contribution.edited",
+    lang: isLang(row.locale) ? row.locale : null,
+    source: row.source,
+    subject: String(id),
+    actorId: by,
+    detail: { field: "npc", value: { npcKind: row.npcKind, npcId: row.npcId, npcName: row.npcName } },
+  });
+  return row;
 }
 
 /**
  * Record which kind a kind-less contribution's NPC is. A no-op, returning false, for a row whose
  * envelope already carried a kind: that is the client's own observation and is not overridden.
+ *
+ * `by` is who answered, for the activity log, as for setContributionNpc.
  */
-export async function setContributionNpcKind(id: number, npcKind: NpcKind): Promise<boolean> {
-  const { rowCount } = await db().query(
+export async function setContributionNpcKind(
+  id: number,
+  npcKind: NpcKind,
+  by: string | null,
+): Promise<boolean> {
+  const { rows } = await db().query<Pick<Contribution, "locale" | "source">>(
     `update "contribution" set "npcKind" = $2, "updatedAt" = now()
-     where "id" = $1 and coalesce("meta"->>'kind', '') = ''`,
+     where "id" = $1 and coalesce("meta"->>'kind', '') = ''
+     returning "locale", "source"`,
     [id, npcKind],
   );
-  return (rowCount ?? 0) > 0;
+  const row = rows[0];
+  if (!row) return false;
+  await recordActivity({
+    kind: "contribution.edited",
+    lang: isLang(row.locale) ? row.locale : null,
+    source: row.source,
+    subject: String(id),
+    actorId: by,
+    detail: { field: "npcKind", value: npcKind },
+  });
+  return true;
 }
 
 export async function createContribution(

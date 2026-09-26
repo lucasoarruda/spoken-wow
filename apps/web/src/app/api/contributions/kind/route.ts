@@ -32,10 +32,10 @@ export async function POST(request: Request) {
   // Permission before existence, as ../resolve does, so a member learns nothing about which
   // ids exist; an unknown id is checked against English, which it then fails or 404s.
   const locale = await contributionLocale(id);
-  const { denied } = await requireCapability("edit", isLang(locale) ? locale : BASE_LANG);
+  const { session, denied } = await requireCapability("edit", isLang(locale) ? locale : BASE_LANG);
   if (denied) return denied;
 
-  const recorded = await setContributionNpcKind(id, body.npcKind as NpcKind);
+  const recorded = await setContributionNpcKind(id, body.npcKind as NpcKind, session.user.id);
   if (!recorded) {
     return Response.json({ error: "no such contribution, or its envelope already names the kind" }, { status: 409 });
   }

@@ -81,6 +81,8 @@ export default function UserMenu() {
     may("configure") && { href: "/lexicon", label: "Pronunciation" },
     may("edit") && { href: "/reports", label: "Reports" },
     may("edit") && { href: "/contributions", label: "Contributions" },
+    // Who did what in this language: for whoever answers for the grants in it.
+    may("admin") && { href: "/activity", label: "Activity" },
     // Any language the viewer looks after, not the page's alone: /admin shows them all, and
     // is gated the same way.
     langsWhere({ role, grants }, "admin").length > 0 && { href: "/admin", label: "Users" },

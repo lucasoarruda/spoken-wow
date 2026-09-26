@@ -34,6 +34,11 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await db().query(
+    `delete from "activity" where "kind" = 'contribution.resolved'
+        and "subject" in (select "id"::text from "contribution" where "ip" = $1)`,
+    [ip],
+  );
   await db().query(`delete from "contribution" where "ip" = $1`, [ip]);
 });
 

@@ -76,7 +76,7 @@ async function resolve(lineId: string, lang: Lang): Promise<CorpusLine[] | null>
 export async function regenerateLine(
   lineId: string,
   createdBy: string,
-  options: { speaker: Speaker; lang?: Lang },
+  options: { speaker: Speaker; lang?: Lang; batchId?: string },
 ): Promise<RegenerateResult> {
   const lang = options.lang ?? BASE_LANG;
   const { speaker } = options;
@@ -224,7 +224,7 @@ export async function regenerateLine(
         leadInSec: speech.leadInSec,
         createdBy,
       },
-      { lang },
+      { lang, batchId: options.batchId },
     );
 
     return {

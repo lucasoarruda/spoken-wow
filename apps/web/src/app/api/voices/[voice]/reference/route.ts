@@ -104,6 +104,6 @@ export async function DELETE(request: Request, context: Context) {
   const checked = await guard(request, voice);
   if (checked.denied) return checked.denied;
 
-  await deleteReference(voice, checked.lang);
+  await deleteReference(voice, checked.lang, checked.session.user.id);
   return Response.json({ reference: null });
 }

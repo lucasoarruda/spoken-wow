@@ -40,10 +40,10 @@ export async function POST(request: Request) {
 
   // Permission before existence, as ../kind does, so a member learns nothing about which ids exist.
   const locale = await contributionLocale(id);
-  const { denied } = await requireCapability("edit", isLang(locale) ? locale : BASE_LANG);
+  const { session, denied } = await requireCapability("edit", isLang(locale) ? locale : BASE_LANG);
   if (denied) return denied;
 
-  const recorded = await setContributionNpc(id, { npcKind, npcId, npcName });
+  const recorded = await setContributionNpc(id, { npcKind, npcId, npcName }, session.user.id);
   if (!recorded) {
     return Response.json(
       { error: "no such quest contribution, or its envelope already names its NPC" },

@@ -18,6 +18,7 @@ import "server-only";
 
 import path from "node:path";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db, query } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 
@@ -128,29 +129,47 @@ export async function liveVersion(
  * would either leave the file with none -- the export then ships nothing for that line --
  * or make the next write fail against the index, which looks like a bug in the next run
  * rather than in this one.
+ *
+ * `by` is who asked, for the activity log: moving the flag writes no take row, so this is
+ * the only record that a restore happened at all.
  */
 export async function setLiveTake(
   source: Source,
   file: string,
   version: number,
-  lang: Lang = BASE_LANG,
+  lang: Lang,
+  by: string | null,
 ): Promise<void> {
   const client = await db().connect();
   try {
     await client.query("begin");
-    await client.query(
+    const { rows: was } = await client.query<{ version: number }>(
       `update "take" set "isCurrent" = false
-        where "source" = $1 and "file" = $2 and "lang" = $3 and "isCurrent"`,
+        where "source" = $1 and "file" = $2 and "lang" = $3 and "isCurrent"
+        returning "version"`,
       [source, file, lang],
     );
-    const { rowCount } = await client.query(
+    const { rows: now } = await client.query<{ lineId: string }>(
       `update "take" set "isCurrent" = true
-        where "source" = $1 and "file" = $2 and "lang" = $3 and "version" = $4`,
+        where "source" = $1 and "file" = $2 and "lang" = $3 and "version" = $4
+        returning "lineId"`,
       [source, file, lang, version],
     );
-    if (rowCount === 0) {
+    if (now.length === 0) {
       throw new Error(`no version ${version} of ${file} in ${source}`);
     }
+    await recordActivity(
+      {
+        kind: "take.restored",
+        lang,
+        source,
+        subject: file,
+        lineId: now[0].lineId,
+        actorId: by,
+        detail: { version, from: was[0]?.version ?? null },
+      },
+      client,
+    );
     await client.query("commit");
   } catch (error) {
     await client.query("rollback").catch(() => {});

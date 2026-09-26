@@ -17,8 +17,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
+import { recordActivity } from "@/lib/activity/store";
 import { corpus } from "@/lib/quests/catalogue";
-import { isSource } from "@/lib/sections";
+import { isSource, type Source } from "@/lib/sections";
 import {
   requireAnyRegenerate,
   requireSpeaker,
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
     lang,
     provider,
   );
+  await recordQueued(batchId, label, session.user.id, "quests", lang, queued);
 
   // The loop is on a two-second idle tick, and waiting that out before the first take would
   // be the most visible part of pressing the button.
@@ -163,6 +165,7 @@ async function queueZones(
 
   const batchId = await createBatch(label, userId, "zones", lang);
   const { queued, skipped } = await enqueue(batchId, jobs, "zones", lang, provider);
+  await recordQueued(batchId, label, userId, "zones", lang, queued);
 
   queueWorker()?.nudge();
 
@@ -214,10 +217,33 @@ async function queueBooks(
 
   const batchId = await createBatch(label, userId, "books", lang);
   const { queued, skipped } = await enqueue(batchId, jobs, "books", lang, provider);
+  await recordQueued(batchId, label, userId, "books", lang, queued);
 
   queueWorker()?.nudge();
 
   return NextResponse.json({ batchId, queued, skipped });
+}
+
+/**
+ * One row for the whole batch, however many lines it holds. The takes it cuts are recorded
+ * as they land and folded under this row on the activity page.
+ */
+async function recordQueued(
+  batchId: string,
+  label: string,
+  actorId: string,
+  source: Source,
+  lang: Lang,
+  count: number,
+): Promise<void> {
+  await recordActivity({
+    kind: "batch.queued",
+    lang,
+    source,
+    subject: batchId,
+    actorId,
+    detail: { batchId, label, count },
+  });
 }
 
 export async function GET(request: NextRequest) {

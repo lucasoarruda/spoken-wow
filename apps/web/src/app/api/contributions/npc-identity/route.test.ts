@@ -28,6 +28,12 @@ vi.mock("@/lib/npc/resolve", async (importOriginal) => ({
   },
 }));
 
+// Mocked to assert the row's shape. A real insert would not fail the test -- recordActivity
+// swallows its own errors outside a transaction -- but the session's "test" user does not
+// exist, so it would only log a foreign-key error and leave nothing to check.
+const { recordActivity } = vi.hoisted(() => ({ recordActivity: vi.fn() }));
+vi.mock("@/lib/activity/store", () => ({ recordActivity }));
+
 import { POST } from "./route";
 
 /** A bucket no other run shares, so a concurrent run's cleanup can't race this one's rows. */
@@ -36,6 +42,7 @@ const ip = `test-${Math.random().toString(36).slice(2, 10)}`;
 afterEach(async () => {
   editable.clear();
   resolved.length = 0;
+  recordActivity.mockClear();
   await db().query(`delete from "contribution" where "ip" = $1`, [ip]);
 });
 
@@ -69,6 +76,9 @@ describe("POST /api/contributions/npc-identity", () => {
     const { rows } = await db().query(`select "npcKind", "npcId", "npcName" from "contribution" where "id" = $1`, [id]);
     expect(rows[0]).toEqual({ npcKind: "creature", npcId: 240, npcName: "Marshal Dughan" });
     expect(resolved).toEqual([expect.objectContaining({ npcKind: "creature", npcId: 240, npcName: "Marshal Dughan", build: "1.15.7/1" })]);
+    expect(recordActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "contribution.edited", subject: String(id), actorId: "test" }),
+    );
   });
 
   it("requires both the id and the name", async () => {

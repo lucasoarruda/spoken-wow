@@ -11,6 +11,7 @@
  * flood would otherwise get through. It does not filter by source, deliberately: the limit is
  * on a person, and filing ten from each page is filing twenty.
  */
+import { recordActivity } from "@/lib/activity/store";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 import { db } from "@/lib/db";
 
@@ -124,14 +125,27 @@ export async function setStatus(
   userId: string,
 ): Promise<Report | null> {
   // Reopening clears the resolution rather than leaving a stale resolver on an open report.
-  const { rows } = await db().query<Report>(
+  const { rows } = await db().query<Report & { lang: Lang }>(
     `update "report"
         set "status" = $2,
             "resolvedAt" = case when $2 = 'open' then null else now() end,
             "resolvedBy" = case when $2 = 'open' then null else $3 end
       where "id" = $1
-      returning ${COLUMNS}`,
+      returning ${COLUMNS}, "lang"`,
     [id, status, userId],
   );
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  const { lang, ...report } = rows[0];
+  // After the update, which is one statement with no transaction to join. A reopen is logged
+  // too, as status "open": it undoes a resolution somebody else may have relied on.
+  await recordActivity({
+    kind: "report.resolved",
+    lang,
+    source: report.source,
+    subject: String(report.id),
+    lineId: report.lineId,
+    actorId: userId,
+    detail: { status: report.status, category: report.category },
+  });
+  return report;
 }

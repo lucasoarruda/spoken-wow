@@ -25,6 +25,8 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  // The file is made up for this case, so everything logged against it is this case's.
+  await db().query(`delete from "activity" where "subject" = $1 and "kind" like 'override.%'`, [file]);
   await db().query(`delete from "line_override" where "file" = $1`, [file]);
 });
 
@@ -63,13 +65,13 @@ describe("clearOverride", () => {
     await writeOverride(file, "q:1155:accept", "A crystal fragment.", null);
     await readOverrides();
 
-    expect(await clearOverride(file)).toBe(true);
+    expect(await clearOverride(file, null)).toBe(true);
     expect((await readOverrides()).get(file)).toBeUndefined();
   });
 
   it("reports that there was nothing to clear", async () => {
     fresh();
-    expect(await clearOverride(file)).toBe(false);
+    expect(await clearOverride(file, null)).toBe(false);
   });
 });
 

@@ -105,6 +105,33 @@ describe("the first take of a line", () => {
   });
 });
 
+describe("the activity log", () => {
+  it("records the take in the same commit, under the batch that cut it", async () => {
+    await commitTake("quests", file, Buffer.from("queued"), { lineId: "g:commit-test", credits: 3 }, {
+      batchId: "00000000-0000-4000-8000-000000000001",
+    });
+    const { rows } = await db().query(
+      `select "kind", "lang", "source", "lineId", "detail" from "activity" where "subject" = $1`,
+      [file],
+    );
+    expect(rows).toEqual([
+      {
+        kind: "take.generated",
+        lang: "enUS",
+        source: "quests",
+        lineId: "g:commit-test",
+        detail: {
+          version: 1,
+          provider: "elevenlabs",
+          credits: 3,
+          costUsd: null,
+          batchId: "00000000-0000-4000-8000-000000000001",
+        },
+      },
+    ]);
+  });
+});
+
 describe("a take's provider", () => {
   it("is ElevenLabs unless it says otherwise, with no dollars", async () => {
     await take("first");

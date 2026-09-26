@@ -176,6 +176,18 @@ describe("cancelPending", () => {
     const states = await stateCounts(batch);
     expect(states).toEqual({ running: 1, cancelled: 2 });
     expect(running).not.toBeNull();
+
+    const { rows } = await db().query(
+      `select "kind", "actorId", "detail" from "activity" where "subject" = $1`,
+      [batch],
+    );
+    expect(rows).toEqual([
+      {
+        kind: "batch.stopped",
+        actorId: null,
+        detail: { batchId: batch, label: expect.any(String), reason: "stopped by hand", cancelled: 2 },
+      },
+    ]);
   });
 
   it("leaves other batches alone when given a batch id", async () => {

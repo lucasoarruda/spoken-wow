@@ -16,9 +16,11 @@
  * check only constrains provenance "none", and the "confirmed implies corpus or moderator"
  * check is satisfied by "moderator" whether or not the row is confirmed.
  */
+import { recordActivity } from "@/lib/activity/store";
 import { requireRegenerate } from "@/lib/generation/authz";
+import { BASE_LANG } from "@/lib/lang";
 import { INT32_MAX } from "@/lib/npc/npc";
-import { getResolution, NPC_KINDS, upsertResolution, type NpcKind } from "@/lib/npc/store";
+import { getResolution, NPC_KINDS, resolutionKey, upsertResolution, type NpcKind } from "@/lib/npc/store";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,16 @@ export async function POST(request: Request) {
     build: existing?.build ?? null,
     note: orExisting(body.note, existing?.note ?? null, 2000),
     resolvedBy: session.user.id,
+  });
+  // Here rather than in upsertResolution, which intake calls too: only a person's answer is an
+  // act. English, because the moderator routes are English's and the answer holds for every
+  // language's lines.
+  await recordActivity({
+    kind: "npc.resolved",
+    lang: BASE_LANG,
+    actorId: session.user.id,
+    subject: resolutionKey(npcKind, npcId),
+    detail: { npcName: row.npcName, race: row.race, gender: row.gender, flavor: row.flavor },
   });
 
   return Response.json({ resolution: row });

@@ -19,6 +19,7 @@
  * postdates the change -- but the app never decides that audio nobody has listened to is
  * fine, because deciding that is the whole content of the mark.
  */
+import { recordActivities } from "@/lib/activity/store";
 import { db } from "@/lib/db";
 import { BASE_LANG, type Lang } from "@/lib/lang";
 
@@ -171,10 +172,22 @@ export async function acknowledge(
        "ackedBy" = excluded."ackedBy"`,
     [source, files, userId, lang],
   );
+  await recordActivities(
+    files.map((file) => ({ kind: "take.acked" as const, lang, source, subject: file, actorId: userId, detail: {} })),
+  );
 }
 
-/** What a save did to one word. Mirrors lexicon_change."kind". */
-export type SoundChange = { grapheme: string; kind: "added" | "edited" | "removed" };
+/**
+ * What a save did to one word. `kind` mirrors lexicon_change."kind"; `before` and `after`
+ * are the rule as a person reads it (see `said`), for the activity log -- lexicon_change
+ * keeps only the word, and the row the rule lived in is overwritten by the save.
+ */
+export type SoundChange = {
+  grapheme: string;
+  kind: "added" | "edited" | "removed";
+  before?: string;
+  after?: string;
+};
 
 /**
  * What a save changed about how words SOUND.
@@ -195,11 +208,13 @@ export function soundChanges(previous: LexiconEntry[], next: LexiconEntry[]): So
 
   for (const [key, entry] of after) {
     const was = before.get(key);
-    if (!was) changes.push({ grapheme: entry.grapheme, kind: "added" });
-    else if (sound(was) !== sound(entry)) changes.push({ grapheme: entry.grapheme, kind: "edited" });
+    if (!was) changes.push({ grapheme: entry.grapheme, kind: "added", after: said(entry) });
+    else if (sound(was) !== sound(entry)) {
+      changes.push({ grapheme: entry.grapheme, kind: "edited", before: said(was), after: said(entry) });
+    }
   }
   for (const [key, entry] of before) {
-    if (!after.has(key)) changes.push({ grapheme: entry.grapheme, kind: "removed" });
+    if (!after.has(key)) changes.push({ grapheme: entry.grapheme, kind: "removed", before: said(entry) });
   }
 
   return changes;
@@ -208,6 +223,15 @@ export function soundChanges(previous: LexiconEntry[], next: LexiconEntry[]): So
 /** Everything about an entry that an ear can tell apart, as one comparable string. */
 function sound(entry: LexiconEntry): string {
   return `${kindOf(entry)}:${entry.alias ?? entry.ipa ?? ""}`;
+}
+
+/**
+ * The same rule as somebody reading the log would write it: an alias as it is, IPA between
+ * slashes, the way a dictionary sets it off -- which is also what tells "toren" the alias
+ * apart from an IPA string that happens to spell the same.
+ */
+function said(entry: LexiconEntry): string {
+  return kindOf(entry) === "alias" ? (entry.alias ?? "") : `/${entry.ipa ?? ""}/`;
 }
 
 /**
@@ -231,5 +255,18 @@ export async function logSoundChanges(
      select "grapheme", "kind", $3, $4, $5
        from unnest($1::text[], $2::text[]) as c("grapheme", "kind")`,
     [changes.map((c) => c.grapheme), changes.map((c) => c.kind), versionId, changedBy, lang],
+  );
+  // After lexicon_change and outside any transaction, like it: there is none to join, and a
+  // log that failed to land must not undo the record the dirty marks are computed from.
+  await recordActivities(
+    // An added word has no before and a removed one no after; undefined is dropped from the
+    // stored detail, so one shape serves all three kinds.
+    changes.map((change) => ({
+      kind: `lexicon.${change.kind}` as const,
+      lang,
+      actorId: changedBy,
+      subject: change.grapheme,
+      detail: { before: change.before, after: change.after },
+    })),
   );
 }

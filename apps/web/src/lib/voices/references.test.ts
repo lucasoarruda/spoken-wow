@@ -79,6 +79,7 @@ afterAll(async () => {
       Object.values(row),
     );
   }
+  await db().query(`delete from "activity" where "actorId" = $1`, [USER]);
   await db().query(`delete from "user" where "id" = $1`, [USER]);
   fs.rmSync(root, { recursive: true, force: true });
   await closeDb();
@@ -249,8 +250,24 @@ describe.skipIf(!hasFfmpeg)("fish.audio as a speaker", () => {
   });
 
   it("is gone once deleted, file and all", async () => {
-    await references.deleteReference(VOICE, LANG);
+    await references.deleteReference(VOICE, LANG, USER);
     expect(await references.readReference(VOICE, LANG)).toBeNull();
     expect(fs.existsSync(references.referencePath(VOICE, LANG))).toBe(false);
+  });
+
+  it("logs each change under who made it, and not the ones that changed nothing", async () => {
+    // A second delete finds no row, and the refused cut above never stored one.
+    await references.deleteReference(VOICE, LANG, USER);
+    const { rows } = await db().query<{ kind: string }>(
+      `select "kind" from "activity"
+        where "actorId" = $1 and "subject" = $2 and "lang" = $3 order by "id"`,
+      [USER, VOICE, LANG],
+    );
+    expect(rows.map((row) => row.kind)).toEqual([
+      "reference.set",
+      "reference.edited",
+      "reference.edited",
+      "reference.deleted",
+    ]);
   });
 });

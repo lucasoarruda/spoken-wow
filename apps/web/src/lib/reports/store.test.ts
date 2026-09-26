@@ -47,6 +47,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await db().query(`delete from "activity" where "actorId" = $1`, [RESOLVER]);
   await db().query(`delete from "user" where "id" = $1`, [RESOLVER]);
   await closeDb();
 });

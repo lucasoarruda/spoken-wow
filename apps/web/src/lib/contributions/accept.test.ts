@@ -52,6 +52,10 @@ afterEach(async () => {
     await db().query(`delete from "quest_line" where "origin" = 'contributed' and "note" = any($1::text[])`, [
       contributionIds.map((id) => `contribution #${id}`),
     ]);
+    await db().query(
+      `delete from "activity" where "kind" like 'contribution.%' and "subject" = any($1::text[])`,
+      [contributionIds.map(String)],
+    );
     await db().query(`delete from "contribution" where "id" = any($1::int[])`, [contributionIds]);
     contributionIds = [];
   }
@@ -158,7 +162,7 @@ describe("resolveContribution: quests accept", () => {
     expect(refused).toMatchObject({ ok: false, reason: "needs-speaker" });
     expect((refused as { message: string }).message).toMatch(/conflicting/);
 
-    expect(await setContributionNpcKind(id, "creature")).toBe(true);
+    expect(await setContributionNpcKind(id, "creature", RESOLVER)).toBe(true);
     expect((await resolveContribution(id, "accepted", RESOLVER)).ok).toBe(true);
     const speakers = (await lineIndex()).get(questLineId(questId, "accept"))!;
     expect(speakers[0]).toMatchObject({ race: "orc", contributionId: id });

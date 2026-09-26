@@ -60,16 +60,22 @@ it("puts a take back by moving the flag, touching no file and adding no take", a
   await take("take three");
   const before = snapshot();
 
-  await restoreTake("quests", file, 1);
+  await restoreTake("quests", file, 1, "enUS", null);
 
   expect(snapshot()).toEqual(before);
   expect(await live()).toBe("take one");
   const rows = await listTakes("quests", file);
   expect(rows).toHaveLength(3);
   expect(rows.filter((r) => r.isCurrent).map((r) => r.version)).toEqual([1]);
+  // Nothing in the take table says a restore happened, so the activity log is its record.
+  const { rows: logged } = await db().query(
+    `select "detail" from "activity" where "kind" = 'take.restored' and "subject" = $1`,
+    [file],
+  );
+  expect(logged.map((row) => row.detail)).toEqual([{ version: 1, from: 3 }]);
 
   // Twice over, which is the case that used to eat the archive entry.
-  await restoreTake("quests", file, 3);
+  await restoreTake("quests", file, 3, "enUS", null);
   expect(snapshot()).toEqual(before);
   expect(await live()).toBe("take three");
 });
@@ -82,6 +88,6 @@ it("refuses a take whose clip was not kept, and leaves the live one alone", asyn
     [file],
   );
 
-  await expect(restoreTake("quests", file, 2)).rejects.toThrow(/was not kept/);
+  await expect(restoreTake("quests", file, 2, "enUS", null)).rejects.toThrow(/was not kept/);
   expect(await live()).toBe("kept");
 });

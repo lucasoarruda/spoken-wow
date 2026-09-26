@@ -24,6 +24,7 @@ import "server-only";
 
 import path from "node:path";
 
+import { recordActivity } from "@/lib/activity/store";
 import { db, query } from "@/lib/db";
 import type { Source } from "@/lib/sections";
 
@@ -81,7 +82,12 @@ export async function commitTake(
   file: string,
   data: Buffer,
   fields: TakeFields,
-  options: { lang?: Lang; measure?: (clip: string) => Promise<number | null> } = {},
+  options: {
+    lang?: Lang;
+    measure?: (clip: string) => Promise<number | null>;
+    /** The queue batch this take was cut for, which the activity log folds it under. */
+    batchId?: string;
+  } = {},
 ): Promise<Committed> {
   const lang = options.lang ?? BASE_LANG;
 
@@ -105,6 +111,7 @@ export async function commitTake(
     bytes: data.byteLength,
     durationSec,
     archiveFile,
+    batchId: options.batchId,
   });
 
   return { version: next, bytes: data.byteLength, archiveFile, durationSec };
@@ -120,8 +127,12 @@ async function insertLive(input: {
   bytes: number;
   durationSec: number | null;
   archiveFile: string;
+  batchId?: string;
 }): Promise<void> {
   const { source, file, lang, version, fields } = input;
+  // || rather than ??: the worker passes "" for a batch whose owner's account is gone, and
+  // both the take and its activity row are then nobody's.
+  const createdBy = fields.createdBy || null;
   const client = await db().connect();
   try {
     await client.query("begin");
@@ -163,11 +174,29 @@ async function insertLive(input: {
         fields.dictionaryVersion ?? null,
         fields.leadIn ?? false,
         fields.leadInSec ?? null,
-        fields.createdBy ?? null,
+        createdBy,
         input.archiveFile,
         fields.provider ?? "elevenlabs",
         fields.costUsd ?? null,
       ],
+    );
+    await recordActivity(
+      {
+        kind: "take.generated",
+        lang: lang as Lang,
+        source,
+        subject: file,
+        lineId: fields.lineId,
+        actorId: createdBy,
+        detail: {
+          version,
+          provider: fields.provider ?? "elevenlabs",
+          credits: fields.credits ?? null,
+          costUsd: fields.costUsd ?? null,
+          ...(input.batchId ? { batchId: input.batchId } : {}),
+        },
+      },
+      client,
     );
     await client.query("commit");
   } catch (error) {

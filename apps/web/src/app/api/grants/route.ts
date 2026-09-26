@@ -71,6 +71,6 @@ export async function DELETE(request: Request) {
   }
   if (!canGrant(who.viewer, capability, lang)) return FORBIDDEN();
 
-  await removeGrant(userId, lang, capability);
+  await removeGrant(userId, lang, capability, who.userId);
   return listing(who.viewer);
 }

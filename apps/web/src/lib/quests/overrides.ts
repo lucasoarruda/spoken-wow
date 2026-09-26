@@ -5,6 +5,7 @@
  * is spoken by up to many NPCs, so a rewrite necessarily changes what all of them say. See
  * the header of migration 0012 for why rewriting the spoken text cannot rename that file.
  */
+import { recordActivity } from "../activity/store";
 import { BASE_LANG, type Lang } from "../lang";
 import { db } from "../db";
 import type { LineOverride } from "./override";
@@ -73,25 +74,57 @@ export async function writeOverride(
   // Nullable to match the column, which is SET NULL: who rewrote a line outlives the account.
   userId: string | null,
 ): Promise<LineOverride> {
-  const { rows } = await db().query<OverrideRow>(
-    `insert into "line_override" ("file", "lineId", "text", "updatedBy")
+  // "before" is read in the same statement, from the snapshot the upsert started with, so
+  // the log says what this write replaced and not what a concurrent one did.
+  const { rows } = await db().query<OverrideRow & { before: string | null }>(
+    `with "was" as (select "text" from "line_override" where "file" = $1)
+     insert into "line_override" ("file", "lineId", "text", "updatedBy")
      values ($1, $2, $3, $4)
      on conflict ("file") do update
         set "text" = excluded."text",
             "lineId" = excluded."lineId",
             "updatedAt" = now(),
             "updatedBy" = excluded."updatedBy"
-     returning "file", "lineId", "text", "updatedAt", "updatedBy"`,
+     returning "file", "lineId", "text", "updatedAt", "updatedBy",
+               (select "text" from "was") as "before"`,
     [file, lineId, text, userId],
   );
   forgetOverrides();
-  return toOverride(rows[0]);
+  const { before, ...row } = rows[0];
+  // Saving the text the line already says is not a rewrite, and would only bury real ones.
+  if (before !== text) {
+    await recordActivity({
+      kind: "override.set",
+      lang: BASE_LANG,
+      actorId: userId,
+      source: "quests",
+      subject: file,
+      lineId,
+      detail: { text, before },
+    });
+  }
+  return toOverride(row);
 }
 
-export async function clearOverride(file: string): Promise<boolean> {
-  const { rowCount } = await db().query(`delete from "line_override" where "file" = $1`, [file]);
+/** `by` is who reverted it, for the activity log: the delete leaves nothing else behind. */
+export async function clearOverride(file: string, by: string | null): Promise<boolean> {
+  const { rows } = await db().query<{ lineId: string; text: string }>(
+    `delete from "line_override" where "file" = $1 returning "lineId", "text"`,
+    [file],
+  );
   forgetOverrides();
-  return (rowCount ?? 0) > 0;
+  if (rows[0]) {
+    await recordActivity({
+      kind: "override.cleared",
+      lang: BASE_LANG,
+      actorId: by,
+      source: "quests",
+      subject: file,
+      lineId: rows[0].lineId,
+      detail: { before: rows[0].text },
+    });
+  }
+  return rows.length > 0;
 }
 
 /**

@@ -12,6 +12,7 @@
  * count-and-timestamp stamp, because there are tens of these rather than thousands and pm2
  * runs two workers that must not disagree about what is hidden.
  */
+import { recordActivity } from "../activity/store";
 import { db } from "../db";
 import { BASE_LANG, type Lang } from "../lang";
 
@@ -104,16 +105,43 @@ export async function writeIgnore(
     [lineId, trimmed, userId, lang],
   );
   forgetIgnores();
+  // A null lang is an ignore in every language, and so a row every language's log shows.
+  await recordActivity({
+    kind: "ignore.set",
+    lang,
+    actorId: userId,
+    source: "quests",
+    subject: lineId,
+    lineId,
+    detail: { reason: trimmed },
+  });
   return toIgnore(rows[0]);
 }
 
-export async function clearIgnore(lineId: string, lang: Lang | null = null): Promise<boolean> {
+/** `by` is who lifted it, for the activity log: the delete leaves nothing else behind. */
+export async function clearIgnore(
+  lineId: string,
+  lang: Lang | null,
+  by: string | null,
+): Promise<boolean> {
   const { rowCount } = await db().query(
     `delete from "line_ignore" where "lineId" = $1 and "lang" is not distinct from $2`,
     [lineId, lang],
   );
   forgetIgnores();
-  return (rowCount ?? 0) > 0;
+  const removed = (rowCount ?? 0) > 0;
+  if (removed) {
+    await recordActivity({
+      kind: "ignore.cleared",
+      lang,
+      actorId: by,
+      source: "quests",
+      subject: lineId,
+      lineId,
+      detail: {},
+    });
+  }
+  return removed;
 }
 
 /**

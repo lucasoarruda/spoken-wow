@@ -14,6 +14,7 @@
 import { cloneName } from "@/lib/voices/clone-name";
 import fs from "node:fs/promises";
 
+import { recordActivity } from "@/lib/activity/store";
 import { requireApiKey } from "@/lib/generation/authz";
 import { invalidateStatus } from "@/lib/generation/status";
 import { requireVoiceViewer } from "@/lib/voices/authz";
@@ -96,6 +97,16 @@ export async function POST(request: Request, context: Context) {
   // Regenerate button is disabled while a slot reads as empty. Without this, a voice created
   // here stays unusable for up to a minute with nothing on screen explaining why.
   invalidateStatus();
+
+  // Everybody's clone, unlike the provenance row below: the log answers who did what in the
+  // language, and a translator cloning into their own account did something.
+  await recordActivity({
+    kind: "voice.cloned",
+    lang,
+    actorId: session.user.id,
+    subject: voice,
+    detail: { voiceId, sampleCount: samples.length },
+  });
 
   // The voice exists by this point, and this table is explicitly not what decides that -
   // listVoices is. So a provenance write that fails must not report the clone as failed,
