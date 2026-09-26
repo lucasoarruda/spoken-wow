@@ -187,8 +187,13 @@ export type QueueSnapshot = {
   running: { source: Source; lang: Lang; lineId: string; npcName: string; preview: string }[];
   failures: { source: Source; lang: Lang; lineId: string; message: string }[];
   latestBatch: { cancelled: number; stoppedBecause: string | null } | null;
-  /** Each owner's queue in drain order. Mirrors QueueSnapshot["queues"] in queue.ts. */
-  queues: QueueLine[];
+  /**
+   * Each owner's queue in drain order. Mirrors QueueSnapshot["queues"] in queue.ts.
+   *
+   * Optional although this release always sends it: an older server omits it, and a tab can
+   * poll one during a pm2 reload or after a rollback.
+   */
+  queues?: QueueLine[];
   /**
    * Carries the source because two explorers poll one queue, and each may only adopt its
    * own: a quests page told that a zones file is now at version 3 would look for a line it

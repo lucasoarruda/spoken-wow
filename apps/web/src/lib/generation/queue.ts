@@ -213,21 +213,24 @@ export async function enqueue(
  * pending, so it keeps its owner's place too.
  */
 export async function activeLanes(max: number): Promise<Lane[]> {
+  // One grouped pass over the lane index rather than a self-join on the owner: the join had
+  // to match a null owner to a null owner with `is not distinct from`, which no index serves.
+  // Each lane carries its owner's oldest job as `first`, and dense_rank over it gives both
+  // lanes of one owner the same place, so `rank <= $1` keeps the first `max` owners whole.
   const { rows } = await db().query<Lane>(
-    `with owners as (
-       select "owner", min("id") as first
+    `with lanes as (
+       select "owner", "provider", min(min("id")) over (partition by "owner") as first
          from "regeneration_job"
         where "state" in ('pending', 'running')
-        group by "owner"
-        order by first
-        limit $1
+        group by "owner", "provider"
+     ),
+     ranked as (
+       select "owner", "provider", first, dense_rank() over (order by first) as rank
+         from lanes
      )
-     select j."owner", j."provider"
-       from "regeneration_job" j
-       join owners o on o."owner" is not distinct from j."owner"
-      where j."state" in ('pending', 'running')
-      group by j."owner", j."provider", o.first
-      order by o.first, j."provider"`,
+     select "owner", "provider" from ranked
+      where rank <= $1
+      order by first, "provider"`,
     [max],
   );
   return rows;
@@ -249,8 +252,18 @@ export async function claimNext(
   leaseMs: number = DEFAULT_LEASE_MS,
   lane?: Lane,
 ): Promise<QueueJob | null> {
-  const inLane = lane ? `and "owner" is not distinct from $2::text and "provider" = $3` : "";
-  const params: unknown[] = lane ? [leaseMs / 1000, lane.owner, lane.provider] : [leaseMs / 1000];
+  // Spelled out per case rather than `"owner" is not distinct from $2`, which reads the same
+  // but cannot use regeneration_job_lane: Postgres only matches an index on `=` or `is null`,
+  // and would walk the primary key filtering every row instead.
+  let inLane = "";
+  const params: unknown[] = [leaseMs / 1000];
+  if (lane && lane.owner === null) {
+    inLane = `and "owner" is null and "provider" = $2`;
+    params.push(lane.provider);
+  } else if (lane) {
+    inLane = `and "owner" = $2 and "provider" = $3`;
+    params.push(lane.owner, lane.provider);
+  }
   const { rows } = await db().query<QueueJob>(
     `update "regeneration_job" as j set
         "state"      = 'running',

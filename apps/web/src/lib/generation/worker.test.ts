@@ -10,8 +10,7 @@
  */
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { closeDb, db } from "@/lib/db";
-import { POOL_MAX } from "@/lib/db";
+import { closeDb, db, POOL_MAX } from "@/lib/db";
 import * as queue from "./queue";
 import { createBatch, enqueue, type QueueEntry } from "./queue";
 import { clampToPool } from "./concurrency";
@@ -502,9 +501,10 @@ describe("per-owner queues", () => {
               failure: { kind: "rate-limit", message: "429", status: 429, fatal: false },
             };
           }
-          // Measured once everything started before the 429 has settled (jobs take 40 ms),
-          // so the peak is what the worker chose after it, not what was already in flight.
-          const settled = limitedAt !== null && Date.now() - limitedAt > 60;
+          // Measured once everything started before the 429 has settled (jobs take 40 ms, and
+          // 100 leaves room for a slow claim), so the peak is what the worker chose after it,
+          // not what was already in flight.
+          const settled = limitedAt !== null && Date.now() - limitedAt > 100;
           if (settled) track.enter(user);
           await sleep(40);
           if (settled) track.leave(user);
@@ -517,6 +517,46 @@ describe("per-owner queues", () => {
 
     expect(track.peak.get(limited)).toBeLessThanOrEqual(2);
     expect(track.peak.get(other)).toBe(4);
+  });
+
+  /**
+   * A lane's width expires after a minute, and re-reading it is its owner's plan over the
+   * network. The refresh here never answers: were it awaited, the pump would wait on it and
+   * the rest of the queue would never be claimed. The clock is moved past the minute by
+   * skewing Date.now rather than waiting, so nothing here depends on timing.
+   */
+  it("keeps draining on a lane's last width while its expired width is re-read", async () => {
+    const owner = await newUser();
+    const id = await seedFor(owner, 4);
+    const realNow = Date.now.bind(Date);
+    let skew = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + skew);
+    let reads = 0;
+    const started: number[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+
+    const worker = startWorker(() => true, {
+      idleMs: 20,
+      apiKeyFor: KEYED,
+      budget: () => (++reads === 1 ? Promise.resolve(2) : new Promise<number>(() => {})),
+      regenerate: {
+        quests: async () => {
+          started.push(started.length);
+          await gate;
+          return OK;
+        },
+      },
+    });
+    // The first two hold the lane open, so its width is cached rather than forgotten.
+    await until(async () => started.length === 2);
+    skew = 61_000;
+    release();
+    await until(async () => (await statesOf(id)).done === 4);
+    await worker.stop();
+
+    // One refresh started, however many pumps found the width stale while it hung.
+    expect(reads).toBe(2);
   });
 
   it("never runs more than the pool can serve, however many lanes could use more", async () => {

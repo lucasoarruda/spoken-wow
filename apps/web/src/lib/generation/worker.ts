@@ -74,8 +74,8 @@ export async function currentBudget(
 ): Promise<number> {
   if (provider === "fish" && apiKey) return clampToPool(await fishBudget(apiKey), POOL_MAX);
   const status = await generationStatus(apiKey ? { apiKey } : {});
-  // The model of whoever's job was claimed last: the flash and turbo families have their own
-  // concurrency, and the model is the collaborator's choice now, not the site's.
+  // The model the lane's owner has chosen for this provider, as it stands now: the flash and
+  // turbo families have their own concurrency, and the model is the owner's choice, not the site's.
   const plan = budgetFor(status.subscription?.tier ?? null, modelId);
   return clampToPool(plan, POOL_MAX);
 }
@@ -112,7 +112,13 @@ const LANE_WIDTH_TTL_MS = 60_000;
 type LaneState = {
   running: number;
   rateLimitedAt: number | null;
-  width: { at: number; value: Promise<number> } | null;
+  /**
+   * The lane's width and when it was read. `known` is the settled number once there is one,
+   * which is what lets a stale width keep being served while its refresh is in flight.
+   */
+  width: { at: number; value: Promise<number>; known: number | null } | null;
+  /** Whether a refresh of a stale width is in flight, so a burst of pumps starts only one. */
+  refreshing: boolean;
 };
 
 /**
@@ -186,7 +192,7 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
   function stateOf(key: string): LaneState {
     let state = lanes.get(key);
     if (!state) {
-      state = { running: 0, rateLimitedAt: null, width: null };
+      state = { running: 0, rateLimitedAt: null, width: null, refreshing: false };
       lanes.set(key, state);
     }
     return state;
@@ -209,17 +215,45 @@ export function startWorker(isLeader: () => boolean, options: WorkerOptions = {}
    * A key or settings that cannot be read is a width of one rather than an error: the one job
    * that is then claimed fails as `auth` in run() and cancels its batch, which is the answer
    * the owner needs to see.
+   *
+   * STALE WHILE REVALIDATE. pump() waits for every active lane's width before claiming
+   * anything, and reading a plan is a network call with no timeout of its own. Awaited on
+   * every expiry, one owner's slow plan read would stall every lane, everyone's queue waiting
+   * on someone else's provider. So only a lane's very first read is awaited; after that an
+   * expired width is refreshed in the background and the last one served meanwhile. A refresh
+   * that fails keeps the width the lane already had - a blip is no reason to drop a working
+   * lane to one - and is tried again a minute later rather than on every pump.
    */
   function widthOf(lane: Lane, state: LaneState): Promise<number> {
-    if (state.width && Date.now() - state.width.at < LANE_WIDTH_TTL_MS) return state.width.value;
+    const cached = state.width;
+    if (cached && Date.now() - cached.at < LANE_WIDTH_TTL_MS) return cached.value;
+
     const owner = lane.owner ?? "";
-    const value = (async () => {
+    const read = async () => {
       const apiKey = await apiKeyFor(owner, lane.provider);
       if (!apiKey) return 1;
       const speaker = speakerFrom(lane.provider, apiKey, await preferenceFor(owner));
       return budget(apiKey, lane.provider, speaker.modelId);
-    })().catch(() => 1);
-    state.width = { at: Date.now(), value };
+    };
+
+    if (cached && cached.known !== null) {
+      if (!state.refreshing) {
+        state.refreshing = true;
+        const previous = cached.known;
+        read()
+          .then(
+            (value) => (state.width = { at: Date.now(), value: Promise.resolve(value), known: value }),
+            () => (state.width = { at: Date.now(), value: Promise.resolve(previous), known: previous }),
+          )
+          .finally(() => (state.refreshing = false));
+      }
+      return cached.value;
+    }
+
+    const value = read().catch(() => 1);
+    const entry: NonNullable<LaneState["width"]> = { at: Date.now(), value, known: null };
+    state.width = entry;
+    void value.then((width) => (entry.known = width));
     return value;
   }
 

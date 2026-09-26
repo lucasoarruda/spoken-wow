@@ -66,6 +66,9 @@ export default function RegenerationPanel({
   // it describe one batch. Read globally they would hang the last stop's obituary on the next
   // batch to run cleanly, for as long as the stopped one stayed in the window.
   const stopped = !active && (snapshot.latestBatch?.cancelled ?? 0) > 0;
+  // A server from before per-owner queues sends no `queues`, and a tab can poll one for the
+  // seconds of a pm2 reload or for as long as a rollback lasts. No list beats a crashed panel.
+  const queues = snapshot.queues ?? [];
 
   return (
     <div className="bg-card/95 border-t backdrop-blur">
@@ -124,9 +127,9 @@ export default function RegenerationPanel({
 
         {/* One row per person's queue once there is more than one: who is running, who is
             waiting and behind how many. The viewer's own is picked out. */}
-        {active && snapshot.queues.length > 1 && (
+        {active && queues.length > 1 && (
           <ul className="text-muted-foreground mt-1.5 space-y-0.5 text-xs">
-            {snapshot.queues.map((queue) => (
+            {queues.map((queue) => (
               <li
                 key={queue.owner ?? "deleted"}
                 className={queue.mine ? "text-foreground font-medium" : undefined}

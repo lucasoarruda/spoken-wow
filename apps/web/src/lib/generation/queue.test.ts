@@ -161,6 +161,28 @@ describe("the owner of a job", () => {
 
     expect((await claimNext())!.owner).toBeNull();
   });
+
+  /**
+   * What an older release's enqueue does: it predates the column and names no owner. That
+   * code runs against this schema between a migration and the pm2 reload, and again after a
+   * rollback, so the database fills the owner in rather than leaving the job ownerless.
+   */
+  it("is filled in from the batch when an insert leaves it out", async () => {
+    const alice = await newUser();
+    const batch = await newBatch("quests", alice);
+    await db().query(
+      `insert into "regeneration_job"
+         ("batchId", "source", "lang", "provider", "lineId", "file", "npcName", "preview", "characters")
+       values ($1, 'quests', 'enUS', 'elevenlabs', 'q:1:accept', $2, 'NPC 1', 'line 1', 100)`,
+      [batch, `${prefix}/1.mp3`],
+    );
+
+    const { rows } = await db().query<{ owner: string | null }>(
+      `select "owner" from "regeneration_job" where "batchId" = $1`,
+      [batch],
+    );
+    expect(rows).toEqual([{ owner: alice }]);
+  });
 });
 
 describe("claimNext", () => {
