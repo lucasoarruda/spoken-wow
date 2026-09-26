@@ -106,6 +106,11 @@ pm2 environment. They are secrets, and that file is the only place they exist:
 sealed under it, and AES-GCM offers no way to re-seal a credential nothing can open. Change
 it and every collaborator pastes their key again — recoverable, but they have to be told.
 
+`app.env` may also set **`QUEUE_MAX_ACTIVE`**, which is not a secret: how many people's
+regeneration queues drain at once. Default 3. Each queue runs at its own key's plan width,
+and all of them together at most 12 jobs (the database pool's limit), so raising it spreads
+those 12 thinner. Anything that is not a whole number of at least 1 is read as 3.
+
 **There is no `ELEVENLABS_API_KEY`.** Every request that reaches ElevenLabs is spent from the
 signed-in user's own account, using a key they set on `/profile`, sealed under
 `SPOKEN_SECRET_KEY`. A route asked to spend without one answers `428 no_api_key`. The Python
